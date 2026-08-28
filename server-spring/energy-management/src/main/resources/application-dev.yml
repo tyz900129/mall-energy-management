@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/mall_energy_management?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: mall_energy_app
+    password: ${MYSQL_PASSWORD}
+  flyway:
+    clean-disabled: true
+
+energy:
+  upload:
+    base-dir: ${ENERGY_UPLOAD_BASE:/home/admin/energy-deploy/uploads}
+  log:
+    application: /tmp/energy-logs/application.log
+    platform-sync: /tmp/energy-logs/platform-sync.log
+    workflow: /tmp/energy-logs/workflow.log
+    webhook: /tmp/energy-logs/webhook.log
+    security: /tmp/energy-logs/security.log
+
+logging:
+  level:
+    root: INFO
+    com.wanyuecity.energy: DEBUG
+    com.baomidou.mybatisplus: WARN
