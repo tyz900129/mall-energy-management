@@ -1,0 +1,29 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+node_modules/
+dist/
+target/
+uploads/*
+!uploads/.gitkeep
+
+# 当前正式版本为 server-spring；排除早期原型和本地交付物
+/backend/
+/frontend/
+/docker-compose.yml
+/*.tar
+/*.tar.gz
+/*.tsv
+/开发计划_*.md
+/能源设备与商户业务管理系统_*.md
+
+# 服务器部署、连接记录与打包快照不进入源码仓库
+/server-spring/deploy/
+/server-spring/known_hosts
+/server-spring/*.tar
+/server-spring/*.tar.gz
+

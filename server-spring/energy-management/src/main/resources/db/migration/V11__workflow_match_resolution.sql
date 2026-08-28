@@ -1,0 +1,2 @@
+CREATE TABLE workflow_match_resolution (id BIGINT PRIMARY KEY AUTO_INCREMENT,workflow_id BIGINT NOT NULL,action VARCHAR(32) NOT NULL,from_status VARCHAR(32) NOT NULL,to_status VARCHAR(32) NOT NULL,conclusion VARCHAR(1000),operator_name VARCHAR(64) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),KEY idx_resolution_workflow(workflow_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

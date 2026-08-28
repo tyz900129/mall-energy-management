@@ -1,0 +1,2 @@
+package com.wanyuecity.energy.workflow.service.dto; import jakarta.validation.constraints.NotBlank; import lombok.Data; @Data public class MatchResolutionRequest {@NotBlank private String action;private String conclusion;}
+

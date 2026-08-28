@@ -1,0 +1,95 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /energy
+  error:
+    include-message: never
+    include-binding-errors: never
+
+spring:
+  application:
+    name: energy-management
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:mall_energy_management}?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${MYSQL_USER:mall_energy_app}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 10000
+      pool-name: EnergyHikariCP
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    table: flyway_schema_history
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml
+
+# Custom application config
+energy:
+  public-base-url: ${ENERGY_PUBLIC_BASE_URL:https://auto.apperload.com}
+  upload:
+    base-dir: ${ENERGY_UPLOAD_BASE:/home/admin/energy-deploy/uploads}
+    url-prefix: /energy/files
+  jwt:
+    secret: ${JWT_SECRET}
+    expire-minutes: 720
+    header: Authorization
+    prefix: "Bearer "
+  cors:
+    allowed-origins: ${ENERGY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://192.66.25.225:5173}
+  platform:
+    credential-secret-env: PLATFORM_CREDENTIAL_SECRET
+    request-timeout-ms: 15000
+    sync-cron: ${ENERGY_PLATFORM_SYNC_CRON:0 0 2 * * ?}
+    relation-concurrency: ${ENERGY_PLATFORM_RELATION_CONCURRENCY:8}
+  bootstrap:
+    default-admin-password: ${ENERGY_DEFAULT_ADMIN_PASSWORD}
+  log:
+    application: ${LOG_DIR:/tmp/energy-logs}/application.log
+    platform-sync: ${LOG_DIR:/tmp/energy-logs}/platform-sync.log
+    workflow: ${LOG_DIR:/tmp/energy-logs}/workflow.log
+    webhook: ${LOG_DIR:/tmp/energy-logs}/webhook.log
+    security: ${LOG_DIR:/tmp/energy-logs}/security.log
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+

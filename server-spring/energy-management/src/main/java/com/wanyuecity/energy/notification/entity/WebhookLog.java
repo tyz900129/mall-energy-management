@@ -1,0 +1,3 @@
+package com.wanyuecity.energy.notification.entity; import com.baomidou.mybatisplus.annotation.*; import lombok.Data; import java.time.LocalDateTime;
+@Data @TableName("webhook_log") public class WebhookLog {@TableId(type=IdType.AUTO)private Long id;private Long workflowId;private String eventType;private String provider;private Long webhookConfigId;private String requestPayload;private String responsePayload;private Integer httpStatus;private String sendStatus;private Integer retryCount;private LocalDateTime nextRetryAt;private LocalDateTime sentAt;private String errorMessage;@TableField(fill=FieldFill.INSERT)private LocalDateTime createdAt;@TableField(fill=FieldFill.INSERT_UPDATE)private LocalDateTime updatedAt;}
+
