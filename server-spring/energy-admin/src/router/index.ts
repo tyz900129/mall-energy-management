@@ -12,6 +12,7 @@ const routes = [
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '工作台', icon: 'Odometer',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'workflow', name: 'WorkflowList', component: () => import('@/views/WorkflowList.vue'), meta: { title: '流程中心', icon: 'Tickets', roles:['SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER'] } },
       { path: 'workflow/new-merchant', name: 'WorkflowNewMerchant', component: () => import('@/views/WorkflowNewMerchant.vue'), meta: { title: '水电费变更', icon: 'CirclePlus', roles:['SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT'] } },
+      { path: 'workflow/merchant-query', name: 'MerchantQuery', component: () => import('@/views/MerchantQuery.vue'), meta: { title: '商户账户查询', icon: 'Search', roles:['SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT'] } },
       { path: 'workflow/:id', name: 'WorkflowDetail', component: () => import('@/views/WorkflowDetail.vue'), meta: { title: '流程详情', icon: 'Document',roles:['SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER'] } },
       { path: 'platform/config', name: 'PlatformConfig', component: () => import('@/views/PlatformConfig.vue'), meta: { title: '源平台配置', icon: 'Connection',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'platform/sync', name: 'PlatformSync', component: () => import('@/views/PlatformSync.vue'), meta: { title: '同步日志', icon: 'Refresh',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },

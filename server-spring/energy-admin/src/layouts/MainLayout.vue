@@ -15,6 +15,7 @@
           <template #title><el-icon><Tickets /></el-icon><span>流程中心</span></template>
           <el-menu-item index="/workflow">全部流程</el-menu-item>
           <el-menu-item v-if="canApply" index="/workflow/new-merchant">水电费变更</el-menu-item>
+          <el-menu-item v-if="canApply" index="/workflow/merchant-query">商户账户查询</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="canPlatform" index="/platform">
           <template #title>

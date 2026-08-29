@@ -49,6 +49,20 @@ public class AccountController {
         return ApiResponse.ok(out);
     }
 
+    /** 申请人按完整六位商户代码查询账户基础信息；不提供模糊检索或编辑能力。 */
+    @GetMapping("/merchant-code/{merchantCode}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER')")
+    public ApiResponse<List<PlatformAccountView>> findByMerchantCode(@PathVariable String merchantCode) {
+        String code = merchantCode == null ? "" : merchantCode.trim();
+        if (!code.matches("\\d{6}")) throw BizException.badRequest("商户代码必须是连续六位数字");
+        QueryWrapper<PlatformAccountCurrent> q = new QueryWrapper<>();
+        q.and(w -> w.eq("merchant_code", code).or().apply(
+                "EXISTS (SELECT 1 FROM platform_account_local_profile p WHERE p.account_number=platform_account_current.account_number AND p.merchant_code={0})",
+                code));
+        q.orderByAsc("account_name");
+        return ApiResponse.ok(accountMapper.selectList(q).stream().map(this::view).toList());
+    }
+
     @PutMapping("/{accountNumber}/merchant-code")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> saveMerchantCode(@PathVariable String accountNumber,@RequestBody MerchantCodeRequest req,Authentication auth){

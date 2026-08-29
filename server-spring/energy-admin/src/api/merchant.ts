@@ -85,7 +85,9 @@ export const accountApi = {
   page: (params: { keyword?: string; showDisabled?: boolean; pageNum?: number; pageSize?: number }) =>
     http.get('/api/v1/accounts', { params }),
   updateMerchantCode: (accountNumber:string, merchantCode:string) =>
-    http.put(`/api/v1/accounts/${encodeURIComponent(accountNumber)}/merchant-code`, { merchantCode })
+    http.put(`/api/v1/accounts/${encodeURIComponent(accountNumber)}/merchant-code`, { merchantCode }),
+  findByMerchantCode: (merchantCode:string) =>
+    http.get(`/api/v1/accounts/merchant-code/${encodeURIComponent(merchantCode)}`)
 }
 
 export const stallApi = {
