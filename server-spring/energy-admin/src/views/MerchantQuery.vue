@@ -8,13 +8,14 @@
     </div>
 
     <el-card shadow="never" class="search-card">
-      <el-form @submit.prevent="search">
-        <el-form-item label="商户代码" class="code-item">
-          <el-input v-model="merchantCode" maxlength="6" inputmode="numeric" pattern="[0-9]*"
-            clearable placeholder="请输入连续六位数字" @keyup.enter="search" />
-          <el-button type="primary" :loading="loading" @click="search">查询</el-button>
-        </el-form-item>
-      </el-form>
+      <form class="query-form" @submit.prevent="search">
+        <label for="merchant-code">商户代码</label>
+        <div class="query-actions">
+          <el-input id="merchant-code" v-model="merchantCode" maxlength="6" inputmode="numeric"
+            pattern="[0-9]*" clearable size="large" placeholder="请输入连续六位数字" />
+          <el-button type="primary" size="large" native-type="submit" :loading="loading">查询</el-button>
+        </div>
+      </form>
     </el-card>
 
     <el-empty v-if="searched && !loading && !accounts.length" description="未查询到该商户代码对应的账户" />
@@ -85,19 +86,23 @@ function money(value: unknown) {
 <style scoped lang="scss">
 .query-page { padding: 20px; }
 .search-card { margin-bottom: 16px; }
-.code-item { margin-bottom: 0; }
-.code-item :deep(.el-form-item__content) { flex-wrap: nowrap; gap: 10px; }
-.code-item .el-input { max-width: 360px; }
+.query-form { display: grid; grid-template-columns: 88px minmax(0, 460px); align-items: center; gap: 12px; }
+.query-form label { color: #606266; font-size: 14px; line-height: 1.4; }
+.query-actions { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 10px; min-width: 0; }
 .results { display: grid; gap: 14px; }
 .card-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
 .stall-tag { margin: 2px 6px 2px 0; }
 @media (max-width: 768px) {
   .query-page { padding: 12px; }
   .page-header { margin-bottom: 12px; }
-  .code-item :deep(.el-form-item__label) { width: 100%; justify-content: flex-start; }
-  .code-item :deep(.el-form-item__content) { width: 100%; margin-left: 0 !important; }
-  .code-item .el-input { min-width: 0; }
-  .code-item .el-button { flex: 0 0 auto; }
+  .page-title { font-size: 20px; line-height: 1.35; }
+  .page-note { margin-top: 4px; font-size: 14px; line-height: 1.55; }
+  .search-card :deep(.el-card__body) { padding: 16px; }
+  .query-form { display: block; }
+  .query-form label { display: block; margin-bottom: 8px; font-size: 15px; }
+  .query-actions { grid-template-columns: 1fr; gap: 12px; width: 100%; }
+  .query-actions .el-button { width: 100%; margin: 0; }
   .account-card :deep(.el-card__body) { padding: 12px; }
+  .card-title { align-items: flex-start; }
 }
 </style>
