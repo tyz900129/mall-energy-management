@@ -28,16 +28,28 @@
 </template>
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'; import { useRouter } from 'vue-router'; import { ElMessage, type FormInstance } from 'element-plus'; import { stallApi } from '@/api/merchant'; import { workflowApi, type BillingChangePrecheck } from '@/api/workflow'; import { enumLabel } from '@/utils/format'
-const router=useRouter(),formRef=ref<FormInstance>(),stalls=ref<any[]>([]),merchantStalls=ref<any[]>([]),check=ref<BillingChangePrecheck|null>(null),checking=ref(false),saving=ref(false),isMobile=ref(window.innerWidth<=768),mobileDateTime=ref('')
+const router=useRouter(),formRef=ref<FormInstance>(),stalls=ref<any[]>([]),merchantStalls=ref<any[]>([]),check=ref<BillingChangePrecheck|null>(null),checking=ref(false),saving=ref(false),requestKey=ref(''),isMobile=ref(window.innerWidth<=768),mobileDateTime=ref('')
 const workflowTypes=[{value:'NEW_MERCHANT',label:'新商户开户'},{value:'EXISTING_MERCHANT_ADD_STALL',label:'已有商户增加铺位'},{value:'MERCHANT_EXIT',label:'已有商户撤柜'}]
 const form=reactive({workflowType:'NEW_MERCHANT',merchantCode:'',merchantName:'',contactName:'',contactPhone:'',stallId:null as number|null,effectiveTime:'',usesWater:undefined as boolean|undefined,remark:''})
 const rules={merchantCode:[{required:true,message:'请输入商户代码'},{pattern:/^\d{6}$/,message:'必须为6位数字'}],merchantName:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入商户名称')):cb()}],contactName:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入商户联系人')):cb()}],contactPhone:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入联系人电话')):cb()}],stallId:[{required:true,message:'请选择铺位'}],effectiveTime:[{required:true,message:'请选择日期'}]}
-function invalidate(clearStalls=true){check.value=null;if(clearStalls&&form.workflowType==='MERCHANT_EXIT'){merchantStalls.value=[];form.stallId=null}}
-function changeType(){check.value=null;merchantStalls.value=[];form.stallId=null;form.usesWater=undefined}
-function onMobileDateTimeChange(){form.effectiveTime=mobileDateTime.value?(mobileDateTime.value.length===16?`${mobileDateTime.value}:00`:mobileDateTime.value):'';check.value=null}
+function invalidate(clearStalls=true){check.value=null;if(!saving.value)requestKey.value='';if(clearStalls&&form.workflowType==='MERCHANT_EXIT'){merchantStalls.value=[];form.stallId=null}}
+function changeType(){check.value=null;requestKey.value='';merchantStalls.value=[];form.stallId=null;form.usesWater=undefined}
+function onMobileDateTimeChange(){form.effectiveTime=mobileDateTime.value?(mobileDateTime.value.length===16?`${mobileDateTime.value}:00`:mobileDateTime.value):'';check.value=null;if(!saving.value)requestKey.value=''}
 function onResize(){isMobile.value=window.innerWidth<=768}
 async function precheck(){if(!/^\d{6}$/.test(form.merchantCode)){ElMessage.warning('请先填写6位商户代码');return}if(form.workflowType!=='MERCHANT_EXIT'&&!form.stallId){ElMessage.warning('请选择铺位编码');return}checking.value=true;try{const r:any=await workflowApi.precheckBillingChange(form);check.value=r;merchantStalls.value=r.merchantStalls||[];if(r.hasWaterMeter&&form.usesWater===undefined)ElMessage.warning('检测到水表，请确认新商户是否用水')}finally{checking.value=false}}
-async function create(){await formRef.value?.validate();if(!check.value?.allowed){ElMessage.warning('请先完成检查并处理提示事项');return}saving.value=true;try{const r:any=await workflowApi.createBillingChange(form);ElMessage.success('水电费变更流程草稿已创建');router.push(`/workflow/${r.id}`)}finally{saving.value=false}}
+function newRequestKey(){return globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}
+async function create(){
+  if(saving.value)return
+  saving.value=true
+  try{
+    await formRef.value?.validate()
+    if(!check.value?.allowed){ElMessage.warning('请先完成检查并处理提示事项');return}
+    if(!requestKey.value)requestKey.value=newRequestKey()
+    const r:any=await workflowApi.createBillingChange({...form,requestKey:requestKey.value})
+    ElMessage.success('水电费变更流程草稿已创建')
+    router.push(`/workflow/${r.id}`)
+  }finally{saving.value=false}
+}
 onMounted(async()=>{window.addEventListener('resize',onResize);const r:any=await stallApi.page({pageNum:1,pageSize:500});stalls.value=(r.records||[]).filter((s:any)=>s.status!=='DECOMMISSIONED')})
 onBeforeUnmount(()=>window.removeEventListener('resize',onResize))
 </script>

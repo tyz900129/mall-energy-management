@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class BillingChangeRequest {
+    @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{16,64}") private String requestKey;
     @NotBlank private String workflowType;
     @NotBlank @Pattern(regexp = "\\d{6}") private String merchantCode;
     private String merchantName;

@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -123,11 +124,14 @@ public class WorkflowService {
 
     @Transactional
     public WorkflowView createBillingChange(BillingChangeRequest req, String username) {
+        Workflow repeated = findByRequestKey(req.getRequestKey(), username);
+        if (repeated != null) return get(repeated.getId());
         validateBillingChangeFields(req);
         BillingChangePrecheckView check = precheckBillingChange(req);
         if (!check.isAllowed()) throw BizException.badRequest(String.join("；", check.getReasons()));
         SysUser user = findUser(username);
         Workflow row = new Workflow();
+        row.setRequestKey(req.getRequestKey());
         row.setWorkflowNo(nextWorkflowNo()); row.setWorkflowType(check.getWorkflowType()); row.setMerchantCode(req.getMerchantCode());
         row.setMerchantName("NEW_MERCHANT".equals(check.getWorkflowType()) ? req.getMerchantName().trim() : (check.getMerchantName() == null ? req.getMerchantCode() : check.getMerchantName()));
         if ("EXISTING_MERCHANT_ADD_STALL".equals(check.getWorkflowType())) {
@@ -146,7 +150,12 @@ public class WorkflowService {
                 "EXISTING_MERCHANT_ADD_STALL".equals(check.getWorkflowType()) ? "BIND" : "UNBIND");
         row.setUsesWater(req.getUsesWater());
         row.setExtraData("{\"usesWater\":" + (req.getUsesWater() == null ? "null" : req.getUsesWater()) + "}");
-        workflowMapper.insert(row);
+        try { workflowMapper.insert(row); }
+        catch (DuplicateKeyException ex) {
+            Workflow existing = findByRequestKey(req.getRequestKey(), username);
+            if (existing != null) return get(existing.getId());
+            throw ex;
+        }
         String operation = "MERCHANT_EXIT".equals(check.getWorkflowType()) ? "UNBIND" : "BIND";
         Set<String> merchantAccounts = new LinkedHashSet<>();
         accountsByMerchantCode(req.getMerchantCode()).forEach(a -> merchantAccounts.add(Objects.toString(a.get("account_number"), "")));
@@ -274,18 +283,26 @@ public class WorkflowService {
 
     @Transactional
     public WorkflowView createNewMerchant(NewMerchantWorkflowRequest req, String username) {
+        Workflow repeated = findByRequestKey(req.getRequestKey(), username);
+        if (repeated != null) return get(repeated.getId());
         NewMerchantPrecheckRequest checkReq = new NewMerchantPrecheckRequest();
         checkReq.setMerchantCode(req.getMerchantCode()); checkReq.setStallId(req.getStallId());
         NewMerchantPrecheckView check = precheckNewMerchant(checkReq);
         if (!check.isAllowed()) throw BizException.badRequest(String.join("；", check.getReasons()));
         SysUser user = findUser(username);
         Workflow row = new Workflow();
+        row.setRequestKey(req.getRequestKey());
         row.setWorkflowNo(nextWorkflowNo()); row.setWorkflowType("NEW_MERCHANT"); row.setMerchantCode(req.getMerchantCode());
         row.setMerchantName(req.getMerchantName()); row.setContactName(req.getContactName()); row.setContactPhone(req.getContactPhone());
         row.setStallId(req.getStallId()); row.setRequestedBillingStartTime(req.getRequestedBillingStartTime());
         row.setApplicantId(user == null ? null : user.getId()); row.setApplicantName(username); row.setStatus("DRAFT");
         row.setRemark(req.getRemark()); row.setExtraData("{\"targetAccountResolution\":\"MERCHANT_CODE_AFTER_PLATFORM_CREATION\"}");
-        workflowMapper.insert(row);
+        try { workflowMapper.insert(row); }
+        catch (DuplicateKeyException ex) {
+            Workflow existing = findByRequestKey(req.getRequestKey(), username);
+            if (existing != null) return get(existing.getId());
+            throw ex;
+        }
         for (NewMerchantPrecheckView.DeviceCheck device : check.getDevices()) {
             WorkflowDevice wd = new WorkflowDevice(); wd.setWorkflowId(row.getId()); wd.setPlatformDeviceId(device.getPlatformDeviceId());
             wd.setDeviceNameSnapshot(device.getDeviceName()); wd.setEnergyTypeSnapshot(device.getEnergyType());
@@ -296,6 +313,15 @@ public class WorkflowService {
             expectedChangeMapper.insert(ec);
         }
         return get(row.getId());
+    }
+
+    private Workflow findByRequestKey(String requestKey, String username) {
+        if (!hasText(requestKey)) return null;
+        Workflow existing = workflowMapper.selectOne(new QueryWrapper<Workflow>()
+                .eq("request_key", requestKey).last("LIMIT 1"));
+        if (existing != null && !Objects.equals(existing.getApplicantName(), username))
+            throw BizException.badRequest("流程请求编号已被使用");
+        return existing;
     }
 
     @Transactional

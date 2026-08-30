@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class Workflow {
     @TableId(type = IdType.AUTO) private Long id;
     private String workflowNo;
+    private String requestKey;
     private String workflowType;
     private String merchantCode;
     private String merchantName;
