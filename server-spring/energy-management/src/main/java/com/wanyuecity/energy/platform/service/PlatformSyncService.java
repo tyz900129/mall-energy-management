@@ -19,6 +19,7 @@ import com.wanyuecity.energy.platform.service.detector.UnauthorizedChangeDetecto
 import com.wanyuecity.energy.platform.service.snapshot.SnapshotWriter;
 import com.wanyuecity.energy.workflow.service.WorkflowPlatformMatcher;
 import com.wanyuecity.energy.stall.service.StallNameResolver;
+import com.wanyuecity.energy.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -66,6 +67,7 @@ public class PlatformSyncService {
     private final UnauthorizedChangeDetector unauthorizedChangeDetector;
     private final WorkflowPlatformMatcher workflowPlatformMatcher;
     private final StallNameResolver stallNameResolver;
+    private final NotificationService notificationService;
 
     // ---- public entry points -------------------------------------------
 
@@ -160,6 +162,8 @@ public class PlatformSyncService {
             batch.setStatus("SUCCESS");
             batch.setCompletedAt(LocalDateTime.now());
             sync.updateBatch(batch);
+
+            notificationService.notifyDataExceptions(batchId);
 
             cfg.setLastSyncAt(LocalDateTime.now());
             cfg.setLastSyncStatus("SUCCESS");
