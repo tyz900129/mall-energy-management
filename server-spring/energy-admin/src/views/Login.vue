@@ -1,8 +1,8 @@
 <template>
   <div class="login-page">
     <el-card class="login-card">
-      <div class="title">商场能源管理后台</div>
-      <div class="subtitle">mall-energy-management</div>
+      <div class="title">万悦城后勤管理系统</div>
+      <div class="subtitle">综合后勤业务管理平台</div>
       <el-form :model="form" :rules="rules" ref="formRef" @keyup.enter="onSubmit">
         <el-form-item prop="username">
           <el-input v-model="form.username" placeholder="账号" :prefix-icon="User" size="large" />

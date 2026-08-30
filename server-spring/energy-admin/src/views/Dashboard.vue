@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <div class="page-header"><div class="page-title">工作台</div></div>
     <el-row :gutter="16">
       <el-col :xs="12" :sm="6">
         <el-card shadow="hover">

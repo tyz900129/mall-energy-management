@@ -4,7 +4,7 @@
     <el-aside :width="isMobile ? '220px' : (collapsed ? '64px' : '220px')" class="aside" :class="{ 'mobile-aside': isMobile, 'mobile-open': mobileMenuOpen }">
       <div class="logo">
         <el-icon><Lightning /></el-icon>
-        <span v-if="!collapsed">能源管理</span>
+        <span v-if="!collapsed">万悦城后勤管理系统</span>
       </div>
       <el-menu :default-active="route.path" router :collapse="!isMobile && collapsed" background-color="#001529" text-color="#c9d1d9" active-text-color="#409EFF" @select="onMenuSelect">
         <el-menu-item v-if="canGeneral" index="/dashboard">

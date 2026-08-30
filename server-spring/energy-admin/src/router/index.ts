@@ -35,6 +35,11 @@ const router = createRouter({
   routes
 })
 
+router.afterEach((to) => {
+  const pageTitle = typeof to.meta.title === 'string' ? to.meta.title : ''
+  document.title = pageTitle ? `${pageTitle} - 万悦城后勤管理系统` : '万悦城后勤管理系统'
+})
+
 router.beforeEach((to, _from, next) => {
   const userStore = useUserStore()
   if (to.meta.public) return next()
