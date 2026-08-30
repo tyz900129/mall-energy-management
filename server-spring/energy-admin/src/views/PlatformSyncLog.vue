@@ -40,7 +40,7 @@
               <div v-for="row in detail.exceptions" :key="row.id" class="exception-item">
                 <div class="exception-head"><el-tag :type="severityType(row.severity)" size="small">{{ enumLabel(row.severity) }}</el-tag><span>{{ row.title }}</span></div>
                 <div class="sub">{{ row.description || '无补充说明' }}</div>
-                <div class="mini">设备：{{ row.platformDeviceId || '—' }}　账户：{{ row.accountNumber || '—' }}</div>
+                <div class="mini">设备：{{ row.platformDeviceId || '—' }}　账户：{{ row.accountName || '—' }}</div>
                 <div class="mini">{{ formatDateTime(row.detectedAt) }}　{{ enumLabel(row.status) }}</div>
               </div>
             </div>
@@ -49,7 +49,7 @@
               <el-table-column prop="title" label="异常" min-width="220" />
               <el-table-column prop="description" label="说明" min-width="280" show-overflow-tooltip />
               <el-table-column prop="platformDeviceId" label="设备 ID" min-width="150" />
-              <el-table-column prop="accountNumber" label="账户" min-width="150" />
+              <el-table-column prop="accountName" label="账户名称" min-width="180" />
               <el-table-column label="发现时间" width="180"><template #default="{row}">{{ formatDateTime(row.detectedAt) }}</template></el-table-column>
               <el-table-column label="状态" width="90"><template #default="{row}">{{ enumLabel(row.status) }}</template></el-table-column>
             </el-table>

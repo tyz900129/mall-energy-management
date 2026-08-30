@@ -115,7 +115,11 @@ public class SyncPersistence {
                 "SELECT severity,COUNT(*) AS count FROM data_exception WHERE sync_batch_id=? GROUP BY severity ORDER BY FIELD(severity,'CRITICAL','ERROR','WARN','INFO')",
                 id));
         detail.setExceptions(jdbc.queryForList(
-                "SELECT id,exception_type AS exceptionType,severity,status,title,description,platform_device_id AS platformDeviceId,account_number AS accountNumber,detected_at AS detectedAt FROM data_exception WHERE sync_batch_id=? ORDER BY FIELD(severity,'CRITICAL','ERROR','WARN','INFO'),id DESC LIMIT 500",
+                "SELECT de.id,de.exception_type AS exceptionType,de.severity,de.status,de.title,de.description," +
+                "de.platform_device_id AS platformDeviceId,de.account_number AS accountNumber," +
+                "COALESCE(NULLIF(p.account_name,''),(SELECT GROUP_CONCAT(DISTINCT COALESCE(NULLIF(pa.account_name,''),r.account_number) ORDER BY r.account_number SEPARATOR '、') FROM platform_account_device_current r LEFT JOIN platform_account_current pa ON pa.account_number=r.account_number WHERE r.platform_device_id=de.platform_device_id),de.account_number) AS accountName,de.detected_at AS detectedAt " +
+                "FROM data_exception de LEFT JOIN platform_account_current p ON p.account_number=de.account_number " +
+                "WHERE de.sync_batch_id=? ORDER BY FIELD(de.severity,'CRITICAL','ERROR','WARN','INFO'),de.id DESC LIMIT 500",
                 id));
         return detail;
     }
