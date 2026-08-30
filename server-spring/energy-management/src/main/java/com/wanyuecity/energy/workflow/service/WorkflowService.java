@@ -124,6 +124,7 @@ public class WorkflowService {
 
     @Transactional
     public WorkflowView createBillingChange(BillingChangeRequest req, String username) {
+        if (!hasText(req.getRequestKey())) req.setRequestKey(UUID.randomUUID().toString());
         Workflow repeated = findByRequestKey(req.getRequestKey(), username);
         if (repeated != null) return get(repeated.getId());
         validateBillingChangeFields(req);
@@ -283,6 +284,7 @@ public class WorkflowService {
 
     @Transactional
     public WorkflowView createNewMerchant(NewMerchantWorkflowRequest req, String username) {
+        if (!hasText(req.getRequestKey())) req.setRequestKey(UUID.randomUUID().toString());
         Workflow repeated = findByRequestKey(req.getRequestKey(), username);
         if (repeated != null) return get(repeated.getId());
         NewMerchantPrecheckRequest checkReq = new NewMerchantPrecheckRequest();
