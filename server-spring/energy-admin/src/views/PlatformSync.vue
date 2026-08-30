@@ -21,6 +21,9 @@
         <el-table-column prop="relationCount" label="关系" width="80" />
         <el-table-column prop="triggerType" label="触发" width="100"><template #default="{row}">{{ enumLabel(row.triggerType) }}</template></el-table-column>
         <el-table-column prop="errorMessage" label="错误" show-overflow-tooltip />
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{row}"><el-button link type="primary" @click="router.push({path:'/platform/sync/log',query:{id:row.id}})">查看详情</el-button></template>
+        </el-table-column>
       </el-table>
       <el-pagination
         style="margin-top: 12px; justify-content: flex-end; display: flex"
@@ -41,12 +44,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { platformApi } from '@/api/platform'
 import { enumLabel, formatDateTime } from '@/utils/format'
+import { useRouter } from 'vue-router'
 
 const rows = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
 const triggering = ref(false)
 const page = reactive({ current: 1, size: 20 })
+const router = useRouter()
 
 async function load() {
   loading.value = true

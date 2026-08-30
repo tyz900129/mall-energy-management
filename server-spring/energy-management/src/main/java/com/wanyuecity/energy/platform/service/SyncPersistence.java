@@ -7,9 +7,12 @@ import com.wanyuecity.energy.platform.entity.SyncLock;
 import com.wanyuecity.energy.platform.mapper.PlatformSyncBatchMapper;
 import com.wanyuecity.energy.platform.mapper.SyncLockMapper;
 import com.wanyuecity.energy.platform.service.dto.SyncBatchView;
+import com.wanyuecity.energy.platform.service.dto.SyncBatchDetailView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
+import com.wanyuecity.energy.core.BizException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ public class SyncPersistence {
 
     private final SyncLockMapper syncLockMapper;
     private final PlatformSyncBatchMapper batchMapper;
+    private final JdbcTemplate jdbc;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean acquireLock(String holder) {
@@ -90,6 +94,30 @@ public class SyncPersistence {
                         .orderByDesc(PlatformSyncBatch::getStartedAt)
                         .last("LIMIT 1"));
         return b == null ? null : toView(b);
+    }
+
+    public SyncBatchDetailView batchDetail(Long id) {
+        PlatformSyncBatch batch = batchMapper.selectById(id);
+        if (batch == null) throw BizException.badRequest("同步批次不存在");
+        SyncBatchDetailView detail = new SyncBatchDetailView();
+        detail.setBatch(toView(batch));
+        Integer currentRows = jdbc.queryForObject(
+                "SELECT (SELECT COUNT(*) FROM platform_account_current WHERE sync_batch_id=?) + " +
+                "(SELECT COUNT(*) FROM platform_device_current WHERE sync_batch_id=?) + " +
+                "(SELECT COUNT(*) FROM platform_account_device_current WHERE sync_batch_id=?)",
+                Integer.class, id, id, id);
+        detail.setCurrentDataAvailable(currentRows != null && currentRows > 0);
+        Integer workflows = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM workflow_match_run WHERE sync_batch_id=? AND match_status='MATCHED'",
+                Integer.class, id);
+        detail.setCompletedWorkflowCount(workflows == null ? 0 : workflows);
+        detail.setExceptionSummary(jdbc.queryForList(
+                "SELECT severity,COUNT(*) AS count FROM data_exception WHERE sync_batch_id=? GROUP BY severity ORDER BY FIELD(severity,'CRITICAL','ERROR','WARN','INFO')",
+                id));
+        detail.setExceptions(jdbc.queryForList(
+                "SELECT id,exception_type AS exceptionType,severity,status,title,description,platform_device_id AS platformDeviceId,account_number AS accountNumber,detected_at AS detectedAt FROM data_exception WHERE sync_batch_id=? ORDER BY FIELD(severity,'CRITICAL','ERROR','WARN','INFO'),id DESC LIMIT 500",
+                id));
+        return detail;
     }
 
     private SyncBatchView toView(PlatformSyncBatch b) {

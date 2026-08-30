@@ -27,5 +27,6 @@ export const platformApi = {
   triggerSync: () => http.post<{ batchNo: string; status: string }>('/api/v1/platform/sync'),
   listBatches: (params: { current?: number; size?: number; pageNum?: number; pageSize?: number }) =>
     http.get<{ records: any[]; total: number; size: number; current: number }>('/api/v1/platform/sync/batches', { params }),
-  latestBatch: () => http.get<any>('/api/v1/platform/sync/latest')
+  latestBatch: () => http.get<any>('/api/v1/platform/sync/latest'),
+  syncLogDetail: (id: number) => http.get<any>(`/api/v1/platform/sync-logs/${id}`)
 }

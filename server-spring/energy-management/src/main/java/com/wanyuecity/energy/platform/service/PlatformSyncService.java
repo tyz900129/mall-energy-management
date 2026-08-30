@@ -12,6 +12,7 @@ import com.wanyuecity.energy.platform.entity.PlatformConfig;
 import com.wanyuecity.energy.platform.entity.PlatformSyncBatch;
 import com.wanyuecity.energy.platform.mapper.PlatformConfigMapper;
 import com.wanyuecity.energy.platform.service.dto.SyncBatchView;
+import com.wanyuecity.energy.platform.service.dto.SyncBatchDetailView;
 import com.wanyuecity.energy.platform.service.detector.MultiAccountDetector;
 import com.wanyuecity.energy.platform.service.detector.OrphanRelationDetector;
 import com.wanyuecity.energy.platform.service.detector.UnauthorizedChangeDetector;
@@ -82,6 +83,10 @@ public class PlatformSyncService {
 
     public SyncBatchView latestBatch() {
         return sync.latestBatch();
+    }
+
+    public SyncBatchDetailView batchDetail(Long id) {
+        return sync.batchDetail(id);
     }
 
     // ---- core ---------------------------------------------------------

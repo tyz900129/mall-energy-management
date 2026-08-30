@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wanyuecity.energy.core.ApiResponse;
 import com.wanyuecity.energy.platform.service.PlatformSyncService;
 import com.wanyuecity.energy.platform.service.dto.SyncBatchView;
+import com.wanyuecity.energy.platform.service.dto.SyncBatchDetailView;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -35,5 +37,11 @@ public class PlatformSyncLogController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
     public ApiResponse<SyncBatchView> latest() {
         return ApiResponse.ok(service.latestBatch());
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
+    public ApiResponse<SyncBatchDetailView> detail(@PathVariable Long id) {
+        return ApiResponse.ok(service.batchDetail(id));
     }
 }
