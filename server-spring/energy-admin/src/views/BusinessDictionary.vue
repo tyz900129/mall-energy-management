@@ -21,7 +21,7 @@
 </div></template>
 <script setup lang="ts">
 import{computed,onMounted,reactive,ref}from'vue';import{ElMessage,type FormInstance}from'element-plus';import{dictionaryApi,cableSpecificationApi,powerSwitchSpecificationApi,type CableSpecification,type PowerSwitchSpecification,type DictionaryItem,type DictionaryType}from'@/api/system'
-type PageType=DictionaryType|'CABLE'|'SWITCH';const types=[{value:'FLOOR',label:'楼层'},{value:'BUSINESS_TYPE',label:'业态'},{value:'CABLE',label:'电缆规格'},{value:'SWITCH',label:'供电开关规格'}] as {value:PageType,label:string}[]
+type PageType=DictionaryType|'CABLE'|'SWITCH';const types=[{value:'FLOOR',label:'楼层'},{value:'BUSINESS_TYPE',label:'业态'},{value:'METER_LOCATION',label:'电表位置'},{value:'CABLE',label:'电缆规格'},{value:'SWITCH',label:'供电开关规格'}] as {value:PageType,label:string}[]
 const type=ref<PageType>('FLOOR'),rows=ref<DictionaryItem[]>([]),cableRows=ref<CableSpecification[]>([]),switchRows=ref<PowerSwitchSpecification[]>([]),loading=ref(false),saving=ref(false),visible=ref(false),formRef=ref<FormInstance>();const form=reactive<any>({});const typeLabel=computed(()=>types.find(t=>t.value===type.value)?.label||'')
 const rules={itemValue:[{required:true,message:'请输入取值编码'}],itemLabel:[{required:true,message:'请输入显示名称'}]}
 const cableRules={specCode:[{required:true,message:'请输入规格编码'}],cableModel:[{required:true,message:'请输入电缆型号'}],specification:[{required:true,message:'请输入电缆规格'}],ratedCurrentA:[{required:true,message:'请输入额定电流'}],ratedPowerKw:[{required:true,message:'请输入承载功率'}]}

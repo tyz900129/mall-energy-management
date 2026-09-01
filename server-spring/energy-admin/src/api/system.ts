@@ -20,7 +20,7 @@ export const systemUserApi = {
 }
 export const systemRoleApi = { list: () => http.get<SystemRole[]>('/api/v1/roles') }
 
-export type DictionaryType = 'FLOOR' | 'AREA' | 'BUSINESS_TYPE' | 'BUSINESS_CATEGORY'
+export type DictionaryType = 'FLOOR' | 'AREA' | 'BUSINESS_TYPE' | 'BUSINESS_CATEGORY' | 'METER_LOCATION'
 export interface DictionaryItem { id:number; dictType:DictionaryType; itemValue:string; itemLabel:string; sortOrder:number; status:number; remark?:string; updatedAt?:string }
 export const dictionaryApi = {
   list: (type:DictionaryType, enabledOnly=true) => http.get<DictionaryItem[]>('/api/v1/dictionaries',{params:{type,enabledOnly}}),
