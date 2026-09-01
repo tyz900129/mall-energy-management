@@ -35,3 +35,10 @@ export const cableSpecificationApi = {
   update:(id:number,data:Partial<CableSpecification>)=>http.put(`/api/v1/cable-specifications/${id}`,data),
   remove:(id:number)=>http.delete(`/api/v1/cable-specifications/${id}`)
 }
+export interface PowerSwitchSpecification { id:number;specCode:string;brand?:string;switchModel:string;poleCount:string;ratedCurrentA:number;breakingCapacityKa?:number;switchType?:string;status:number;sortOrder:number;remark?:string }
+export const powerSwitchSpecificationApi = {
+  list:(enabledOnly=true)=>http.get<PowerSwitchSpecification[]>('/api/v1/power-switch-specifications',{params:{enabledOnly}}),
+  create:(data:Partial<PowerSwitchSpecification>)=>http.post('/api/v1/power-switch-specifications',data),
+  update:(id:number,data:Partial<PowerSwitchSpecification>)=>http.put(`/api/v1/power-switch-specifications/${id}`,data),
+  remove:(id:number)=>http.delete(`/api/v1/power-switch-specifications/${id}`)
+}

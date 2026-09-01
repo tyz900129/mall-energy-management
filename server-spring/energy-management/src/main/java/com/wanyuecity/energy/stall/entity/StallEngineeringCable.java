@@ -3,5 +3,5 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 @Data @TableName("stall_engineering_cable") public class StallEngineeringCable {
- @TableId(type=IdType.AUTO) private Long id; private Long stallEngineeringProfileId; private Long cableSpecificationId; private Integer quantity; private LocalDateTime createdAt; private LocalDateTime updatedAt;
+ @TableId(type=IdType.AUTO) private Long id; private Long stallEngineeringProfileId; private Long cableSpecificationId; private Long powerSwitchSpecificationId; private Integer quantity; private Integer switchQuantity; private LocalDateTime createdAt; private LocalDateTime updatedAt;
 }
