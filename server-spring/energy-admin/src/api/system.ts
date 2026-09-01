@@ -28,3 +28,10 @@ export const dictionaryApi = {
   update: (id:number,data:Partial<DictionaryItem>) => http.put(`/api/v1/dictionaries/${id}`,data),
   remove: (id:number) => http.delete(`/api/v1/dictionaries/${id}`)
 }
+export interface CableSpecification { id:number;specCode:string;cableModel:string;specification:string;ratedCurrentA:number;ratedPowerKw:number;status:number;sortOrder:number;remark?:string }
+export const cableSpecificationApi = {
+  list:(enabledOnly=true)=>http.get<CableSpecification[]>('/api/v1/cable-specifications',{params:{enabledOnly}}),
+  create:(data:Partial<CableSpecification>)=>http.post('/api/v1/cable-specifications',data),
+  update:(id:number,data:Partial<CableSpecification>)=>http.put(`/api/v1/cable-specifications/${id}`,data),
+  remove:(id:number)=>http.delete(`/api/v1/cable-specifications/${id}`)
+}

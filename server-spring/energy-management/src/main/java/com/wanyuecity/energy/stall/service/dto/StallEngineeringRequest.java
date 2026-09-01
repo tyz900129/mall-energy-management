@@ -1,12 +1,15 @@
 package com.wanyuecity.energy.stall.service.dto;
 
 import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class StallEngineeringRequest {
+    @Valid private List<StallCableRequest> cables;
     @Min(0) private Integer cableQuantity; private String cableModel; @DecimalMin("0") private BigDecimal loadPowerKw; private String meterLocation;
     private Boolean waterSupply; private String waterMeterCaliber; private String waterMeterLocation;
     private Boolean drainageAvailable; private String drainagePipeCaliber; private String drainagePipelineNo;
