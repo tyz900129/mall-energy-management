@@ -89,7 +89,7 @@ const total = ref(0)
 const loading = ref(false)
 const submitting = ref(false)
 const exporting=ref(false),importing=ref(false),fileInput=ref<HTMLInputElement>();const userStore=useUserStore();const isAdmin=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(r)));const isSuperAdmin=computed(()=>userStore.user?.roles?.includes('SUPER_ADMIN'));const canExport=computed(()=>isAdmin.value||userStore.user?.roles?.includes('VIEWER'))
-const dictionaries=reactive<Record<DictionaryType,DictionaryItem[]>>({FLOOR:[],AREA:[],BUSINESS_TYPE:[],BUSINESS_CATEGORY:[],METER_LOCATION:[]})
+const dictionaries=reactive<Record<DictionaryType,DictionaryItem[]>>({FLOOR:[],AREA:[],BUSINESS_TYPE:[],BUSINESS_CATEGORY:[],METER_LOCATION:[],WATER_METER_CALIBER:[],DRAINAGE_PIPE_CALIBER:[],EXHAUST_FAN:[],FRESH_AIR_UNIT:[],AIR_CONDITIONER_SPEC:[],NATURAL_GAS_CALIBER:[],GAS_SHUTOFF_LOCATION:[]})
 function dictLabel(type:DictionaryType,value:string){return dictionaries[type].find(d=>d.itemValue===value)?.itemLabel||value||'-'}
 const page = reactive({ pageNum: 1, pageSize: 20 })
 const query = reactive<{ keyword: string; status: string; floorCode: string; businessType: string }>({

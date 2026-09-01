@@ -10,14 +10,15 @@ import java.util.List;
 @Data
 public class StallEngineeringRequest {
     @Valid private List<StallCableRequest> cables;
+    @Valid private List<StallAirConditionerRequest> airConditioners;
     @Min(0) private Integer cableQuantity; private String cableModel; @DecimalMin("0") private BigDecimal loadPowerKw; private String meterLocation;
     private Boolean waterSupply; private String waterMeterCaliber; private String waterMeterLocation;
     private Boolean drainageAvailable; private String drainagePipeCaliber; private String drainagePipelineNo;
-    private Boolean exhaustDuctAvailable; private String exhaustDuctNo;
-    private Boolean freshAirDuctAvailable; private String freshAirDuctNo;
+    private Boolean exhaustDuctAvailable; private String exhaustDuctNo; private String exhaustFanCode;
+    private Boolean freshAirDuctAvailable; private String freshAirDuctNo; private String freshAirUnitCode;
     @Min(0) private Integer airConditionerQuantity; @Min(0) private Integer fanCoilQuantity; @Min(0) private Integer hangingCabinetQuantity; @Min(0) private Integer airOutletQuantity; private String airConditionerModel;
-    private Boolean gasConditionAvailable; private Boolean gasConnected; private String gasType; @Min(0) private Integer gasPipeQuantity; private String gasPipeCaliber; private String gasPipelineNo; private String gasInterfaceLocation;
+    private Boolean gasConditionAvailable; private Boolean naturalGasUsed; private Boolean gasConnected; private String gasType; @Min(0) private Integer gasPipeQuantity; private String gasPipeCaliber; private String naturalGasCaliberCode; private String gasPipelineNo; private String gasInterfaceLocation;
     private String gasMeterNo; private String gasMeterModel; private String gasMeterLocation; @DecimalMin("0") private BigDecimal designGasFlow; @DecimalMin("0") private BigDecimal designGasLoadKw; private String gasValveNo;
-    private Boolean gasAlarm; @Min(0) private Integer gasAlarmQuantity; private Boolean autoShutoffValve; private Boolean gasAccepted; private LocalDate gasAcceptanceDate; private String gasAcceptanceOrg;
+    private Boolean gasAlarm; @Min(0) private Integer gasAlarmQuantity; private Boolean autoShutoffValve; private String gasShutoffLocationCode; private Boolean gasAccepted; private LocalDate gasAcceptanceDate; private String gasAcceptanceOrg;
     @Size(max=1000) private String remark;
 }
