@@ -28,9 +28,10 @@
             <el-tag :type="statusTag(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="230" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button size="small" link @click="onEdit(row)">编辑</el-button>
+            <el-button size="small" link type="primary" @click="router.push(`/stall/${row.id}/engineering`)">工程资料</el-button>
             <el-popconfirm v-if="row.status !== 'DECOMMISSIONED'" title="将铺位标记为停用？" @confirm="onDelete(row)">
               <template #reference><el-button size="small" link type="warning">停用</el-button></template>
             </el-popconfirm>
@@ -80,8 +81,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { stallApi } from '@/api/merchant'
 import { dictionaryApi, type DictionaryItem, type DictionaryType } from '@/api/system'
 import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
 
 const rows = ref<any[]>([])
+const router=useRouter()
 const total = ref(0)
 const loading = ref(false)
 const submitting = ref(false)

@@ -20,6 +20,7 @@ const routes = [
       { path: 'exception', name: 'DataException', component: () => import('@/views/DataException.vue'), meta: { title: '异常中心', icon: 'Warning',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'merchant', name: 'Merchant', component: () => import('@/views/Merchant.vue'), meta: { title: '商户账户管理', icon: 'OfficeBuilding',roles:['SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER'] } },
       { path: 'stall', name: 'Stall', component: () => import('@/views/Stall.vue'), meta: { title: '铺位管理', icon: 'Grid',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
+      { path: 'stall/:id/engineering', name: 'StallEngineering', component: () => import('@/views/StallEngineering.vue'), meta: { title: '铺位工程资料', icon: 'Tools',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'stall-device', name: 'StallDevice', component: () => import('@/views/StallDevice.vue'), meta: { title: '设备绑定', icon: 'Link',roles:['SUPER_ADMIN','SYSTEM_ADMIN'] } },
       { path: 'system/user', name: 'SystemUser', component: () => import('@/views/SystemUser.vue'), meta: { title: '用户管理', icon: 'User',roles:['SUPER_ADMIN'] } },
       { path: 'system/dictionary', name: 'BusinessDictionary', component: () => import('@/views/BusinessDictionary.vue'), meta: { title: '基础字典', icon: 'List',roles:['SUPER_ADMIN','SYSTEM_ADMIN'] } },

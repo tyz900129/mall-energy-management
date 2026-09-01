@@ -106,7 +106,9 @@ export const stallApi = {
   softDelete: (id: number) => http.delete(`/api/v1/stalls/${id}`),
   permanentDelete: (id: number) => http.delete(`/api/v1/stalls/${id}/permanent`),
   exportExcel: (params: Record<string, any>) => http.get('/api/v1/stalls/export', { params, responseType: 'blob' }),
-  importExcel: (file: File) => { const data=new FormData();data.append('file',file);return http.post('/api/v1/stalls/import',data,{headers:{'Content-Type':'multipart/form-data'}}) }
+  importExcel: (file: File) => { const data=new FormData();data.append('file',file);return http.post('/api/v1/stalls/import',data,{headers:{'Content-Type':'multipart/form-data'}}) },
+  getEngineering: (id: number) => http.get(`/api/v1/stalls/${id}/engineering`),
+  saveEngineering: (id: number, data: Record<string, any>) => http.put(`/api/v1/stalls/${id}/engineering`, data)
 }
 
 export const stallDeviceApi = {
