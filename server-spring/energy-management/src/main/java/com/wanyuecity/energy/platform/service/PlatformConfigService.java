@@ -79,6 +79,18 @@ public class PlatformConfigService {
         return r;
     }
 
+    public PlatformConnection connect() {
+        PlatformConfig c = load();
+        if (c.getPasswordCiphertext() == null || "__PENDING__".equals(c.getPasswordCiphertext())) {
+            throw BizException.badRequest("源平台密码尚未配置");
+        }
+        String password = crypto.decrypt(c.getPasswordCiphertext(), c.getPasswordIv());
+        var session = adapter.login(c.getBaseUrl(), c.getAccountUsername(), password);
+        return new PlatformConnection(c.getBaseUrl(), c.getSpaceId(), session.token());
+    }
+
+    public record PlatformConnection(String baseUrl, String spaceId, String token) {}
+
     private PlatformConfig load() {
         PlatformConfig c = configMapper.findSingleton();
         if (c == null) {

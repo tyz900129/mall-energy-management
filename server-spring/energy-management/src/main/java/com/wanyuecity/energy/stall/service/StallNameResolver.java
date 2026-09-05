@@ -21,15 +21,13 @@ import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * 以铺位编码匹配源平台账户。设备绑定是独立、稳定的本地主数据，
- * 不允许再通过设备当前所属账户反推铺位租户。
- */
+/** 以本地铺位—设备绑定关系为入口，派生设备当前所属的启用计费账户名称。 */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class StallNameResolver {
     public static final String PENDING_NAME = "待同步账户";
+    public static final String AMBIGUOUS_NAME = "多账户待核对";
 
     private final StallMapper stallMapper;
     private final PlatformAccountCurrentMapper accountMapper;
@@ -40,9 +38,10 @@ public class StallNameResolver {
     public String refresh(Long stallId) {
         Stall stall = stallMapper.selectById(stallId);
         if (stall == null) return PENDING_NAME;
-        PlatformAccountCurrent account = findByStallCode(stall.getStallCode());
-        if (account == null) account = findUniqueAccountByBoundDevices(stallId);
-        String derived = account == null ? PENDING_NAME : displayName(account);
+        AccountResolution resolution = resolveByBoundDevices(stallId);
+        PlatformAccountCurrent account = resolution.account();
+        String derived = resolution.ambiguous() ? AMBIGUOUS_NAME
+                : account == null ? PENDING_NAME : displayName(account);
         if (!derived.equals(stall.getStallName())) {
             stall.setStallName(derived);
             stallMapper.updateById(stall);
@@ -50,11 +49,8 @@ public class StallNameResolver {
         return derived;
     }
 
-    /**
-     * 编码无法匹配时，只在铺位全部已绑定设备共同指向唯一账户时补全名称。
-     * 多账户或无关系均不猜测，避免跨铺位设备导致商户名称误配。
-     */
-    private PlatformAccountCurrent findUniqueAccountByBoundDevices(Long stallId) {
+    /** 只接受铺位已绑定设备共同指向的唯一启用账户；多账户时明确提示，不做猜测。 */
+    private AccountResolution resolveByBoundDevices(Long stallId) {
         Set<String> accountNumbers = new LinkedHashSet<>();
         for (StallDevice binding : stallDeviceMapper.listActiveByStall(stallId)) {
             for (PlatformAccountDeviceCurrent relation : relationMapper.selectList(
@@ -65,10 +61,31 @@ public class StallNameResolver {
                 }
             }
         }
-        if (accountNumbers.size() != 1) return null;
-        return accountMapper.selectOne(new LambdaQueryWrapper<PlatformAccountCurrent>()
-                .eq(PlatformAccountCurrent::getAccountNumber, accountNumbers.iterator().next()).last("LIMIT 1"));
+        if (accountNumbers.isEmpty()) return new AccountResolution(null, false);
+        List<PlatformAccountCurrent> enabledAccounts = accountMapper.selectList(
+                new LambdaQueryWrapper<PlatformAccountCurrent>()
+                        .in(PlatformAccountCurrent::getAccountNumber, accountNumbers))
+                .stream().filter(account -> isEnabled(account.getPlatformStatus())).toList();
+        Set<String> enabledNumbers = new LinkedHashSet<>();
+        enabledAccounts.forEach(account -> enabledNumbers.add(account.getAccountNumber()));
+        if (enabledNumbers.size() > 1) return new AccountResolution(null, true);
+        if (enabledNumbers.isEmpty()) return new AccountResolution(null, false);
+        String onlyNumber = enabledNumbers.iterator().next();
+        return new AccountResolution(enabledAccounts.stream()
+                .filter(account -> onlyNumber.equals(account.getAccountNumber())).findFirst().orElse(null), false);
     }
+
+    /** 供铺位详情使用，确保展示资料与铺位名称采用同一套绑定规则。 */
+    public PlatformAccountCurrent findByBoundDevices(Long stallId) {
+        AccountResolution resolution = resolveByBoundDevices(stallId);
+        return resolution.ambiguous() ? null : resolution.account();
+    }
+
+    private boolean isEnabled(String status) {
+        return status == null || !Set.of("0", "DISABLED", "INACTIVE").contains(status.toUpperCase(Locale.ROOT));
+    }
+
+    private record AccountResolution(PlatformAccountCurrent account, boolean ambiguous) {}
 
     public PlatformAccountCurrent findByStallCode(String stallCode) {
         if (stallCode == null || stallCode.isBlank()) return null;
@@ -119,7 +136,7 @@ public class StallNameResolver {
     public void refreshExistingAfterStartup() {
         try {
             refreshAll();
-            log.info("stall account names refreshed by stall code");
+            log.info("stall account names refreshed by active device bindings");
         } catch (Exception ex) {
             log.error("failed to refresh stall names after startup: {}", ex.getMessage(), ex);
         }

@@ -42,3 +42,10 @@ export const powerSwitchSpecificationApi = {
   update:(id:number,data:Partial<PowerSwitchSpecification>)=>http.put(`/api/v1/power-switch-specifications/${id}`,data),
   remove:(id:number)=>http.delete(`/api/v1/power-switch-specifications/${id}`)
 }
+export interface AirConditionerSpecification { id:number;specCode:string;model:string;equipmentType:'FAN_COIL'|'HANGING_CABINET'|'OTHER';ratedPowerKw:number;airflowCmh:number;status:number;sortOrder:number;remark?:string }
+export const airConditionerSpecificationApi = {
+  list:(enabledOnly=true)=>http.get<AirConditionerSpecification[]>('/api/v1/air-conditioner-specifications',{params:{enabledOnly}}),
+  create:(data:Partial<AirConditionerSpecification>)=>http.post('/api/v1/air-conditioner-specifications',data),
+  update:(id:number,data:Partial<AirConditionerSpecification>)=>http.put(`/api/v1/air-conditioner-specifications/${id}`,data),
+  remove:(id:number)=>http.delete(`/api/v1/air-conditioner-specifications/${id}`)
+}

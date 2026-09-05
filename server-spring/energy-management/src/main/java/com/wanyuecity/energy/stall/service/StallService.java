@@ -101,6 +101,9 @@ public class StallService {
         }
         applyRequest(s, req);
         stallMapper.updateById(s);
+        // 编码或基础资料修改后也重新读取设备所属账户，避免列表继续显示旧名称。
+        stallNameResolver.refresh(id);
+        s = stallMapper.selectById(id);
         return toView(s);
     }
 
@@ -199,7 +202,7 @@ public class StallService {
         v.setRemark(s.getRemark());
         v.setCreatedAt(s.getCreatedAt());
         v.setUpdatedAt(s.getUpdatedAt());
-        var account = stallNameResolver.findByStallCode(s.getStallCode());
+        var account = stallNameResolver.findByBoundDevices(s.getId());
         if (account != null) {
             v.setAccountNumber(account.getAccountNumber());
             v.setAccountMobilePhone(account.getMobilePhone());

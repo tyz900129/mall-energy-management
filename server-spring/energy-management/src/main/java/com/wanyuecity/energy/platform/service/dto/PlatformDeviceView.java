@@ -14,6 +14,7 @@ public class PlatformDeviceView {
     private String gatewayName;
     private String channelName;
     private String productName;
+    private String productId;
     private String energyType;
     private String energyTypeName;
     private Integer commStatus;

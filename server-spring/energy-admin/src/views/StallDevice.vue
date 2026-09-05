@@ -203,7 +203,7 @@ async function doSearch() {
 async function onUnbind(row: any) {
   await stallDeviceApi.unbind(row.stallId, row.platformDeviceId)
   ElMessage.success('已解绑')
-  loadStallDevices()
+  await Promise.all([loadStalls(), loadStallDevices()])
 }
 
 function quickBind(row: any) {

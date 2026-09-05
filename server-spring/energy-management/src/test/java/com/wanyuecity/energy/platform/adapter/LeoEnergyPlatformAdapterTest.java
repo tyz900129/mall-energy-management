@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.time.LocalDate;
+import java.util.List;
+import com.wanyuecity.energy.platform.dto.PlatformDevice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -88,6 +91,24 @@ class LeoEnergyPlatformAdapterTest {
         RecordedRequest detail = server.takeRequest();
         detail = server.takeRequest();
         assertTrue(detail.getPath().startsWith("/api/devices/show/DEVICE-1"));
+    }
+
+    @Test
+    void mapsEnergyReportColumnsToDailyUsage() throws Exception {
+        server.enqueue(json("{\"code\":\"200000\",\"data\":{\"columnList\":[{\"prop\":\"_1\"},{\"prop\":\"_2\"}],\"valueList\":[{\"deviceId\":\"DEVICE-1\",\"_1\":\"12.5\",\"_2\":\"8.25\"}]}}"));
+        PlatformDevice device = PlatformDevice.builder().platformDeviceId("DEVICE-1").deviceName("电表")
+                .commAddress("1").productId("100").build();
+
+        var points = adapter.fetchDailyUsage(server.url("/").toString(), "TOKEN", List.of(device),
+                "ELECTRIC", "11X", "正向有功电能",
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2));
+
+        assertEquals(2, points.size());
+        assertEquals("12.5", points.get(0).value().toPlainString());
+        assertEquals(LocalDate.of(2026, 8, 2), points.get(1).usageDate());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("/api/devices/show/energy-report-data", request.getPath());
+        assertEquals("TOKEN", request.getHeader("token"));
     }
 
     private MockResponse json(String body) {

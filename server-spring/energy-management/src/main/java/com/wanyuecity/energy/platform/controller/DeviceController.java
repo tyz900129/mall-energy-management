@@ -87,6 +87,7 @@ public class DeviceController {
         v.setGatewayName(d.getGatewayName());
         v.setChannelName(d.getChannelName());
         v.setProductName(d.getProductName());
+        v.setProductId(d.getProductId());
         v.setEnergyType(d.getEnergyType());
         v.setEnergyTypeName(d.getEnergyTypeName());
         v.setCommStatus(d.getCommStatus());

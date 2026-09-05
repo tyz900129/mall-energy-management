@@ -164,7 +164,9 @@ public class WorkflowService {
         for (BillingChangePrecheckView.DeviceCheck device : check.getDevices()) {
             if (!device.isIncluded()) continue;
             selectedDeviceIds.add(device.getPlatformDeviceId());
-            String oldAccount = device.getCurrentAccountNumbers().stream().filter(merchantAccounts::contains).findFirst().orElse(null);
+            String oldAccount = "UNBIND".equals(operation)
+                    ? device.getCurrentAccountNumbers().stream().filter(merchantAccounts::contains).findFirst().orElse(null)
+                    : device.getCurrentAccountNumbers().stream().filter(a -> !merchantAccounts.contains(a)).findFirst().orElse(null);
             WorkflowDevice wd = new WorkflowDevice(); wd.setWorkflowId(row.getId()); wd.setPlatformDeviceId(device.getPlatformDeviceId());
             wd.setDeviceNameSnapshot(device.getDeviceName()); wd.setEnergyTypeSnapshot(device.getEnergyType()); wd.setCommAddressSnapshot(device.getCommAddress());
             wd.setSerialNumberSnapshot(device.getSerialNumber()); wd.setGatewayNameSnapshot(device.getGatewayName()); wd.setChannelNameSnapshot(device.getChannelName());
@@ -173,7 +175,7 @@ public class WorkflowService {
             wd.setOperationType(operation); workflowDeviceMapper.insert(wd);
             WorkflowExpectedChange ec = new WorkflowExpectedChange(); ec.setWorkflowId(row.getId());
             ec.setChangeType("UNBIND".equals(operation) ? "DEVICE_UNBIND" : "DEVICE_BIND"); ec.setPlatformDeviceId(device.getPlatformDeviceId());
-            ec.setFromAccountNumber("UNBIND".equals(operation) ? oldAccount : null);
+            ec.setFromAccountNumber(oldAccount);
             ec.setExpectedEffectiveTime(req.getEffectiveTime()); ec.setVerifyStatus("PENDING"); expectedChangeMapper.insert(ec);
         }
         if ("UNBIND".equals(operation)) {
@@ -311,7 +313,7 @@ public class WorkflowService {
             wd.setCommAddressSnapshot(device.getCommAddress()); wd.setSerialNumberSnapshot(device.getSerialNumber()); wd.setOperationType("BIND");
             workflowDeviceMapper.insert(wd);
             WorkflowExpectedChange ec = new WorkflowExpectedChange(); ec.setWorkflowId(row.getId()); ec.setChangeType("DEVICE_BIND");
-            ec.setPlatformDeviceId(device.getPlatformDeviceId()); ec.setExpectedEffectiveTime(req.getRequestedBillingStartTime()); ec.setVerifyStatus("PENDING");
+            ec.setPlatformDeviceId(device.getPlatformDeviceId()); ec.setFromAccountNumber(device.getCurrentAccountNumbers().stream().findFirst().orElse(null)); ec.setExpectedEffectiveTime(req.getRequestedBillingStartTime()); ec.setVerifyStatus("PENDING");
             expectedChangeMapper.insert(ec);
         }
         return get(row.getId());

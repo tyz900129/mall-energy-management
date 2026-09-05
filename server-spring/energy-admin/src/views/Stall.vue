@@ -54,7 +54,7 @@
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑铺位' : '新增铺位'" width="560px">
       <el-form :model="form" label-width="100px">
         <el-form-item label="铺位编码"><el-input v-model="form.stallCode" /></el-form-item>
-        <el-form-item label="当前商户"><el-input :model-value="form.stallName || '同步后自动获取'" disabled /><div class="form-tip">按铺位编码从源平台账户自动同步，与设备绑定无关</div></el-form-item>
+        <el-form-item label="当前商户"><el-input :model-value="form.stallName || '同步后自动获取'" disabled /><div class="form-tip">根据铺位已绑定设备所属的启用计费账户自动更新</div></el-form-item>
         <el-form-item label="楼层"><el-select v-model="form.floorCode" style="width:100%"><el-option v-for="d in dictionaries.FLOOR" :key="d.id" :label="d.itemLabel" :value="d.itemValue"/></el-select></el-form-item>
         <el-form-item label="面积(㎡)"><el-input-number v-model="form.area" :min="0" /></el-form-item>
         <el-form-item label="业态"><el-select v-model="form.businessType" style="width:100%"><el-option v-for="d in dictionaries.BUSINESS_TYPE" :key="d.id" :label="d.itemLabel" :value="d.itemValue"/></el-select></el-form-item>

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanyuecity.energy.platform.dto.PlatformAccount;
 import com.wanyuecity.energy.platform.dto.PlatformAccountDeviceRelation;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
+import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -200,6 +203,66 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
         return out;
     }
 
+    @Override
+    public List<PlatformDailyUsage> fetchDailyUsage(String baseUrl, String sessionToken,
+                                                    List<PlatformDevice> devices,
+                                                    String energyType, String identifier,
+                                                    String identifierName,
+                                                    LocalDate startDate, LocalDate endDate) {
+        if (devices == null || devices.isEmpty()) return List.of();
+        if (!startDate.getMonth().equals(endDate.getMonth()) || startDate.getYear() != endDate.getYear()) {
+            throw new PlatformAdapterException("BAD_RANGE", "Daily usage request cannot cross calendar months");
+        }
+        var root = mapper.createObjectNode();
+        DateTimeFormatter dt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        root.put("startTime", startDate.atStartOfDay().format(dt));
+        root.put("endTime", endDate.atTime(23, 59, 59).format(dt));
+        root.put("energyType", switch (energyType == null ? "" : energyType.toUpperCase()) {
+            case "WATER" -> 0; case "GAS" -> 2; default -> 1;
+        });
+        root.put("timeType", "month");
+        var deviceList = root.putArray("deviceList");
+        for (PlatformDevice d : devices) {
+            var n = deviceList.addObject();
+            n.put("id", d.getPlatformDeviceId());
+            n.put("name", d.getDeviceName());
+            n.put("commAddress", d.getCommAddress());
+            try { n.put("productId", Long.parseLong(d.getProductId())); }
+            catch (Exception ex) { n.put("productId", d.getProductId()); }
+        }
+        var func = root.putArray("funcList").addObject();
+        var productIds = func.putArray("productIds");
+        devices.stream().map(PlatformDevice::getProductId).filter(v -> v != null && !v.isBlank()).distinct()
+                .forEach(v -> { try { productIds.add(Long.parseLong(v)); } catch (Exception ex) { productIds.add(v); } });
+        func.put("identifier", identifier);
+        func.put("identifierName", identifierName);
+        func.put("label", identifierName);
+        func.put("value", identifier);
+
+        JsonNode response = postJson(baseUrl, "/api/devices/show/energy-report-data", sessionToken, root);
+        if (!isSuccess(response)) {
+            throw new PlatformAdapterException("PLATFORM_ERROR", "Usage fetch failed: " + codeAndMessage(response));
+        }
+        JsonNode data = response.path("data");
+        JsonNode values = data.path("valueList");
+        if (!values.isArray()) return List.of();
+        List<PlatformDailyUsage> out = new ArrayList<>();
+        for (JsonNode row : values) {
+            String deviceId = firstText(row, "deviceId", "id");
+            for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
+                JsonNode value = row.path("_" + day.getDayOfMonth());
+                if (value.isMissingNode() || value.isNull() || value.asText("").isBlank()) continue;
+                try {
+                    out.add(new PlatformDailyUsage(deviceId, day, identifier, identifierName,
+                            new BigDecimal(value.asText()), row.toString()));
+                } catch (NumberFormatException ignored) {
+                    log.warn("non-numeric usage ignored, deviceId={}, date={}, value={}", deviceId, day, value.asText());
+                }
+            }
+        }
+        return out;
+    }
+
     /** Fetch relations for a single account. Empty list on any failure. */
     private List<PlatformAccountDeviceRelation> fetchRelationsForAccount(String baseUrl, String sessionToken, String accountId, String accountNumber) {
         try {
@@ -240,6 +303,17 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 .header("token", cookieHeader == null ? "" : cookieHeader)
                 .header("Accept", "application/json")
                 .get()
+                .build();
+        return execute(req);
+    }
+
+    private JsonNode postJson(String baseUrl, String path, String token, JsonNode body) {
+        Request req = new Request.Builder()
+                .url(joinUrl(baseUrl, path))
+                .header("Cookie", token == null ? "" : token)
+                .header("token", token == null ? "" : token)
+                .header("Accept", "application/json")
+                .post(RequestBody.create(body.toString(), JSON))
                 .build();
         return execute(req);
     }

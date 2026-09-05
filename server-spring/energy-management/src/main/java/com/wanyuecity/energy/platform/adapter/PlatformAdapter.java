@@ -3,7 +3,9 @@ package com.wanyuecity.energy.platform.adapter;
 import com.wanyuecity.energy.platform.dto.PlatformAccount;
 import com.wanyuecity.energy.platform.dto.PlatformAccountDeviceRelation;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
+import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -40,4 +42,11 @@ public interface PlatformAdapter {
      * account detail endpoint; implementations may override for efficiency.
      */
     List<PlatformAccountDeviceRelation> fetchAccountDeviceRelations(String baseUrl, String sessionToken, String spaceId);
+
+    /** Fetch daily usage/readings for devices. The requested range must stay within one calendar month. */
+    List<PlatformDailyUsage> fetchDailyUsage(String baseUrl, String sessionToken,
+                                             List<PlatformDevice> devices,
+                                             String energyType, String identifier,
+                                             String identifierName,
+                                             LocalDate startDate, LocalDate endDate);
 }
