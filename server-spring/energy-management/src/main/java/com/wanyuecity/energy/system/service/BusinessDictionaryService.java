@@ -12,7 +12,7 @@ import java.util.List;
 
 @Service @RequiredArgsConstructor
 public class BusinessDictionaryService {
-    public static final List<String> TYPES=List.of("FLOOR","BUSINESS_TYPE","METER_LOCATION","WATER_METER_CALIBER","DRAINAGE_PIPE_CALIBER","EXHAUST_FAN","FRESH_AIR_UNIT","AIR_CONDITIONER_SPEC","NATURAL_GAS_CALIBER","GAS_SHUTOFF_LOCATION");
+    public static final List<String> TYPES=List.of("FLOOR","BUSINESS_TYPE","METER_LOCATION","WATER_METER_CALIBER","DRAINAGE_PIPE_CALIBER","EXHAUST_FAN","FRESH_AIR_UNIT","AIR_CONDITIONER_SPEC","NATURAL_GAS_CALIBER","GAS_SHUTOFF_LOCATION","POWER_NODE_TYPE");
     private final BusinessDictionaryMapper mapper;
     public List<BusinessDictionary> list(String type, boolean enabledOnly){
         validateType(type); var q=new LambdaQueryWrapper<BusinessDictionary>().eq(BusinessDictionary::getDictType,type);
