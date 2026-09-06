@@ -20,7 +20,7 @@ export const systemUserApi = {
 }
 export const systemRoleApi = { list: () => http.get<SystemRole[]>('/api/v1/roles') }
 
-export type DictionaryType = 'FLOOR'|'AREA'|'BUSINESS_TYPE'|'BUSINESS_CATEGORY'|'METER_LOCATION'|'WATER_METER_CALIBER'|'DRAINAGE_PIPE_CALIBER'|'EXHAUST_FAN'|'FRESH_AIR_UNIT'|'AIR_CONDITIONER_SPEC'|'NATURAL_GAS_CALIBER'|'GAS_SHUTOFF_LOCATION'
+export type DictionaryType = 'FLOOR'|'AREA'|'BUSINESS_TYPE'|'BUSINESS_CATEGORY'|'METER_LOCATION'|'WATER_METER_CALIBER'|'DRAINAGE_PIPE_CALIBER'|'EXHAUST_FAN'|'FRESH_AIR_UNIT'|'AIR_CONDITIONER_SPEC'|'NATURAL_GAS_CALIBER'|'GAS_SHUTOFF_LOCATION'|'POWER_NODE_TYPE'
 export interface DictionaryItem { id:number; dictType:DictionaryType; itemValue:string; itemLabel:string; sortOrder:number; status:number; remark?:string; updatedAt?:string }
 export const dictionaryApi = {
   list: (type:DictionaryType, enabledOnly=true) => http.get<DictionaryItem[]>('/api/v1/dictionaries',{params:{type,enabledOnly}}),

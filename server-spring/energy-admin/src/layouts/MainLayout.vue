@@ -17,6 +17,7 @@
           <el-menu-item v-if="canApply" index="/workflow/new-merchant">水电费变更</el-menu-item>
           <el-menu-item v-if="canApply" index="/workflow/merchant-query">商户账户查询</el-menu-item>
         </el-sub-menu>
+        <el-menu-item v-if="canGeneral" index="/power/topology"><el-icon><Share /></el-icon><template #title>配电拓扑管理</template></el-menu-item>
         <el-sub-menu v-if="canGeneral" index="/energy">
           <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
           <el-menu-item index="/energy/devices">设备与分组</el-menu-item>
@@ -101,7 +102,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Lightning, Odometer, Connection, OfficeBuilding, Grid, Link, User, UserFilled, Expand, Fold, Warning, Tickets, Bell, DocumentChecked, List, DataAnalysis
+  Lightning, Odometer, Connection, OfficeBuilding, Grid, Link, User, UserFilled, Expand, Fold, Warning, Tickets, Bell, DocumentChecked, List, DataAnalysis, Share
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 

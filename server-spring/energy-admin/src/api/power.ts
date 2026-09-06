@@ -1,0 +1,4 @@
+import http from './http'
+export interface PowerNode {id:number;parentId?:number;nodeCode:string;nodeName:string;nodeType:string;nodeTypeName:string;switchSpecificationId?:number;switchSpecificationName?:string;switchRatedCurrentA?:number;ratedVoltageV?:number;ratedCurrentA?:number;ratedPowerKw?:number;location?:string;stallId?:number;stallCode?:string;platformDeviceId?:string;sortOrder:number;status:number;remark?:string;children:PowerNode[]}
+export type PowerNodePayload=Omit<PowerNode,'id'|'nodeTypeName'|'switchSpecificationName'|'switchRatedCurrentA'|'stallCode'|'children'>
+export const powerTopologyApi={tree:()=>http.get<PowerNode[]>('/api/v1/power-topology/nodes'),create:(data:Partial<PowerNodePayload>)=>http.post('/api/v1/power-topology/nodes',data),update:(id:number,data:Partial<PowerNodePayload>)=>http.put(`/api/v1/power-topology/nodes/${id}`,data),remove:(id:number)=>http.delete(`/api/v1/power-topology/nodes/${id}`)}

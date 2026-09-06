@@ -20,6 +20,7 @@ const routes = [
       { path: 'energy/devices', name: 'DeviceGroup', component: () => import('@/views/DeviceGroup.vue'), meta: { title: '设备与分组', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/sync', name: 'UsageSync', component: () => import('@/views/UsageSync.vue'), meta: { title: '历史用量同步', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/analysis', name: 'UsageAnalysis', component: () => import('@/views/UsageAnalysis.vue'), meta: { title: '用量阅读分析', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
+      { path: 'power/topology', name: 'PowerTopology', component: () => import('@/views/PowerTopology.vue'), meta: { title: '配电拓扑管理', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'exception', name: 'DataException', component: () => import('@/views/DataException.vue'), meta: { title: '异常中心', icon: 'Warning',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'merchant', name: 'Merchant', component: () => import('@/views/Merchant.vue'), meta: { title: '商户账户管理', icon: 'OfficeBuilding',roles:['SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER'] } },
       { path: 'stall', name: 'Stall', component: () => import('@/views/Stall.vue'), meta: { title: '铺位管理', icon: 'Grid',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
