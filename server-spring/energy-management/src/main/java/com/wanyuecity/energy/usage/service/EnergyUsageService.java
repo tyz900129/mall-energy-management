@@ -9,10 +9,12 @@ import com.wanyuecity.energy.platform.entity.PlatformDeviceCurrent;
 import com.wanyuecity.energy.platform.mapper.PlatformDeviceCurrentMapper;
 import com.wanyuecity.energy.platform.service.PlatformConfigService;
 import com.wanyuecity.energy.usage.service.dto.*;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,20 @@ public class EnergyUsageService {
     private final PlatformDeviceCurrentMapper deviceMapper;
     private final PlatformConfigService configService;
     private final PlatformAdapter platformAdapter;
+    private final TransactionTemplate transactionTemplate;
+    private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
+
+    @PostConstruct
+    void closeInterruptedSyncBatches() {
+        jdbc.update("""
+                UPDATE energy_usage_sync_batch
+                SET monthly_points=(SELECT COUNT(*) FROM energy_usage_monthly m WHERE m.sync_batch_id=energy_usage_sync_batch.id),
+                    daily_points=(SELECT COUNT(*) FROM energy_usage_daily d WHERE d.sync_batch_id=energy_usage_sync_batch.id),
+                    failed=GREATEST(failed,requested-succeeded),status='FAILED',
+                    error_message=CONCAT_WS('\n',NULLIF(error_message,''),'服务重启导致同步中断，请重新执行'),
+                    completed_at=COALESCE(completed_at,CURRENT_TIMESTAMP(3))
+                WHERE status='RUNNING'""");
+    }
 
     public List<Map<String, Object>> groups() {
         return jdbc.queryForList("""
@@ -107,6 +124,17 @@ public class EnergyUsageService {
     }
 
     public Map<String, Object> sync(UsageSyncRequest request) {
+        if (!syncInProgress.compareAndSet(false, true)) {
+            throw BizException.badRequest("已有用量同步正在执行，请等待当前批次完成");
+        }
+        try {
+            return executeSync(request);
+        } finally {
+            syncInProgress.set(false);
+        }
+    }
+
+    private Map<String, Object> executeSync(UsageSyncRequest request) {
         validateRange(request.startDate(), request.endDate());
         List<PlatformDeviceCurrent> current = selectDevices(request.groupId(), request.deviceIds());
         if (current.isEmpty()) throw BizException.badRequest("没有符合条件的设备");
@@ -140,6 +168,8 @@ public class EnergyUsageService {
                         succeeded += batch.size();
                     } catch (Exception ex) {
                         failed += batch.size(); errors.add("设备批次 " + (offset / 50 + 1) + ": " + ex.getMessage());
+                    } finally {
+                        updateSyncProgress(batchId,succeeded,failed);
                     }
                 }
             }
@@ -269,12 +299,12 @@ public class EnergyUsageService {
     }
 
     private void syncMonthlyChunks(PlatformConfigService.PlatformConnection c,List<PlatformDevice> devices,String energyType,Metric metric,LocalDate start,LocalDate end,Long batchId){LocalDate cursor=start.withDayOfMonth(1);while(!cursor.isAfter(end)){LocalDate yearEnd=LocalDate.of(cursor.getYear(),12,31);LocalDate chunkEnd=yearEnd.isAfter(end)?end:yearEnd;List<PlatformMonthlyUsage> points=platformAdapter.fetchMonthlyUsage(c.baseUrl(),c.token(),devices,energyType,metric.identifier(),metric.name(),cursor,chunkEnd);upsertMonthlyPoints(points,energyType,batchId);cursor=LocalDate.of(cursor.getYear()+1,1,1);}}
-    private void upsertMonthlyPoints(List<PlatformMonthlyUsage> points,String energyType,Long batchId){if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();jdbc.batchUpdate("""
+    private void upsertMonthlyPoints(List<PlatformMonthlyUsage> points,String energyType,Long batchId){if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();transactionTemplate.executeWithoutResult(status->jdbc.batchUpdate("""
       INSERT INTO energy_usage_monthly(platform_device_id,usage_month,energy_type,identifier,identifier_name,usage_value,sync_batch_id,synced_at,raw_json)
       VALUES(?,?,?,?,?,?,?,?,CAST(? AS JSON)) ON DUPLICATE KEY UPDATE energy_type=VALUES(energy_type),identifier_name=VALUES(identifier_name),usage_value=VALUES(usage_value),sync_batch_id=VALUES(sync_batch_id),synced_at=VALUES(synced_at),raw_json=VALUES(raw_json)
-      """,points,500,(ps,p)->{ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageMonth());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,p.value());ps.setLong(7,batchId);ps.setObject(8,syncedAt);ps.setString(9,p.rawJson());});}
+      """,points,500,(ps,p)->{ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageMonth());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,p.value());ps.setLong(7,batchId);ps.setObject(8,syncedAt);ps.setString(9,p.rawJson());}));}
     private LocalDate dailyRetentionStart(){return LocalDate.now().withDayOfMonth(1).minusMonths(2);}
-    private int archiveAndPurgeDaily(Long batchId){LocalDate cutoff=dailyRetentionStart();jdbc.update("""
+    private int archiveAndPurgeDaily(Long batchId){LocalDate cutoff=dailyRetentionStart();Integer purged=transactionTemplate.execute(status->{jdbc.update("""
       INSERT INTO energy_usage_monthly(platform_device_id,usage_month,energy_type,identifier,identifier_name,usage_value,sync_batch_id,synced_at,raw_json)
       SELECT u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier,MAX(u.identifier_name),SUM(COALESCE(u.usage_value,0)),?,CURRENT_TIMESTAMP(3),JSON_OBJECT('source','daily-backfill')
       FROM energy_usage_daily u WHERE u.usage_date<? GROUP BY u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier
@@ -285,7 +315,7 @@ public class EnergyUsageService {
       FROM energy_usage_daily u JOIN device_dimension_assignment a ON a.platform_device_id=u.platform_device_id AND u.usage_date>=a.effective_from AND (a.effective_to IS NULL OR u.usage_date<=a.effective_to)
       WHERE u.usage_date<? GROUP BY u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier,a.dimension_id,a.dimension_value_id
       ON DUPLICATE KEY UPDATE usage_value=VALUES(usage_value),updated_at=CURRENT_TIMESTAMP(3)
-      """,cutoff);return jdbc.update("DELETE FROM energy_usage_daily WHERE usage_date<?",cutoff);}
+      """,cutoff);return jdbc.update("DELETE FROM energy_usage_daily WHERE usage_date<?",cutoff);});return purged==null?0:purged;}
 
     private void syncDateChunks(PlatformConfigService.PlatformConnection c, List<PlatformDevice> devices,
                                 String energyType, Metric metric, LocalDate start, LocalDate end, Long batchId) {
@@ -301,14 +331,14 @@ public class EnergyUsageService {
     }
 
     private void upsertDailyPoints(List<PlatformDailyUsage> points, String energyType, Metric metric, Long batchId) {
-        if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();jdbc.batchUpdate("""
+        if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();transactionTemplate.executeWithoutResult(status->jdbc.batchUpdate("""
                 INSERT INTO energy_usage_daily(platform_device_id,usage_date,energy_type,identifier,identifier_name,
                   usage_value,meter_reading,value_mode,sync_batch_id,synced_at,raw_json)
                 VALUES(?,?,?,?,?,?,?,?,?,?,CAST(? AS JSON))
                 ON DUPLICATE KEY UPDATE energy_type=VALUES(energy_type),identifier_name=VALUES(identifier_name),
                   usage_value=VALUES(usage_value),meter_reading=VALUES(meter_reading),value_mode=VALUES(value_mode),
                   sync_batch_id=VALUES(sync_batch_id),synced_at=VALUES(synced_at),raw_json=VALUES(raw_json)""",
-                points,500,(ps,p)->{BigDecimal usage="READING".equals(metric.mode())?null:p.value();BigDecimal reading="READING".equals(metric.mode())?p.value():null;ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageDate());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,usage);ps.setBigDecimal(7,reading);ps.setString(8,metric.mode());ps.setLong(9,batchId);ps.setObject(10,syncedAt);ps.setString(11,p.rawJson());});
+                points,500,(ps,p)->{BigDecimal usage="READING".equals(metric.mode())?null:p.value();BigDecimal reading="READING".equals(metric.mode())?p.value():null;ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageDate());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,usage);ps.setBigDecimal(7,reading);ps.setString(8,metric.mode());ps.setLong(9,batchId);ps.setObject(10,syncedAt);ps.setString(11,p.rawJson());}));
     }
 
     private Metric resolveMetric(PlatformDeviceCurrent d) {
@@ -345,6 +375,7 @@ public class EnergyUsageService {
     }
     private int countDailyPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_daily WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
     private int countMonthlyPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_monthly WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
+    private void updateSyncProgress(Long batchId,int succeeded,int failed){jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,monthly_points=?,daily_points=? WHERE id=?",succeeded,failed,countMonthlyPoints(batchId),countDailyPoints(batchId),batchId);}
     private int valueOrZero(Integer v) { return v == null ? 0 : v; }
     private String defaultColor(String v) { return blank(v) ? "#409EFF" : v; }
     private boolean blank(String v) { return v == null || v.isBlank(); }

@@ -12,7 +12,7 @@ export function formatDateTime(value?: string | number | Date | null): string {
 }
 
 const labels: Record<string, string> = {
-  SUCCESS: '成功', FAILED: '失败', RUNNING: '运行中', PENDING: '等待中', MANUAL: '手动', SCHEDULED: '定时',
+  SUCCESS: '成功', FAILED: '失败', PARTIAL: '部分成功', PARTIAL_FAILED: '部分失败', RUNNING: '运行中', PENDING: '等待中', MANUAL: '手动', SCHEDULED: '定时',
   OPEN: '待处理', ACK: '已确认', HANDLING: '处理中', RESOLVED: '已解决', IGNORED: '已忽略',
   INFO: '提示', WARN: '警告', ERROR: '错误', CRITICAL: '严重',
   ACTIVE: '生效中', INACTIVE: '已失效', ELECTRIC: '电', WATER: '水', GAS: '燃气', OTHER: '其他',
