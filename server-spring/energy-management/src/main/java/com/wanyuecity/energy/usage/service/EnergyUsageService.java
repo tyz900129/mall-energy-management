@@ -149,8 +149,9 @@ public class EnergyUsageService {
             Map<MetricKey, List<PlatformDevice>> groups = new LinkedHashMap<>();
             for (PlatformDeviceCurrent d : current) {
                 try {
-                    Metric metric = resolveMetric(d);
-                    groups.computeIfAbsent(new MetricKey(metric, d.getEnergyType()), k -> new ArrayList<>()).add(toPlatformDevice(d));
+                    String energyType = effectiveEnergyType(d);
+                    Metric metric = resolveMetric(d,energyType);
+                    groups.computeIfAbsent(new MetricKey(metric,energyType,d.getProductId(),d.getProductName()), k -> new ArrayList<>()).add(toPlatformDevice(d,energyType));
                 } catch (Exception ex) {
                     failed++; errors.add(label(d) + ": " + ex.getMessage());
                 }
@@ -167,7 +168,7 @@ public class EnergyUsageService {
                         if(!dailyEnd.isBefore(dailyStart))syncDateChunks(connection,batch,entry.getKey().energyType(),metric,dailyStart,dailyEnd,batchId);
                         succeeded += batch.size();
                     } catch (Exception ex) {
-                        failed += batch.size(); errors.add("设备批次 " + (offset / 50 + 1) + ": " + ex.getMessage());
+                        failed += batch.size(); errors.add("产品 " + productLabel(entry.getKey()) + "，设备批次 " + (offset / 50 + 1) + ": " + ex.getMessage());
                     } finally {
                         updateSyncProgress(batchId,succeeded,failed);
                     }
@@ -341,15 +342,12 @@ public class EnergyUsageService {
                 points,500,(ps,p)->{BigDecimal usage="READING".equals(metric.mode())?null:p.value();BigDecimal reading="READING".equals(metric.mode())?p.value():null;ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageDate());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,usage);ps.setBigDecimal(7,reading);ps.setString(8,metric.mode());ps.setLong(9,batchId);ps.setObject(10,syncedAt);ps.setString(11,p.rawJson());}));
     }
 
-    private Metric resolveMetric(PlatformDeviceCurrent d) {
+    private Metric resolveMetric(PlatformDeviceCurrent d,String energyType) {
         if (blank(d.getProductId()) || blank(d.getCommAddress())) throw new IllegalArgumentException("缺少 productId 或通讯地址");
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT identifier,identifier_name,value_mode FROM device_energy_metric WHERE product_id=? AND energy_type=? AND enabled=1",
-                d.getProductId(), d.getEnergyType());
-        if (!rows.isEmpty()) return new Metric(String.valueOf(rows.get(0).get("identifier")),
-                String.valueOf(rows.get(0).get("identifier_name")), String.valueOf(rows.get(0).get("value_mode")));
-        if ("ELECTRIC".equalsIgnoreCase(d.getEnergyType())) return new Metric("11X", "正向有功电能", "USAGE");
-        if ("WATER".equalsIgnoreCase(d.getEnergyType())) return new Metric("totalFlow", "累计流量", "USAGE");
-        throw new IllegalArgumentException("尚未配置产品测量点");
+        if ("ELECTRIC".equals(energyType)) return new Metric("11X", "正向有功电能", "USAGE");
+        if ("WATER".equals(energyType)) return new Metric("totalFlow", "累计流量", "USAGE");
+        if ("GAS".equals(energyType)) return new Metric("totalFlow", "累计用气量", "USAGE");
+        throw new IllegalArgumentException("无法自动识别设备能源类型");
     }
 
     private List<PlatformDeviceCurrent> selectDevices(Long groupId, List<String> ids) {
@@ -359,10 +357,12 @@ public class EnergyUsageService {
         return deviceMapper.selectList(q);
     }
 
-    private PlatformDevice toPlatformDevice(PlatformDeviceCurrent d) {
+    private String effectiveEnergyType(PlatformDeviceCurrent d){String product=Optional.ofNullable(d.getProductName()).orElse("").toUpperCase(Locale.ROOT);String productId=Optional.ofNullable(d.getProductId()).orElse("");if(Set.of("437","438").contains(productId)||product.contains("水表"))return "WATER";if(Set.of("436","608").contains(productId)||product.contains("DTSU")||product.contains("DDSU")||product.contains("电表"))return "ELECTRIC";if(product.contains("燃气")||product.contains("气表"))return "GAS";String source=Optional.ofNullable(d.getEnergyType()).orElse("").toUpperCase(Locale.ROOT);return Set.of("ELECTRIC","WATER","GAS").contains(source)?source:"OTHER";}
+    private String productLabel(MetricKey key){return (blank(key.productName())?"未知产品":key.productName())+"（"+key.productId()+"）";}
+    private PlatformDevice toPlatformDevice(PlatformDeviceCurrent d,String energyType) {
         return PlatformDevice.builder().platformDeviceId(d.getPlatformDeviceId()).deviceName(d.getDeviceName())
                 .commAddress(d.getCommAddress()).productId(d.getProductId()).productName(d.getProductName())
-                .energyType(d.getEnergyType()).energyTypeName(d.getEnergyTypeName()).build();
+                .energyType(energyType).energyTypeName(d.getEnergyTypeName()).build();
     }
 
     private void validateRange(LocalDate start, LocalDate end) {
@@ -383,6 +383,6 @@ public class EnergyUsageService {
     private String truncate(String v, int n) { return v == null || v.length() <= n ? v : v.substring(0, n); }
     private BigDecimal decimal(Object v) { return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString()); }
     private record Metric(String identifier, String name, String mode) {}
-    private record MetricKey(Metric metric, String energyType) {}
+    private record MetricKey(Metric metric, String energyType,String productId,String productName) {}
     private record AnalysisFilter(String table,String dateField,String joins, String sql, List<Object> args) {}
 }
