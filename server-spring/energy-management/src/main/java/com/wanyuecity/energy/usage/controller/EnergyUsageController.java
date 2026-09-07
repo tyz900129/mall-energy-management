@@ -41,7 +41,8 @@ public class EnergyUsageController {
     @GetMapping("/usage/sync-batches") public ApiResponse<List<Map<String,Object>>> batches() { return ApiResponse.ok(service.syncBatches()); }
     @GetMapping("/analysis") public ApiResponse<Map<String,Object>> analysis(
             @RequestParam LocalDate startDate,@RequestParam LocalDate endDate,
+            @RequestParam(defaultValue="MONTH") String period,
             @RequestParam(required=false) Long groupId,@RequestParam(required=false) String deviceId) {
-        return ApiResponse.ok(service.analysis(startDate,endDate,groupId,deviceId));
+        return ApiResponse.ok(service.analysis(startDate,endDate,period,groupId,deviceId));
     }
 }

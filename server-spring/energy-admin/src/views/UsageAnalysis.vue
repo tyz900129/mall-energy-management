@@ -1,29 +1,42 @@
-<template><div class="page"><div class="page-header"><div class="page-title">用量阅读分析</div></div><el-card><div class="toolbar"><el-date-picker v-model="range" type="daterange" value-format="YYYY-MM-DD" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"/><el-select v-model="groupId" clearable placeholder="全部分组"><el-option v-for="g in groups" :key="g.id" :label="g.group_name" :value="g.id"/></el-select><el-button type="primary" @click="load">查询</el-button></div></el-card>
-<el-row :gutter="14" class="summary"><el-col :span="8"><el-card><div class="label">总用量</div><div class="value">{{num(data.totalUsage)}}</div></el-card></el-col><el-col :span="8"><el-card><div class="label">有数据天数</div><div class="value">{{data.days||0}}</div></el-card></el-col><el-col :span="8"><el-card><div class="label">日均用量</div><div class="value">{{num((Number(data.totalUsage)||0)/(data.days||1))}}</div></el-card></el-col></el-row>
-<el-row :gutter="14"><el-col :xs="24" :lg="13"><el-card><template #header><b>每日趋势</b></template><div v-if="!data.trend?.length" class="empty">暂无数据</div><div v-for="p in data.trend||[]" :key="p.usage_date" class="bar-row"><span>{{p.usage_date}}</span><div class="bar-bg"><i :style="{width:bar(p.total_usage)}"/></div><b>{{num(p.total_usage)}}</b></div></el-card></el-col><el-col :xs="24" :lg="11"><el-card><template #header><b>设备用量排行</b></template><el-table :data="data.ranking||[]" max-height="540"><el-table-column prop="device_name" label="设备" min-width="150" show-overflow-tooltip/><el-table-column prop="group_name" label="分组" width="100"/><el-table-column label="总量" width="100" align="right"><template #default="{row}">{{num(row.total_usage)}}</template></el-table-column><el-table-column label="日均" width="90" align="right"><template #default="{row}">{{num(row.avg_usage)}}</template></el-table-column></el-table></el-card></el-col></el-row></div></template>
+<template>
+ <div class="page usage-analysis">
+  <div class="page-header"><div><div class="page-title">用量分析</div><div class="subtitle">按周、月、季度、年度查看水电用量趋势及对比分析</div></div></div>
+  <el-card class="filter-card">
+   <div class="period-switch"><span>统计周期</span><el-radio-group v-model="period" @change="changePeriod"><el-radio-button value="WEEK">周</el-radio-button><el-radio-button value="MONTH">月</el-radio-button><el-radio-button value="QUARTER">季</el-radio-button><el-radio-button value="YEAR">年</el-radio-button></el-radio-group></div>
+   <div class="toolbar"><el-date-picker v-model="range" type="daterange" value-format="YYYY-MM-DD" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"/><el-select v-model="groupId" clearable placeholder="全部设备分组"><el-option v-for="g in groups" :key="g.id" :label="g.group_name" :value="g.id"/></el-select><el-button type="primary" :loading="loading" @click="load">查询分析</el-button></div>
+  </el-card>
+
+  <el-row :gutter="14" class="summary">
+   <el-col v-for="s in summaries" :key="s.energyType" :xs="24" :md="12"><el-card :class="['summary-card',s.energyType.toLowerCase()]"><div class="summary-head"><span>{{energyLabel(s.energyType)}}总用量</span><el-tag :type="changeType(s.changePercent)" effect="plain">较前一等长周期 {{changeText(s.changePercent)}}</el-tag></div><div class="value">{{num(s.totalUsage)}} <small>{{unit(s.energyType)}}</small></div><div class="summary-meta"><span>日均 {{num(s.averageDailyUsage)}} {{unit(s.energyType)}}</span><span>涉及设备 {{s.deviceCount||0}} 台</span><span>上期 {{num(s.previousUsage)}} {{unit(s.energyType)}}</span></div></el-card></el-col>
+  </el-row>
+
+  <el-row :gutter="14">
+   <el-col :xs="24" :lg="15"><el-card class="trend-card"><template #header><div class="card-header"><b>{{periodLabel}}用量趋势</b><span>{{data.startDate||'-'}} 至 {{data.endDate||'-'}}</span></div></template><div v-if="!data.trend?.length" class="empty">当前范围暂无用量数据，请先同步历史用量</div><div v-for="p in data.trend||[]" :key="p.period_start" class="trend-row"><div class="period-name">{{formatPeriod(p.period_start)}}</div><div class="bars"><div class="bar-line"><span class="energy-dot electric"/>电<div class="bar-bg"><i class="electric-bar" :style="{width:bar(p.electric_usage,'ELECTRIC')}"/></div><b>{{num(p.electric_usage)}} kWh</b></div><div class="bar-line"><span class="energy-dot water"/>水<div class="bar-bg"><i class="water-bar" :style="{width:bar(p.water_usage,'WATER')}"/></div><b>{{num(p.water_usage)}} m³</b></div></div></div></el-card></el-col>
+   <el-col :xs="24" :lg="9"><el-card><template #header><b>分析结论</b></template><div v-if="!insights.length" class="empty compact">暂无可分析数据</div><div v-for="(item,i) in insights" :key="i" class="insight"><span>{{i+1}}</span><p>{{item}}</p></div></el-card></el-col>
+  </el-row>
+
+  <el-card class="ranking-card"><template #header><div class="card-header"><b>设备用量排行</b><el-radio-group v-model="rankingEnergy" size="small"><el-radio-button value="ELECTRIC">电表</el-radio-button><el-radio-button value="WATER">水表</el-radio-button></el-radio-group></div></template><el-table :data="filteredRanking" max-height="560"><el-table-column type="index" label="排名" width="65"/><el-table-column prop="device_name" label="设备名称" min-width="180" show-overflow-tooltip/><el-table-column prop="group_name" label="设备分组" min-width="110"><template #default="{row}">{{row.group_name||'未分组'}}</template></el-table-column><el-table-column label="统计用量" width="145" align="right"><template #default="{row}"><b>{{num(row.total_usage)}}</b> {{unit(row.energy_type)}}</template></el-table-column><el-table-column label="日均用量" width="135" align="right"><template #default="{row}">{{num(row.avg_daily_usage)}} {{unit(row.energy_type)}}</template></el-table-column><el-table-column prop="covered_days" label="数据天数" width="95" align="center"/></el-table></el-card>
+ </div>
+</template>
+
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { energyApi } from '@/api/energy'
-
-const groups = ref<any[]>([])
-const groupId = ref<number>()
-const data = ref<any>({ trend: [], ranking: [] })
-const now = new Date()
-const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-const end = new Date(now.getFullYear(), now.getMonth(), 0)
-const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const range = ref([fmt(start), fmt(end)])
-const max = computed(() => Math.max(0, ...(data.value.trend || []).map((v: any) => Number(v.total_usage) || 0)))
-const num = (v: any) => (Number(v) || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-const bar = (v: any) => `${max.value ? Math.max(1, Number(v) / max.value * 100) : 0}%`
-
-async function load() {
-  if (!range.value?.length) return
-  data.value = (await energyApi.analysis({ startDate: range.value[0], endDate: range.value[1], groupId: groupId.value })) as any
-}
-onMounted(async () => {
-  groups.value = (await energyApi.groups()) as any
-  await load()
-})
+import{computed,onMounted,ref}from'vue';import{energyApi}from'@/api/energy';
+type Period='WEEK'|'MONTH'|'QUARTER'|'YEAR';
+const groups=ref<any[]>([]),groupId=ref<number>(),period=ref<Period>('MONTH'),rankingEnergy=ref('ELECTRIC'),loading=ref(false),data=ref<any>({trend:[],ranking:[],summaries:[]});
+const fmt=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const defaultRange=(p:Period)=>{const end=new Date(),start=new Date(end);if(p==='WEEK')start.setDate(start.getDate()-7*11);else if(p==='MONTH')start.setMonth(start.getMonth()-11,1);else if(p==='QUARTER')start.setMonth(start.getMonth()-21,1);else start.setFullYear(start.getFullYear()-4,0,1);return[fmt(start),fmt(end)]};
+const range=ref<string[]>(defaultRange(period.value));
+const summaries=computed(()=>data.value.summaries||[]),filteredRanking=computed(()=>(data.value.ranking||[]).filter((x:any)=>x.energy_type===rankingEnergy.value));
+const periodLabel=computed(()=>({WEEK:'每周',MONTH:'每月',QUARTER:'每季度',YEAR:'每年'}[period.value]));
+const maximum=computed(()=>({
+ ELECTRIC:Math.max(0,...(data.value.trend||[]).map((x:any)=>Number(x.electric_usage)||0)),
+ WATER:Math.max(0,...(data.value.trend||[]).map((x:any)=>Number(x.water_usage)||0))
+}));
+const insights=computed(()=>{const rows=data.value.trend||[],out:string[]=[];for(const e of['ELECTRIC','WATER']){const key=e==='ELECTRIC'?'electric_usage':'water_usage',values=rows.map((x:any)=>Number(x[key])||0);if(!values.some(Boolean))continue;const max=Math.max(...values),peak=rows[values.indexOf(max)],first=values[0],last=values[values.length-1],change=first?((last-first)/first*100):null;out.push(`${energyLabel(e)}用量峰值出现在${formatPeriod(peak.period_start)}，为 ${num(max)} ${unit(e)}。`);if(change!==null&&rows.length>1)out.push(`${energyLabel(e)}最新${periodLabel.value.replace('每','')}较首个${periodLabel.value.replace('每','')}${change>=0?'上升':'下降'} ${Math.abs(change).toFixed(1)}%。`)}for(const s of summaries.value){if(s.changePercent!==null&&s.changePercent!==undefined)out.push(`本统计范围${energyLabel(s.energyType)}总量较前一等长周期${Number(s.changePercent)>=0?'增加':'减少'} ${Math.abs(Number(s.changePercent)).toFixed(1)}%。`)}return out});
+function changePeriod(){range.value=defaultRange(period.value);load()}function energyLabel(v:string){return v==='WATER'?'水':'电'}function unit(v:string){return v==='WATER'?'m³':'kWh'}function num(v:any){return(Number(v)||0).toLocaleString('zh-CN',{maximumFractionDigits:2})}function bar(v:any,e:'ELECTRIC'|'WATER'){const m=maximum.value[e];return`${m?Math.max(1,Number(v)/m*100):0}%`}function changeText(v:any){if(v===null||v===undefined)return'新增数据';const n=Number(v);return`${n>=0?'↑':'↓'} ${Math.abs(n).toFixed(1)}%`}function changeType(v:any){if(v===null||v===undefined)return'info';return Number(v)>0?'danger':Number(v)<0?'success':'info'}
+function formatPeriod(value:any){const d=new Date(String(value).slice(0,10)+'T00:00:00');if(Number.isNaN(d.getTime()))return String(value||'-');if(period.value==='YEAR')return`${d.getFullYear()}年`;if(period.value==='QUARTER')return`${d.getFullYear()}年第${Math.floor(d.getMonth()/3)+1}季度`;if(period.value==='MONTH')return`${d.getFullYear()}年${d.getMonth()+1}月`;const end=new Date(d);end.setDate(end.getDate()+6);return`${d.getMonth()+1}/${d.getDate()}－${end.getMonth()+1}/${end.getDate()}`}
+async function load(){if(!range.value?.length)return;loading.value=true;try{data.value=await energyApi.analysis({startDate:range.value[0],endDate:range.value[1],period:period.value,groupId:groupId.value}) as any}finally{loading.value=false}}
+onMounted(async()=>{groups.value=await energyApi.groups() as any;await load()});
 </script>
-<style scoped>.page{padding:18px}.page-header{margin-bottom:14px}.page-title{font-size:22px;font-weight:700}.toolbar{display:flex;gap:10px}.toolbar .el-select{width:180px}.summary{margin:14px 0}.label{color:#909399}.value{font-size:28px;font-weight:700;margin-top:8px}.empty{text-align:center;color:#909399;padding:50px}.bar-row{display:grid;grid-template-columns:95px 1fr 90px;gap:10px;align-items:center;margin:11px 0;font-size:13px}.bar-row b{text-align:right}.bar-bg{height:12px;background:#f0f2f5;border-radius:6px;overflow:hidden}.bar-bg i{display:block;height:100%;background:linear-gradient(90deg,#409eff,#67c23a);border-radius:6px}</style>
+
+<style scoped>.usage-analysis{padding:18px}.page-header{margin-bottom:14px}.page-title{font-size:22px;font-weight:700}.subtitle{font-size:13px;color:#909399;margin-top:5px}.filter-card{margin-bottom:14px}.period-switch,.toolbar,.summary-head,.summary-meta,.card-header{display:flex;align-items:center}.period-switch{gap:16px;margin-bottom:14px}.period-switch>span{font-weight:600}.toolbar{gap:10px}.toolbar .el-select{width:190px}.summary{margin-bottom:14px}.summary-card{border-top:3px solid}.summary-card.electric{border-top-color:#e6a23c}.summary-card.water{border-top-color:#409eff}.summary-head{justify-content:space-between;color:#606266}.value{font-size:30px;font-weight:700;margin:12px 0}.value small{font-size:14px;color:#909399}.summary-meta{gap:18px;flex-wrap:wrap;font-size:13px;color:#909399}.card-header{justify-content:space-between}.card-header>span{font-size:12px;color:#909399}.trend-row{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid #ebeef5}.period-name{font-weight:600;padding-top:5px}.bars{display:flex;flex-direction:column;gap:9px}.bar-line{display:grid;grid-template-columns:10px 14px 1fr 120px;gap:7px;align-items:center;font-size:12px}.bar-line b{text-align:right}.energy-dot{width:9px;height:9px;border-radius:50%}.energy-dot.electric{background:#e6a23c}.energy-dot.water{background:#409eff}.bar-bg{height:11px;background:#f0f2f5;border-radius:6px;overflow:hidden}.bar-bg i{display:block;height:100%;border-radius:6px}.electric-bar{background:linear-gradient(90deg,#f3c263,#e6a23c)}.water-bar{background:linear-gradient(90deg,#79bbff,#409eff)}.empty{text-align:center;color:#909399;padding:70px 10px}.empty.compact{padding:35px 10px}.insight{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #ebeef5}.insight>span{flex:none;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;background:#ecf5ff;color:#409eff}.insight p{margin:2px 0;line-height:1.6;color:#606266}.ranking-card{margin-top:14px}@media(max-width:768px){.usage-analysis{padding:10px}.period-switch{align-items:flex-start;flex-direction:column;gap:8px}.period-switch :deep(.el-radio-group){display:flex;width:100%}.period-switch :deep(.el-radio-button){flex:1}.period-switch :deep(.el-radio-button__inner){width:100%;padding:9px 8px}.toolbar{flex-direction:column}.toolbar>*{width:100%!important}.summary .el-col+.el-col{margin-top:10px}.summary-meta{gap:7px;flex-direction:column;align-items:flex-start}.trend-row{grid-template-columns:1fr}.bar-line{grid-template-columns:10px 14px 1fr 92px}.card-header{gap:10px}.ranking-card{overflow:hidden}}</style>
