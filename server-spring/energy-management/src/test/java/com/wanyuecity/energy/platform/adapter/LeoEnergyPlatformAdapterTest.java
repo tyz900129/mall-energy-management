@@ -111,6 +111,26 @@ class LeoEnergyPlatformAdapterTest {
         assertEquals("TOKEN", request.getHeader("token"));
     }
 
+    @Test
+    void mapsYearReportColumnsToMonthlyUsage() throws Exception {
+        server.enqueue(json("{\"code\":\"200000\",\"data\":{\"columnList\":[{\"prop\":\"_7\"},{\"prop\":\"_8\"}],\"valueList\":[{\"deviceId\":\"DEVICE-1\",\"_7\":\"318.75\",\"_8\":\"402.5\"}]}}"));
+        PlatformDevice device = PlatformDevice.builder().platformDeviceId("DEVICE-1").deviceName("电表")
+                .commAddress("1").productId("100").build();
+
+        var points = adapter.fetchMonthlyUsage(server.url("/").toString(), "TOKEN", List.of(device),
+                "ELECTRIC", "11X", "正向有功电能",
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(2, points.size());
+        assertEquals(LocalDate.of(2026, 7, 1), points.get(0).usageMonth());
+        assertEquals("318.75", points.get(0).value().toPlainString());
+        assertEquals(LocalDate.of(2026, 8, 1), points.get(1).usageMonth());
+        RecordedRequest request = server.takeRequest();
+        String body = request.getBody().readUtf8();
+        assertEquals("/api/devices/show/energy-report-data", request.getPath());
+        assertTrue(body.contains("\"timeType\":\"year\""));
+    }
+
     private MockResponse json(String body) {
         return new MockResponse()
                 .setHeader("Content-Type", "application/json")

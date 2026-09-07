@@ -3,6 +3,7 @@ package com.wanyuecity.energy.usage.service;
 import com.wanyuecity.energy.core.BizException;
 import com.wanyuecity.energy.platform.adapter.PlatformAdapter;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
+import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.entity.PlatformDeviceCurrent;
 import com.wanyuecity.energy.platform.mapper.PlatformDeviceCurrentMapper;
@@ -132,19 +133,21 @@ public class EnergyUsageService {
                 for (int offset = 0; offset < devices.size(); offset += 50) {
                     List<PlatformDevice> batch = devices.subList(offset, Math.min(offset + 50, devices.size()));
                     try {
-                        syncDateChunks(connection, batch, entry.getKey().energyType(), metric,
-                                request.startDate(), request.endDate(), batchId);
+                        syncMonthlyChunks(connection,batch,entry.getKey().energyType(),metric,request.startDate(),request.endDate(),batchId);
+                        LocalDate dailyStart=request.startDate().isAfter(dailyRetentionStart())?request.startDate():dailyRetentionStart();
+                        LocalDate dailyEnd=request.endDate().isBefore(LocalDate.now())?request.endDate():LocalDate.now();
+                        if(!dailyEnd.isBefore(dailyStart))syncDateChunks(connection,batch,entry.getKey().energyType(),metric,dailyStart,dailyEnd,batchId);
                         succeeded += batch.size();
                     } catch (Exception ex) {
                         failed += batch.size(); errors.add("设备批次 " + (offset / 50 + 1) + ": " + ex.getMessage());
                     }
                 }
             }
+            int monthlyPoints=countMonthlyPoints(batchId),dailyPoints=countDailyPoints(batchId),purged=archiveAndPurgeDaily(batchId);
             String status = failed == 0 ? "SUCCESS" : (succeeded > 0 ? "PARTIAL" : "FAILED");
-            jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,status=?,error_message=?,completed_at=? WHERE id=?",
-                    succeeded, failed, status, truncate(String.join("\n", errors), 4000), LocalDateTime.now(), batchId);
-            return Map.of("batchNo", batchNo, "status", status, "requested", current.size(), "succeeded", succeeded,
-                    "failed", failed, "points", countPoints(batchId));
+            jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,monthly_points=?,daily_points=?,purged_daily_points=?,status=?,error_message=?,completed_at=? WHERE id=?",
+                    succeeded, failed,monthlyPoints,dailyPoints,purged,status, truncate(String.join("\n", errors), 4000), LocalDateTime.now(), batchId);
+            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("requested",current.size());result.put("succeeded",succeeded);result.put("failed",failed);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
         } catch (RuntimeException ex) {
             jdbc.update("UPDATE energy_usage_sync_batch SET failed=?,status='FAILED',error_message=?,completed_at=? WHERE id=?",
                     current.size(), truncate(ex.getMessage(), 4000), LocalDateTime.now(), batchId);
@@ -162,40 +165,34 @@ public class EnergyUsageService {
         if (!Set.of("WEEK", "MONTH", "QUARTER", "YEAR").contains(normalizedPeriod)) {
             throw BizException.badRequest("统计周期仅支持周、月、季、年");
         }
-        AnalysisFilter current = analysisFilter(start, end, groupId, deviceId, dimensionId, dimensionValueId);
-        String bucket = bucketExpression(normalizedPeriod);
+        boolean daily="WEEK".equals(normalizedPeriod);String sourceTable=daily?"energy_usage_daily":"energy_usage_monthly";String dateField=daily?"u.usage_date":"u.usage_month";
+        if(daily&&start.isBefore(dailyRetentionStart()))start=dailyRetentionStart();
+        AnalysisFilter current = analysisFilter(start, end, groupId, deviceId, dimensionId, dimensionValueId,sourceTable,dateField);
+        String bucket = bucketExpression(normalizedPeriod,dateField);
         List<Map<String, Object>> trend = jdbc.queryForList("""
                 SELECT %s period_start,
                        SUM(CASE WHEN UPPER(u.energy_type)='ELECTRIC' THEN COALESCE(u.usage_value,0) ELSE 0 END) electric_usage,
                        SUM(CASE WHEN UPPER(u.energy_type)='WATER' THEN COALESCE(u.usage_value,0) ELSE 0 END) water_usage,
                        COUNT(DISTINCT CASE WHEN UPPER(u.energy_type)='ELECTRIC' THEN u.platform_device_id END) electric_devices,
                        COUNT(DISTINCT CASE WHEN UPPER(u.energy_type)='WATER' THEN u.platform_device_id END) water_devices
-                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
-                WHERE u.usage_date BETWEEN ? AND ? %s
+                FROM %s u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
+                WHERE %s BETWEEN ? AND ? %s
                 GROUP BY period_start ORDER BY period_start
-                """.formatted(bucket, current.joins(), current.sql()), current.args().toArray());
+                """.formatted(bucket,sourceTable,current.joins(),dateField,current.sql()), current.args().toArray());
         List<Map<String, Object>> ranking = jdbc.queryForList("""
                 SELECT u.platform_device_id,d.device_name,g.group_name,UPPER(u.energy_type) energy_type,
-                       SUM(COALESCE(u.usage_value,0)) total_usage,AVG(COALESCE(u.usage_value,0)) avg_daily_usage,
-                       MAX(COALESCE(u.usage_value,0)) peak_daily_usage,COUNT(DISTINCT u.usage_date) covered_days
-                FROM energy_usage_daily u JOIN platform_device_current d ON d.platform_device_id=u.platform_device_id
+                       SUM(COALESCE(u.usage_value,0)) total_usage,AVG(COALESCE(u.usage_value,0)) avg_period_usage,
+                       MAX(COALESCE(u.usage_value,0)) peak_period_usage,COUNT(DISTINCT %s) covered_periods
+                FROM %s u JOIN platform_device_current d ON d.platform_device_id=u.platform_device_id
                 LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
-                LEFT JOIN device_group g ON g.id=a.group_id WHERE u.usage_date BETWEEN ? AND ? %s
+                LEFT JOIN device_group g ON g.id=a.group_id WHERE %s BETWEEN ? AND ? %s
                 GROUP BY u.platform_device_id,d.device_name,g.group_name,u.energy_type ORDER BY energy_type,total_usage DESC
-                """.formatted(current.joins(), current.sql()), current.args().toArray());
-        List<Map<String,Object>> breakdown = dimensionId == null ? List.of() : jdbc.queryForList("""
-                SELECT %s period_start,v.id dimension_value_id,v.value_name dimension_value_name,v.color,
-                       SUM(CASE WHEN UPPER(u.energy_type)='ELECTRIC' THEN COALESCE(u.usage_value,0) ELSE 0 END) electric_usage,
-                       SUM(CASE WHEN UPPER(u.energy_type)='WATER' THEN COALESCE(u.usage_value,0) ELSE 0 END) water_usage
-                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
-                JOIN analysis_dimension_value v ON v.id=da.dimension_value_id
-                WHERE u.usage_date BETWEEN ? AND ? %s
-                GROUP BY period_start,v.id,v.value_name,v.color ORDER BY period_start,v.sort_order,v.id
-                """.formatted(bucket,current.joins(),current.sql()),current.args().toArray());
+                """.formatted(dateField,sourceTable,current.joins(),dateField,current.sql()), current.args().toArray());
+        List<Map<String,Object>> breakdown = dimensionId == null ? List.of() : dimensionBreakdown(start,end,normalizedPeriod,dimensionId,dimensionValueId,deviceId);
         long rangeDays = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
         LocalDate previousEnd = start.minusDays(1);
         LocalDate previousStart = previousEnd.minusDays(rangeDays - 1);
-        AnalysisFilter previous = analysisFilter(previousStart, previousEnd, groupId, deviceId, dimensionId, dimensionValueId);
+        AnalysisFilter previous = analysisFilter(previousStart, previousEnd, groupId, deviceId, dimensionId, dimensionValueId,sourceTable,dateField);
         Map<String, BigDecimal> currentTotals = totals(current);
         Map<String, BigDecimal> previousTotals = totals(previous);
         List<Map<String, Object>> summaries = new ArrayList<>();
@@ -213,30 +210,30 @@ public class EnergyUsageService {
         Map<String,Object> result=new LinkedHashMap<>();result.put("period",normalizedPeriod);result.put("startDate",start);result.put("endDate",end);result.put("rangeDays",rangeDays);result.put("trend",trend);result.put("breakdown",breakdown);result.put("dimensionTotals",dimensionTotals);result.put("ranking",ranking);result.put("summaries",summaries);return result;
     }
 
-    private AnalysisFilter analysisFilter(LocalDate start, LocalDate end, Long groupId, String deviceId, Long dimensionId, Long dimensionValueId) {
+    private AnalysisFilter analysisFilter(LocalDate start, LocalDate end, Long groupId, String deviceId, Long dimensionId, Long dimensionValueId,String table,String dateField) {
         List<Object> args = new ArrayList<>(List.of(start, end));String sql = "",joins="";
         if (groupId != null) { sql += " AND a.group_id=?";args.add(groupId); }
         if (deviceId != null && !deviceId.isBlank()) { sql += " AND u.platform_device_id=?";args.add(deviceId.trim()); }
-        if(dimensionId!=null){joins=" JOIN device_dimension_assignment da ON da.platform_device_id=u.platform_device_id AND u.usage_date>=da.effective_from AND (da.effective_to IS NULL OR u.usage_date<=da.effective_to) ";sql+=" AND da.dimension_id=?";args.add(dimensionId);if(dimensionValueId!=null){sql+=" AND da.dimension_value_id=?";args.add(dimensionValueId);}}
-        return new AnalysisFilter(joins, sql, args);
+        if(dimensionId!=null){joins=" JOIN device_dimension_assignment da ON da.platform_device_id=u.platform_device_id AND "+dateField+">=da.effective_from AND (da.effective_to IS NULL OR "+dateField+"<=da.effective_to) ";sql+=" AND da.dimension_id=?";args.add(dimensionId);if(dimensionValueId!=null){sql+=" AND da.dimension_value_id=?";args.add(dimensionValueId);}}
+        return new AnalysisFilter(table,dateField,joins, sql, args);
     }
 
     private Map<String, BigDecimal> totals(AnalysisFilter filter) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT UPPER(u.energy_type) energy_type,SUM(COALESCE(u.usage_value,0)) total_usage
-                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
-                WHERE u.usage_date BETWEEN ? AND ? %s GROUP BY UPPER(u.energy_type)
-                """.formatted(filter.joins(),filter.sql()), filter.args().toArray());
+                FROM %s u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
+                WHERE %s BETWEEN ? AND ? %s GROUP BY UPPER(u.energy_type)
+                """.formatted(filter.table(),filter.joins(),filter.dateField(),filter.sql()), filter.args().toArray());
         Map<String, BigDecimal> result = new HashMap<>();
         rows.forEach(v -> result.put(String.valueOf(v.get("energy_type")), decimal(v.get("total_usage"))));return result;
     }
 
-    private String bucketExpression(String period) {
+    private String bucketExpression(String period,String dateField) {
         return switch (period) {
-            case "WEEK" -> "DATE_SUB(u.usage_date, INTERVAL WEEKDAY(u.usage_date) DAY)";
-            case "QUARTER" -> "STR_TO_DATE(CONCAT(YEAR(u.usage_date),'-',LPAD((QUARTER(u.usage_date)-1)*3+1,2,'0'),'-01'),'%Y-%m-%d')";
-            case "YEAR" -> "MAKEDATE(YEAR(u.usage_date),1)";
-            default -> "DATE_SUB(u.usage_date, INTERVAL DAYOFMONTH(u.usage_date)-1 DAY)";
+            case "WEEK" -> "DATE_SUB("+dateField+", INTERVAL WEEKDAY("+dateField+") DAY)";
+            case "QUARTER" -> "STR_TO_DATE(CONCAT(YEAR("+dateField+"),'-',LPAD((QUARTER("+dateField+")-1)*3+1,2,'0'),'-01'),'%Y-%m-%d')";
+            case "YEAR" -> "MAKEDATE(YEAR("+dateField+"),1)";
+            default -> "DATE_SUB("+dateField+", INTERVAL DAYOFMONTH("+dateField+")-1 DAY)";
         };
     }
 
@@ -244,6 +241,51 @@ public class EnergyUsageService {
         if (previous.signum() == 0) return current.signum() == 0 ? BigDecimal.ZERO : null;
         return current.subtract(previous).multiply(BigDecimal.valueOf(100)).divide(previous, 2, java.math.RoundingMode.HALF_UP);
     }
+
+    private List<Map<String,Object>> dimensionBreakdown(LocalDate start,LocalDate end,String period,Long dimensionId,Long valueId,String deviceId){
+        String valueFilter=valueId==null?"":" AND x.dimension_value_id="+valueId;String deviceFilter=deviceId==null||deviceId.isBlank()?"":" AND x.platform_device_id=?";
+        List<Object> args=new ArrayList<>();Collections.addAll(args,start.withDayOfMonth(1),end.withDayOfMonth(1),dimensionId,dimensionId,start,end,dimensionId,start.withDayOfMonth(1),end.withDayOfMonth(1));if(!deviceFilter.isEmpty())args.add(deviceId.trim());
+        String bucket=bucketExpression(period,"x.usage_date");
+        return jdbc.queryForList("""
+          SELECT %s period_start,v.id dimension_value_id,v.value_name dimension_value_name,v.color,
+            SUM(CASE WHEN UPPER(x.energy_type)='ELECTRIC' THEN x.usage_value ELSE 0 END) electric_usage,
+            SUM(CASE WHEN UPPER(x.energy_type)='WATER' THEN x.usage_value ELSE 0 END) water_usage
+          FROM (
+            SELECT s.platform_device_id,s.usage_month usage_date,s.energy_type,s.usage_value,s.dimension_value_id
+            FROM energy_usage_monthly_dimension s WHERE s.usage_month BETWEEN ? AND ? AND s.dimension_id=?
+            UNION ALL
+            SELECT d.platform_device_id,d.usage_date,d.energy_type,COALESCE(d.usage_value,0),a.dimension_value_id
+            FROM energy_usage_daily d JOIN device_dimension_assignment a ON a.platform_device_id=d.platform_device_id AND a.dimension_id=? AND d.usage_date>=a.effective_from AND (a.effective_to IS NULL OR d.usage_date<=a.effective_to)
+            WHERE d.usage_date BETWEEN ? AND ? AND NOT EXISTS(SELECT 1 FROM energy_usage_monthly_dimension s WHERE s.platform_device_id=d.platform_device_id AND s.usage_month=DATE_SUB(d.usage_date,INTERVAL DAYOFMONTH(d.usage_date)-1 DAY) AND s.identifier=d.identifier AND s.dimension_id=a.dimension_id)
+            UNION ALL
+            SELECT m.platform_device_id,m.usage_month,m.energy_type,COALESCE(m.usage_value,0),a.dimension_value_id
+            FROM energy_usage_monthly m JOIN device_dimension_assignment a ON a.platform_device_id=m.platform_device_id AND a.dimension_id=? AND LAST_DAY(m.usage_month)>=a.effective_from AND (a.effective_to IS NULL OR LAST_DAY(m.usage_month)<=a.effective_to)
+            WHERE m.usage_month BETWEEN ? AND ?
+              AND NOT EXISTS(SELECT 1 FROM energy_usage_monthly_dimension s WHERE s.platform_device_id=m.platform_device_id AND s.usage_month=m.usage_month AND s.identifier=m.identifier AND s.dimension_id=a.dimension_id)
+              AND NOT EXISTS(SELECT 1 FROM energy_usage_daily d WHERE d.platform_device_id=m.platform_device_id AND d.identifier=m.identifier AND d.usage_date BETWEEN m.usage_month AND LAST_DAY(m.usage_month))
+          ) x JOIN analysis_dimension_value v ON v.id=x.dimension_value_id
+          WHERE 1=1 %s %s GROUP BY period_start,v.id,v.value_name,v.color ORDER BY period_start,v.sort_order,v.id
+          """.formatted(bucket,valueFilter,deviceFilter),args.toArray());
+    }
+
+    private void syncMonthlyChunks(PlatformConfigService.PlatformConnection c,List<PlatformDevice> devices,String energyType,Metric metric,LocalDate start,LocalDate end,Long batchId){LocalDate cursor=start.withDayOfMonth(1);while(!cursor.isAfter(end)){LocalDate yearEnd=LocalDate.of(cursor.getYear(),12,31);LocalDate chunkEnd=yearEnd.isAfter(end)?end:yearEnd;List<PlatformMonthlyUsage> points=platformAdapter.fetchMonthlyUsage(c.baseUrl(),c.token(),devices,energyType,metric.identifier(),metric.name(),cursor,chunkEnd);upsertMonthlyPoints(points,energyType,batchId);cursor=LocalDate.of(cursor.getYear()+1,1,1);}}
+    private void upsertMonthlyPoints(List<PlatformMonthlyUsage> points,String energyType,Long batchId){if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();jdbc.batchUpdate("""
+      INSERT INTO energy_usage_monthly(platform_device_id,usage_month,energy_type,identifier,identifier_name,usage_value,sync_batch_id,synced_at,raw_json)
+      VALUES(?,?,?,?,?,?,?,?,CAST(? AS JSON)) ON DUPLICATE KEY UPDATE energy_type=VALUES(energy_type),identifier_name=VALUES(identifier_name),usage_value=VALUES(usage_value),sync_batch_id=VALUES(sync_batch_id),synced_at=VALUES(synced_at),raw_json=VALUES(raw_json)
+      """,points,500,(ps,p)->{ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageMonth());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,p.value());ps.setLong(7,batchId);ps.setObject(8,syncedAt);ps.setString(9,p.rawJson());});}
+    private LocalDate dailyRetentionStart(){return LocalDate.now().withDayOfMonth(1).minusMonths(2);}
+    private int archiveAndPurgeDaily(Long batchId){LocalDate cutoff=dailyRetentionStart();jdbc.update("""
+      INSERT INTO energy_usage_monthly(platform_device_id,usage_month,energy_type,identifier,identifier_name,usage_value,sync_batch_id,synced_at,raw_json)
+      SELECT u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier,MAX(u.identifier_name),SUM(COALESCE(u.usage_value,0)),?,CURRENT_TIMESTAMP(3),JSON_OBJECT('source','daily-backfill')
+      FROM energy_usage_daily u WHERE u.usage_date<? GROUP BY u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier
+      ON DUPLICATE KEY UPDATE platform_device_id=VALUES(platform_device_id)
+      """,batchId,cutoff);jdbc.update("""
+      INSERT INTO energy_usage_monthly_dimension(platform_device_id,usage_month,energy_type,identifier,dimension_id,dimension_value_id,usage_value)
+      SELECT u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier,a.dimension_id,a.dimension_value_id,SUM(COALESCE(u.usage_value,0))
+      FROM energy_usage_daily u JOIN device_dimension_assignment a ON a.platform_device_id=u.platform_device_id AND u.usage_date>=a.effective_from AND (a.effective_to IS NULL OR u.usage_date<=a.effective_to)
+      WHERE u.usage_date<? GROUP BY u.platform_device_id,DATE_SUB(u.usage_date,INTERVAL DAYOFMONTH(u.usage_date)-1 DAY),u.energy_type,u.identifier,a.dimension_id,a.dimension_value_id
+      ON DUPLICATE KEY UPDATE usage_value=VALUES(usage_value),updated_at=CURRENT_TIMESTAMP(3)
+      """,cutoff);return jdbc.update("DELETE FROM energy_usage_daily WHERE usage_date<?",cutoff);}
 
     private void syncDateChunks(PlatformConfigService.PlatformConnection c, List<PlatformDevice> devices,
                                 String energyType, Metric metric, LocalDate start, LocalDate end, Long batchId) {
@@ -253,23 +295,20 @@ public class EnergyUsageService {
             if (chunkEnd.isAfter(end)) chunkEnd = end;
             List<PlatformDailyUsage> points = platformAdapter.fetchDailyUsage(c.baseUrl(), c.token(), devices,
                     energyType, metric.identifier(), metric.name(), cursor, chunkEnd);
-            for (PlatformDailyUsage p : points) upsertPoint(p, energyType, metric, batchId);
+            upsertDailyPoints(points, energyType, metric, batchId);
             cursor = chunkEnd.plusDays(1);
         }
     }
 
-    private void upsertPoint(PlatformDailyUsage p, String energyType, Metric metric, Long batchId) {
-        BigDecimal usage = "READING".equals(metric.mode()) ? null : p.value();
-        BigDecimal reading = "READING".equals(metric.mode()) ? p.value() : null;
-        jdbc.update("""
+    private void upsertDailyPoints(List<PlatformDailyUsage> points, String energyType, Metric metric, Long batchId) {
+        if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();jdbc.batchUpdate("""
                 INSERT INTO energy_usage_daily(platform_device_id,usage_date,energy_type,identifier,identifier_name,
                   usage_value,meter_reading,value_mode,sync_batch_id,synced_at,raw_json)
                 VALUES(?,?,?,?,?,?,?,?,?,?,CAST(? AS JSON))
                 ON DUPLICATE KEY UPDATE energy_type=VALUES(energy_type),identifier_name=VALUES(identifier_name),
                   usage_value=VALUES(usage_value),meter_reading=VALUES(meter_reading),value_mode=VALUES(value_mode),
                   sync_batch_id=VALUES(sync_batch_id),synced_at=VALUES(synced_at),raw_json=VALUES(raw_json)""",
-                p.platformDeviceId(), p.usageDate(), energyType, p.identifier(), p.identifierName(), usage, reading,
-                metric.mode(), batchId, LocalDateTime.now(), p.rawJson());
+                points,500,(ps,p)->{BigDecimal usage="READING".equals(metric.mode())?null:p.value();BigDecimal reading="READING".equals(metric.mode())?p.value():null;ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageDate());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,usage);ps.setBigDecimal(7,reading);ps.setString(8,metric.mode());ps.setLong(9,batchId);ps.setObject(10,syncedAt);ps.setString(11,p.rawJson());});
     }
 
     private Metric resolveMetric(PlatformDeviceCurrent d) {
@@ -304,7 +343,8 @@ public class EnergyUsageService {
         if (start == null || end == null || end.isBefore(start)) throw BizException.badRequest("日期范围无效");
         if (start.plusYears(10).isBefore(end)) throw BizException.badRequest("分析范围不能超过十年");
     }
-    private int countPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_daily WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
+    private int countDailyPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_daily WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
+    private int countMonthlyPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_monthly WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
     private int valueOrZero(Integer v) { return v == null ? 0 : v; }
     private String defaultColor(String v) { return blank(v) ? "#409EFF" : v; }
     private boolean blank(String v) { return v == null || v.isBlank(); }
@@ -313,5 +353,5 @@ public class EnergyUsageService {
     private BigDecimal decimal(Object v) { return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString()); }
     private record Metric(String identifier, String name, String mode) {}
     private record MetricKey(Metric metric, String energyType) {}
-    private record AnalysisFilter(String joins, String sql, List<Object> args) {}
+    private record AnalysisFilter(String table,String dateField,String joins, String sql, List<Object> args) {}
 }

@@ -4,6 +4,7 @@ import com.wanyuecity.energy.platform.dto.PlatformAccount;
 import com.wanyuecity.energy.platform.dto.PlatformAccountDeviceRelation;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
+import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -49,4 +50,11 @@ public interface PlatformAdapter {
                                              String energyType, String identifier,
                                              String identifierName,
                                              LocalDate startDate, LocalDate endDate);
+
+    /** Fetch twelve monthly accumulated usage values. The requested range must stay within one calendar year. */
+    List<PlatformMonthlyUsage> fetchMonthlyUsage(String baseUrl, String sessionToken,
+                                                 List<PlatformDevice> devices,
+                                                 String energyType, String identifier,
+                                                 String identifierName,
+                                                 LocalDate startDate, LocalDate endDate);
 }

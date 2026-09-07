@@ -6,6 +6,7 @@ import com.wanyuecity.energy.platform.dto.PlatformAccount;
 import com.wanyuecity.energy.platform.dto.PlatformAccountDeviceRelation;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
+import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
@@ -260,6 +261,39 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 }
             }
         }
+        return out;
+    }
+
+    @Override
+    public List<PlatformMonthlyUsage> fetchMonthlyUsage(String baseUrl, String sessionToken,
+                                                        List<PlatformDevice> devices,
+                                                        String energyType, String identifier,
+                                                        String identifierName,
+                                                        LocalDate startDate, LocalDate endDate) {
+        if (devices == null || devices.isEmpty()) return List.of();
+        if (startDate.getYear() != endDate.getYear()) {
+            throw new PlatformAdapterException("BAD_RANGE", "Monthly usage request cannot cross calendar years");
+        }
+        var root = mapper.createObjectNode();
+        DateTimeFormatter dt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        root.put("startTime", startDate.atStartOfDay().format(dt));
+        root.put("endTime", endDate.atTime(23, 59, 59).format(dt));
+        root.put("energyType", switch (energyType == null ? "" : energyType.toUpperCase()) {
+            case "WATER" -> 0; case "GAS" -> 2; default -> 1;
+        });
+        root.put("timeType", "year");
+        var deviceList = root.putArray("deviceList");
+        for (PlatformDevice d : devices) {
+            var n = deviceList.addObject();n.put("id", d.getPlatformDeviceId());n.put("name", d.getDeviceName());n.put("commAddress", d.getCommAddress());
+            try { n.put("productId", Long.parseLong(d.getProductId())); } catch (Exception ex) { n.put("productId", d.getProductId()); }
+        }
+        var func = root.putArray("funcList").addObject();var productIds = func.putArray("productIds");
+        devices.stream().map(PlatformDevice::getProductId).filter(v -> v != null && !v.isBlank()).distinct().forEach(v -> { try { productIds.add(Long.parseLong(v)); } catch (Exception ex) { productIds.add(v); } });
+        func.put("identifier", identifier);func.put("identifierName", identifierName);func.put("label", identifierName);func.put("value", identifier);
+        JsonNode response = postJson(baseUrl, "/api/devices/show/energy-report-data", sessionToken, root);
+        if (!isSuccess(response)) throw new PlatformAdapterException("PLATFORM_ERROR", "Monthly usage fetch failed: " + codeAndMessage(response));
+        JsonNode values=response.path("data").path("valueList");if(!values.isArray())return List.of();List<PlatformMonthlyUsage> out=new ArrayList<>();
+        for(JsonNode row:values){String deviceId=firstText(row,"deviceId","id");for(int month=startDate.getMonthValue();month<=endDate.getMonthValue();month++){JsonNode value=row.path("_"+month);if(value.isMissingNode()||value.isNull()||value.asText("").isBlank())continue;try{out.add(new PlatformMonthlyUsage(deviceId,LocalDate.of(startDate.getYear(),month,1),identifier,identifierName,new BigDecimal(value.asText()),row.toString()));}catch(NumberFormatException ignored){log.warn("non-numeric monthly usage ignored, deviceId={}, month={}, value={}",deviceId,month,value.asText());}}}
         return out;
     }
 
