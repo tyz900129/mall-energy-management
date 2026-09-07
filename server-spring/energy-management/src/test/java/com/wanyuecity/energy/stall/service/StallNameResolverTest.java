@@ -55,6 +55,19 @@ class StallNameResolverTest {
     }
 
     @Test
+    void extractsMerchantNameFromStandardBillingAccountName() {
+        Stall stall=new Stall();stall.setId(1L);stall.setStallCode("L528");stall.setStallName(StallNameResolver.PENDING_NAME);
+        StallDevice binding=new StallDevice();binding.setPlatformDeviceId("D1");
+        PlatformAccountDeviceCurrent relation=new PlatformAccountDeviceCurrent();relation.setAccountNumber("A1");
+        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setAccountName("3066-006804-柳真真");account.setPlatformStatus("1");
+        when(stallMapper.selectById(1L)).thenReturn(stall);
+        when(stallDeviceMapper.listActiveByStall(1L)).thenReturn(List.of(binding));
+        when(relationMapper.selectList(any())).thenReturn(List.of(relation));
+        when(accountMapper.selectList(any())).thenReturn(List.of(account));
+        assertEquals("柳真真",resolver.refresh(1L));
+    }
+
+    @Test
     void ignoresDisabledAccountFromBoundDevice() {
         Stall stall=new Stall();stall.setId(1L);stall.setStallCode("L1");stall.setStallName("旧名称");
         StallDevice binding=new StallDevice();binding.setPlatformDeviceId("D1");
