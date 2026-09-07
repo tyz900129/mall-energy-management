@@ -6,7 +6,7 @@
         <el-icon><Lightning /></el-icon>
         <span v-if="!collapsed">万悦城后勤管理系统</span>
       </div>
-      <el-menu :default-active="route.path" router :collapse="!isMobile && collapsed" background-color="#001529" text-color="#c9d1d9" active-text-color="#409EFF" @select="onMenuSelect">
+      <el-menu class="side-menu" :default-active="route.path" router :collapse="!isMobile && collapsed" background-color="#001529" text-color="#c9d1d9" active-text-color="#409EFF" @select="onMenuSelect">
         <el-menu-item v-if="canGeneral" index="/dashboard">
           <el-icon><Odometer /></el-icon>
           <template #title>工作台</template>
@@ -149,14 +149,23 @@ function onCommand(cmd: string) {
 
 <style scoped lang="scss">
 .layout { height: 100vh; min-width: 0; }
-.aside { background: #001529; transition: width 0.2s; overflow: hidden; }
+.aside {
+  height: 100%; min-height: 0; background: #001529; transition: width 0.2s;
+  overflow: hidden; display: flex; flex-direction: column;
+}
 .content-container { min-width: 0; height: 100%; overflow: hidden; }
 .logo {
-  height: 56px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 56px; flex: 0 0 56px; display: flex; align-items: center; justify-content: center; gap: 8px;
   color: #fff; font-weight: 600; font-size: 16px; border-bottom: 1px solid #1f3a5f;
   i { color: #409EFF; font-size: 20px; }
 }
-.aside :deep(.el-menu) { border-right: 0; }
+.side-menu {
+  flex: 1 1 auto; min-height: 0; border-right: 0; overflow-x: hidden; overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #36566b #001529;
+}
+.side-menu::-webkit-scrollbar { width: 6px; }
+.side-menu::-webkit-scrollbar-track { background: #001529; }
+.side-menu::-webkit-scrollbar-thumb { background: #36566b; border-radius: 6px; }
 .header {
   background: #fff; display: flex; align-items: center; gap: 16px;
   border-bottom: 1px solid #e6e6e6; padding: 0 16px;
@@ -172,7 +181,7 @@ function onCommand(cmd: string) {
 @media (max-width: 768px) {
   .layout { height: 100dvh; min-height: 100vh; }
   .mobile-aside {
-    position: fixed; z-index: 2001; left: 0; top: 0; bottom: 0; height: 100vh;
+    position: fixed; z-index: 2001; left: 0; top: 0; bottom: 0; height: 100vh; height: 100dvh;
     transform: translateX(-100%); transition: transform .22s ease; box-shadow: 6px 0 20px #0003;
   }
   .mobile-aside.mobile-open { transform: translateX(0); }
