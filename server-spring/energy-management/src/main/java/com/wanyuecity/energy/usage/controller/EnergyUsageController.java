@@ -52,6 +52,13 @@ public class EnergyUsageController {
     @PostMapping("/usage/sync") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Map<String,Object>> sync(@Valid @RequestBody UsageSyncRequest r) { return ApiResponse.ok(service.sync(r)); }
     @GetMapping("/usage/sync-batches") public ApiResponse<List<Map<String,Object>>> batches() { return ApiResponse.ok(service.syncBatches()); }
+    @GetMapping("/usage/sync-exclusions") public ApiResponse<List<Map<String,Object>>> exclusions() { return ApiResponse.ok(service.syncExclusions()); }
+    @PostMapping("/usage/sync-exclusions") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
+    public ApiResponse<Integer> addExclusions(@Valid @RequestBody UsageSyncExclusionRequest r) { return ApiResponse.ok(service.addSyncExclusions(r)); }
+    @PutMapping("/usage/sync-exclusions/{deviceId}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
+    public ApiResponse<Void> updateExclusion(@PathVariable String deviceId,@Valid @RequestBody UsageSyncExclusionUpdateRequest r) { service.updateSyncExclusion(deviceId,r); return ApiResponse.ok(null); }
+    @DeleteMapping("/usage/sync-exclusions/{deviceId}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
+    public ApiResponse<Void> deleteExclusion(@PathVariable String deviceId) { service.deleteSyncExclusion(deviceId); return ApiResponse.ok(null); }
     @GetMapping("/analysis") public ApiResponse<Map<String,Object>> analysis(
             @RequestParam LocalDate startDate,@RequestParam LocalDate endDate,
             @RequestParam(defaultValue="MONTH") String period,

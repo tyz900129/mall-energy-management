@@ -21,5 +21,9 @@ export const energyApi = {
   saveMetric: (data: any) => http.put('/api/v1/energy/metrics', data),
   syncUsage: (data: any) => http.post<any>('/api/v1/energy/usage/sync', data, { timeout: 10 * 60 * 1000 }),
   syncBatches: () => http.get<any[]>('/api/v1/energy/usage/sync-batches'),
+  syncExclusions: () => http.get<any[]>('/api/v1/energy/usage/sync-exclusions'),
+  addSyncExclusions: (data: any) => http.post<number>('/api/v1/energy/usage/sync-exclusions', data),
+  updateSyncExclusion: (deviceId: string, data: any) => http.put(`/api/v1/energy/usage/sync-exclusions/${encodeURIComponent(deviceId)}`, data),
+  deleteSyncExclusion: (deviceId: string) => http.delete(`/api/v1/energy/usage/sync-exclusions/${encodeURIComponent(deviceId)}`),
   analysis: (params: any) => http.get<any>('/api/v1/energy/analysis', { params })
 }

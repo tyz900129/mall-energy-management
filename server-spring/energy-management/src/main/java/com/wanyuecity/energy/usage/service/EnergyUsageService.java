@@ -123,6 +123,68 @@ public class EnergyUsageService {
         return jdbc.queryForList("SELECT * FROM device_energy_metric WHERE enabled=1 ORDER BY energy_type,product_id");
     }
 
+    public List<Map<String, Object>> syncExclusions() {
+        return jdbc.queryForList("""
+                SELECT e.platform_device_id,
+                       COALESCE(NULLIF(d.device_name,''),e.device_name) device_name,
+                       d.comm_address,d.serial_number,d.product_id,d.product_name,
+                       d.energy_type,d.energy_type_name,d.comm_status,d.last_acq_time,
+                       e.reason,e.enabled,e.created_at,e.updated_at
+                FROM energy_usage_sync_exclusion e
+                LEFT JOIN platform_device_current d ON d.platform_device_id=e.platform_device_id
+                ORDER BY e.enabled DESC,e.updated_at DESC,e.platform_device_id
+                """);
+    }
+
+    @Transactional
+    public int addSyncExclusions(UsageSyncExclusionRequest request) {
+        Set<String> deviceIds = new LinkedHashSet<>();
+        for (String deviceId : request.deviceIds()) {
+            if (deviceId != null && !deviceId.isBlank()) deviceIds.add(deviceId.trim());
+        }
+        if (deviceIds.isEmpty()) throw BizException.badRequest("请选择需要过滤的设备");
+        String reason = blank(request.reason()) ? "离线设备，暂停用量同步" : request.reason().trim();
+        List<String> missing = new ArrayList<>();
+        for (String deviceId : deviceIds) {
+            List<String> names = jdbc.query("SELECT device_name FROM platform_device_current WHERE platform_device_id=?",
+                    (rs, rowNum) -> rs.getString(1), deviceId);
+            if (names.isEmpty()) {
+                missing.add(deviceId);
+                continue;
+            }
+            jdbc.update("""
+                    INSERT INTO energy_usage_sync_exclusion(platform_device_id,device_name,reason,enabled)
+                    VALUES(?,?,?,1)
+                    ON DUPLICATE KEY UPDATE device_name=VALUES(device_name),reason=VALUES(reason),enabled=1,
+                      updated_at=CURRENT_TIMESTAMP(3)
+                    """, deviceId, names.get(0), reason);
+        }
+        if (!missing.isEmpty()) throw BizException.badRequest("设备不存在：" + String.join("、", missing));
+        return deviceIds.size();
+    }
+
+    @Transactional
+    public void updateSyncExclusion(String deviceId, UsageSyncExclusionUpdateRequest request) {
+        int affected = jdbc.update("""
+                UPDATE energy_usage_sync_exclusion
+                SET enabled=?,reason=COALESCE(NULLIF(?,''),reason),updated_at=CURRENT_TIMESTAMP(3)
+                WHERE platform_device_id=?
+                """, Boolean.TRUE.equals(request.enabled()) ? 1 : 0,
+                request.reason() == null ? null : request.reason().trim(), deviceId);
+        if (affected == 0) {
+            Integer existing = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM energy_usage_sync_exclusion WHERE platform_device_id=?", Integer.class, deviceId);
+            if (existing == null || existing == 0) throw BizException.badRequest("过滤名单设备不存在");
+        }
+    }
+
+    @Transactional
+    public void deleteSyncExclusion(String deviceId) {
+        if (jdbc.update("DELETE FROM energy_usage_sync_exclusion WHERE platform_device_id=?", deviceId) == 0) {
+            throw BizException.badRequest("过滤名单设备不存在");
+        }
+    }
+
     public Map<String, Object> sync(UsageSyncRequest request) {
         if (!syncInProgress.compareAndSet(false, true)) {
             throw BizException.badRequest("已有用量同步正在执行，请等待当前批次完成");
@@ -136,11 +198,16 @@ public class EnergyUsageService {
 
     private Map<String, Object> executeSync(UsageSyncRequest request) {
         validateRange(request.startDate(), request.endDate());
-        List<PlatformDeviceCurrent> current = selectDevices(request.groupId(), request.deviceIds());
-        if (current.isEmpty()) throw BizException.badRequest("没有符合条件的设备");
+        List<PlatformDeviceCurrent> selected = selectDevices(request.groupId(), request.deviceIds());
+        if (selected.isEmpty()) throw BizException.badRequest("没有符合条件的设备");
+        Set<String> excludedIds = enabledSyncExclusionIds();
+        List<PlatformDeviceCurrent> current = selected.stream()
+                .filter(device -> !excludedIds.contains(device.getPlatformDeviceId())).toList();
+        int excludedDevices = selected.size() - current.size();
+        if (current.isEmpty()) throw BizException.badRequest("所选设备均在同步过滤名单中，共 " + excludedDevices + " 台");
         String batchNo = "EU" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-        jdbc.update("INSERT INTO energy_usage_sync_batch(batch_no,start_date,end_date,group_id,requested,status,started_at) VALUES(?,?,?,?,?,'RUNNING',?)",
-                batchNo, request.startDate(), request.endDate(), request.groupId(), current.size(), LocalDateTime.now());
+        jdbc.update("INSERT INTO energy_usage_sync_batch(batch_no,start_date,end_date,group_id,requested,excluded_devices,status,started_at) VALUES(?,?,?,?,?,?,'RUNNING',?)",
+                batchNo, request.startDate(), request.endDate(), request.groupId(), current.size(), excludedDevices, LocalDateTime.now());
         Long batchId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         int succeeded = 0, failed = 0;
         List<String> errors = new ArrayList<>();
@@ -170,7 +237,7 @@ public class EnergyUsageService {
             String status = failed == 0 ? "SUCCESS" : (succeeded > 0 ? "PARTIAL" : "FAILED");
             jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,monthly_points=?,daily_points=?,purged_daily_points=?,status=?,error_message=?,completed_at=? WHERE id=?",
                     succeeded, failed,monthlyPoints,dailyPoints,purged,status, truncate(String.join("\n", errors), 4000), LocalDateTime.now(), batchId);
-            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("requested",current.size());result.put("succeeded",succeeded);result.put("failed",failed);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
+            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("selected",selected.size());result.put("requested",current.size());result.put("excludedDevices",excludedDevices);result.put("succeeded",succeeded);result.put("failed",failed);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
         } catch (RuntimeException ex) {
             jdbc.update("UPDATE energy_usage_sync_batch SET failed=?,status='FAILED',error_message=?,completed_at=? WHERE id=?",
                     current.size(), truncate(ex.getMessage(), 4000), LocalDateTime.now(), batchId);
@@ -348,6 +415,11 @@ public class EnergyUsageService {
         if (ids != null && !ids.isEmpty()) q.in("platform_device_id", ids);
         if (groupId != null) q.exists("SELECT 1 FROM device_group_assignment a WHERE a.platform_device_id=platform_device_current.platform_device_id AND a.group_id=" + groupId);
         return deviceMapper.selectList(q);
+    }
+
+    private Set<String> enabledSyncExclusionIds() {
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT platform_device_id FROM energy_usage_sync_exclusion WHERE enabled=1", String.class));
     }
 
     private String effectiveEnergyType(PlatformDeviceCurrent d){String product=Optional.ofNullable(d.getProductName()).orElse("").toUpperCase(Locale.ROOT);String productId=Optional.ofNullable(d.getProductId()).orElse("");if(Set.of("437","438").contains(productId)||product.contains("水表"))return "WATER";if(Set.of("436","608").contains(productId)||product.contains("DTSU")||product.contains("DDSU")||product.contains("电表"))return "ELECTRIC";if(product.contains("燃气")||product.contains("气表"))return "GAS";String source=Optional.ofNullable(d.getEnergyType()).orElse("").toUpperCase(Locale.ROOT);return Set.of("ELECTRIC","WATER","GAS").contains(source)?source:"OTHER";}
