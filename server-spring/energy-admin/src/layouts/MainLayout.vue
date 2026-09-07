@@ -20,7 +20,7 @@
         <el-menu-item v-if="canGeneral" index="/power/topology"><el-icon><Share /></el-icon><template #title>配电拓扑管理</template></el-menu-item>
         <el-sub-menu v-if="canGeneral" index="/energy">
           <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
-          <el-menu-item index="/energy/devices">设备与分组</el-menu-item>
+          <el-menu-item index="/energy/devices">设备分析维度</el-menu-item>
           <el-menu-item index="/energy/sync">历史用量同步</el-menu-item>
           <el-menu-item index="/energy/analysis">用量分析</el-menu-item>
         </el-sub-menu>

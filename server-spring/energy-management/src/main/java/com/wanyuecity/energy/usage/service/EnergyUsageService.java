@@ -156,13 +156,13 @@ public class EnergyUsageService {
         return jdbc.queryForList("SELECT * FROM energy_usage_sync_batch ORDER BY started_at DESC LIMIT 50");
     }
 
-    public Map<String, Object> analysis(LocalDate start, LocalDate end, String period, Long groupId, String deviceId) {
+    public Map<String, Object> analysis(LocalDate start, LocalDate end, String period, Long groupId, String deviceId, Long dimensionId, Long dimensionValueId) {
         validateAnalysisRange(start, end);
         String normalizedPeriod = period == null ? "MONTH" : period.trim().toUpperCase(Locale.ROOT);
         if (!Set.of("WEEK", "MONTH", "QUARTER", "YEAR").contains(normalizedPeriod)) {
             throw BizException.badRequest("统计周期仅支持周、月、季、年");
         }
-        AnalysisFilter current = analysisFilter(start, end, groupId, deviceId);
+        AnalysisFilter current = analysisFilter(start, end, groupId, deviceId, dimensionId, dimensionValueId);
         String bucket = bucketExpression(normalizedPeriod);
         List<Map<String, Object>> trend = jdbc.queryForList("""
                 SELECT %s period_start,
@@ -170,23 +170,32 @@ public class EnergyUsageService {
                        SUM(CASE WHEN UPPER(u.energy_type)='WATER' THEN COALESCE(u.usage_value,0) ELSE 0 END) water_usage,
                        COUNT(DISTINCT CASE WHEN UPPER(u.energy_type)='ELECTRIC' THEN u.platform_device_id END) electric_devices,
                        COUNT(DISTINCT CASE WHEN UPPER(u.energy_type)='WATER' THEN u.platform_device_id END) water_devices
-                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id
+                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
                 WHERE u.usage_date BETWEEN ? AND ? %s
                 GROUP BY period_start ORDER BY period_start
-                """.formatted(bucket, current.sql()), current.args().toArray());
+                """.formatted(bucket, current.joins(), current.sql()), current.args().toArray());
         List<Map<String, Object>> ranking = jdbc.queryForList("""
                 SELECT u.platform_device_id,d.device_name,g.group_name,UPPER(u.energy_type) energy_type,
                        SUM(COALESCE(u.usage_value,0)) total_usage,AVG(COALESCE(u.usage_value,0)) avg_daily_usage,
                        MAX(COALESCE(u.usage_value,0)) peak_daily_usage,COUNT(DISTINCT u.usage_date) covered_days
                 FROM energy_usage_daily u JOIN platform_device_current d ON d.platform_device_id=u.platform_device_id
-                LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id
+                LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
                 LEFT JOIN device_group g ON g.id=a.group_id WHERE u.usage_date BETWEEN ? AND ? %s
                 GROUP BY u.platform_device_id,d.device_name,g.group_name,u.energy_type ORDER BY energy_type,total_usage DESC
-                """.formatted(current.sql()), current.args().toArray());
+                """.formatted(current.joins(), current.sql()), current.args().toArray());
+        List<Map<String,Object>> breakdown = dimensionId == null ? List.of() : jdbc.queryForList("""
+                SELECT %s period_start,v.id dimension_value_id,v.value_name dimension_value_name,v.color,
+                       SUM(CASE WHEN UPPER(u.energy_type)='ELECTRIC' THEN COALESCE(u.usage_value,0) ELSE 0 END) electric_usage,
+                       SUM(CASE WHEN UPPER(u.energy_type)='WATER' THEN COALESCE(u.usage_value,0) ELSE 0 END) water_usage
+                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
+                JOIN analysis_dimension_value v ON v.id=da.dimension_value_id
+                WHERE u.usage_date BETWEEN ? AND ? %s
+                GROUP BY period_start,v.id,v.value_name,v.color ORDER BY period_start,v.sort_order,v.id
+                """.formatted(bucket,current.joins(),current.sql()),current.args().toArray());
         long rangeDays = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
         LocalDate previousEnd = start.minusDays(1);
         LocalDate previousStart = previousEnd.minusDays(rangeDays - 1);
-        AnalysisFilter previous = analysisFilter(previousStart, previousEnd, groupId, deviceId);
+        AnalysisFilter previous = analysisFilter(previousStart, previousEnd, groupId, deviceId, dimensionId, dimensionValueId);
         Map<String, BigDecimal> currentTotals = totals(current);
         Map<String, BigDecimal> previousTotals = totals(previous);
         List<Map<String, Object>> summaries = new ArrayList<>();
@@ -199,23 +208,25 @@ public class EnergyUsageService {
             row.put("changePercent", percentageChange(total, prior));row.put("averageDailyUsage", total.divide(BigDecimal.valueOf(rangeDays), 4, java.math.RoundingMode.HALF_UP));
             row.put("deviceCount", devices);summaries.add(row);
         }
-        return Map.of("period", normalizedPeriod, "startDate", start, "endDate", end, "rangeDays", rangeDays,
-                "trend", trend, "ranking", ranking, "summaries", summaries);
+        List<Map<String,Object>> dimensionTotals = new ArrayList<>();
+        if(dimensionId!=null){Map<Long,Map<String,Object>> totalsByValue=new LinkedHashMap<>();for(Map<String,Object> row:breakdown){Long valueId=((Number)row.get("dimension_value_id")).longValue();Map<String,Object> total=totalsByValue.computeIfAbsent(valueId,k->{Map<String,Object> m=new LinkedHashMap<>();m.put("dimensionValueId",k);m.put("dimensionValueName",row.get("dimension_value_name"));m.put("color",row.get("color"));m.put("electricUsage",BigDecimal.ZERO);m.put("waterUsage",BigDecimal.ZERO);return m;});total.put("electricUsage",decimal(total.get("electricUsage")).add(decimal(row.get("electric_usage"))));total.put("waterUsage",decimal(total.get("waterUsage")).add(decimal(row.get("water_usage"))));}dimensionTotals.addAll(totalsByValue.values());}
+        Map<String,Object> result=new LinkedHashMap<>();result.put("period",normalizedPeriod);result.put("startDate",start);result.put("endDate",end);result.put("rangeDays",rangeDays);result.put("trend",trend);result.put("breakdown",breakdown);result.put("dimensionTotals",dimensionTotals);result.put("ranking",ranking);result.put("summaries",summaries);return result;
     }
 
-    private AnalysisFilter analysisFilter(LocalDate start, LocalDate end, Long groupId, String deviceId) {
-        List<Object> args = new ArrayList<>(List.of(start, end));String sql = "";
+    private AnalysisFilter analysisFilter(LocalDate start, LocalDate end, Long groupId, String deviceId, Long dimensionId, Long dimensionValueId) {
+        List<Object> args = new ArrayList<>(List.of(start, end));String sql = "",joins="";
         if (groupId != null) { sql += " AND a.group_id=?";args.add(groupId); }
         if (deviceId != null && !deviceId.isBlank()) { sql += " AND u.platform_device_id=?";args.add(deviceId.trim()); }
-        return new AnalysisFilter(sql, args);
+        if(dimensionId!=null){joins=" JOIN device_dimension_assignment da ON da.platform_device_id=u.platform_device_id AND u.usage_date>=da.effective_from AND (da.effective_to IS NULL OR u.usage_date<=da.effective_to) ";sql+=" AND da.dimension_id=?";args.add(dimensionId);if(dimensionValueId!=null){sql+=" AND da.dimension_value_id=?";args.add(dimensionValueId);}}
+        return new AnalysisFilter(joins, sql, args);
     }
 
     private Map<String, BigDecimal> totals(AnalysisFilter filter) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT UPPER(u.energy_type) energy_type,SUM(COALESCE(u.usage_value,0)) total_usage
-                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id
+                FROM energy_usage_daily u LEFT JOIN device_group_assignment a ON a.platform_device_id=u.platform_device_id %s
                 WHERE u.usage_date BETWEEN ? AND ? %s GROUP BY UPPER(u.energy_type)
-                """.formatted(filter.sql()), filter.args().toArray());
+                """.formatted(filter.joins(),filter.sql()), filter.args().toArray());
         Map<String, BigDecimal> result = new HashMap<>();
         rows.forEach(v -> result.put(String.valueOf(v.get("energy_type")), decimal(v.get("total_usage"))));return result;
     }
@@ -302,5 +313,5 @@ public class EnergyUsageService {
     private BigDecimal decimal(Object v) { return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString()); }
     private record Metric(String identifier, String name, String mode) {}
     private record MetricKey(Metric metric, String energyType) {}
-    private record AnalysisFilter(String sql, List<Object> args) {}
+    private record AnalysisFilter(String joins, String sql, List<Object> args) {}
 }

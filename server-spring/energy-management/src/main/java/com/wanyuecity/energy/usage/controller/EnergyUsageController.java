@@ -2,6 +2,7 @@ package com.wanyuecity.energy.usage.controller;
 
 import com.wanyuecity.energy.core.ApiResponse;
 import com.wanyuecity.energy.usage.service.EnergyUsageService;
+import com.wanyuecity.energy.usage.service.AnalysisDimensionService;
 import com.wanyuecity.energy.usage.service.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,18 @@ import java.util.Map;
 @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
 public class EnergyUsageController {
     private final EnergyUsageService service;
+    private final AnalysisDimensionService dimensionService;
+
+    @GetMapping("/dimensions") public ApiResponse<List<Map<String,Object>>> dimensions(){return ApiResponse.ok(dimensionService.dimensions());}
+    @PostMapping("/dimensions") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Map<String,Object>> createDimension(@Valid @RequestBody AnalysisDimensionRequest r){return ApiResponse.ok(dimensionService.createDimension(r));}
+    @PutMapping("/dimensions/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> updateDimension(@PathVariable Long id,@Valid @RequestBody AnalysisDimensionRequest r){dimensionService.updateDimension(id,r);return ApiResponse.ok(null);}
+    @DeleteMapping("/dimensions/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> deleteDimension(@PathVariable Long id){dimensionService.deleteDimension(id);return ApiResponse.ok(null);}
+    @PostMapping("/dimensions/{id}/values") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Map<String,Object>> createValue(@PathVariable Long id,@Valid @RequestBody AnalysisDimensionValueRequest r){return ApiResponse.ok(dimensionService.createValue(id,r));}
+    @PutMapping("/dimension-values/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> updateValue(@PathVariable Long id,@Valid @RequestBody AnalysisDimensionValueRequest r){dimensionService.updateValue(id,r);return ApiResponse.ok(null);}
+    @DeleteMapping("/dimension-values/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> deleteValue(@PathVariable Long id){dimensionService.deleteValue(id);return ApiResponse.ok(null);}
+    @GetMapping("/dimensions/{id}/devices") public ApiResponse<List<Map<String,Object>>> dimensionDevices(@PathVariable Long id,@RequestParam(required=false)Long valueId,@RequestParam(required=false)Boolean unassigned,@RequestParam(required=false)String keyword,@RequestParam(required=false)String energyType,@RequestParam(required=false)LocalDate effectiveDate){return ApiResponse.ok(dimensionService.devices(id,valueId,unassigned,keyword,energyType,effectiveDate));}
+    @GetMapping("/dimensions/{id}/devices/{deviceId}/history") public ApiResponse<List<Map<String,Object>>> assignmentHistory(@PathVariable Long id,@PathVariable String deviceId){return ApiResponse.ok(dimensionService.history(deviceId,id));}
+    @PostMapping("/dimensions/assign") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Integer> assignDimension(@Valid @RequestBody DeviceDimensionAssignRequest r){return ApiResponse.ok(dimensionService.assign(r));}
 
     @GetMapping("/groups") public ApiResponse<List<Map<String,Object>>> groups() { return ApiResponse.ok(service.groups()); }
     @PostMapping("/groups") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
@@ -42,7 +55,8 @@ public class EnergyUsageController {
     @GetMapping("/analysis") public ApiResponse<Map<String,Object>> analysis(
             @RequestParam LocalDate startDate,@RequestParam LocalDate endDate,
             @RequestParam(defaultValue="MONTH") String period,
-            @RequestParam(required=false) Long groupId,@RequestParam(required=false) String deviceId) {
-        return ApiResponse.ok(service.analysis(startDate,endDate,period,groupId,deviceId));
+            @RequestParam(required=false) Long groupId,@RequestParam(required=false) String deviceId,
+            @RequestParam(required=false) Long dimensionId,@RequestParam(required=false) Long dimensionValueId) {
+        return ApiResponse.ok(service.analysis(startDate,endDate,period,groupId,deviceId,dimensionId,dimensionValueId));
     }
 }
