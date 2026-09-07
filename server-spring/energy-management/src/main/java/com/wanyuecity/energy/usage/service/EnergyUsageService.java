@@ -161,17 +161,9 @@ public class EnergyUsageService {
                 Metric metric = entry.getKey().metric();
                 for (int offset = 0; offset < devices.size(); offset += 50) {
                     List<PlatformDevice> batch = devices.subList(offset, Math.min(offset + 50, devices.size()));
-                    try {
-                        syncMonthlyChunks(connection,batch,entry.getKey().energyType(),metric,request.startDate(),request.endDate(),batchId);
-                        LocalDate dailyStart=request.startDate().isAfter(dailyRetentionStart())?request.startDate():dailyRetentionStart();
-                        LocalDate dailyEnd=request.endDate().isBefore(LocalDate.now())?request.endDate():LocalDate.now();
-                        if(!dailyEnd.isBefore(dailyStart))syncDateChunks(connection,batch,entry.getKey().energyType(),metric,dailyStart,dailyEnd,batchId);
-                        succeeded += batch.size();
-                    } catch (Exception ex) {
-                        failed += batch.size(); errors.add("产品 " + productLabel(entry.getKey()) + "，设备批次 " + (offset / 50 + 1) + ": " + ex.getMessage());
-                    } finally {
-                        updateSyncProgress(batchId,succeeded,failed);
-                    }
+                    BatchResult batchResult=syncDeviceBatch(connection,batch,entry.getKey(),request.startDate(),request.endDate(),batchId,offset/50+1,true);
+                    succeeded+=batchResult.succeeded();failed+=batchResult.failed();errors.addAll(batchResult.errors());
+                    updateSyncProgress(batchId,succeeded,failed);
                 }
             }
             int monthlyPoints=countMonthlyPoints(batchId),dailyPoints=countDailyPoints(batchId),purged=archiveAndPurgeDaily(batchId);
@@ -300,6 +292,7 @@ public class EnergyUsageService {
     }
 
     private void syncMonthlyChunks(PlatformConfigService.PlatformConnection c,List<PlatformDevice> devices,String energyType,Metric metric,LocalDate start,LocalDate end,Long batchId){LocalDate cursor=start.withDayOfMonth(1);while(!cursor.isAfter(end)){LocalDate yearEnd=LocalDate.of(cursor.getYear(),12,31);LocalDate chunkEnd=yearEnd.isAfter(end)?end:yearEnd;List<PlatformMonthlyUsage> points=platformAdapter.fetchMonthlyUsage(c.baseUrl(),c.token(),devices,energyType,metric.identifier(),metric.name(),cursor,chunkEnd);upsertMonthlyPoints(points,energyType,batchId);cursor=LocalDate.of(cursor.getYear()+1,1,1);}}
+    private BatchResult syncDeviceBatch(PlatformConfigService.PlatformConnection c,List<PlatformDevice> devices,MetricKey key,LocalDate start,LocalDate end,Long batchId,int batchNo,boolean allowSplit){try{syncMonthlyChunks(c,devices,key.energyType(),key.metric(),start,end,batchId);LocalDate dailyStart=start.isAfter(dailyRetentionStart())?start:dailyRetentionStart();LocalDate dailyEnd=end.isBefore(LocalDate.now())?end:LocalDate.now();if(!dailyEnd.isBefore(dailyStart))syncDateChunks(c,devices,key.energyType(),key.metric(),dailyStart,dailyEnd,batchId);return new BatchResult(devices.size(),0,List.of());}catch(Exception ex){if(allowSplit&&devices.size()>25){int middle=devices.size()/2;BatchResult left=syncDeviceBatch(c,devices.subList(0,middle),key,start,end,batchId,batchNo,false);BatchResult right=syncDeviceBatch(c,devices.subList(middle,devices.size()),key,start,end,batchId,batchNo,false);List<String> combined=new ArrayList<>(left.errors());combined.addAll(right.errors());return new BatchResult(left.succeeded()+right.succeeded(),left.failed()+right.failed(),combined);}String suffix=devices.size()==1?"，设备 "+devices.get(0).getDeviceName()+"（"+devices.get(0).getPlatformDeviceId()+"）":"，设备批次 "+batchNo+"（"+devices.size()+" 台）";return new BatchResult(0,devices.size(),List.of("产品 "+productLabel(key)+suffix+": "+ex.getMessage()));}}
     private void upsertMonthlyPoints(List<PlatformMonthlyUsage> points,String energyType,Long batchId){if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();transactionTemplate.executeWithoutResult(status->jdbc.batchUpdate("""
       INSERT INTO energy_usage_monthly(platform_device_id,usage_month,energy_type,identifier,identifier_name,usage_value,sync_batch_id,synced_at,raw_json)
       VALUES(?,?,?,?,?,?,?,?,CAST(? AS JSON)) ON DUPLICATE KEY UPDATE energy_type=VALUES(energy_type),identifier_name=VALUES(identifier_name),usage_value=VALUES(usage_value),sync_batch_id=VALUES(sync_batch_id),synced_at=VALUES(synced_at),raw_json=VALUES(raw_json)
@@ -384,5 +377,6 @@ public class EnergyUsageService {
     private BigDecimal decimal(Object v) { return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString()); }
     private record Metric(String identifier, String name, String mode) {}
     private record MetricKey(Metric metric, String energyType,String productId,String productName) {}
+    private record BatchResult(int succeeded,int failed,List<String> errors) {}
     private record AnalysisFilter(String table,String dateField,String joins, String sql, List<Object> args) {}
 }
