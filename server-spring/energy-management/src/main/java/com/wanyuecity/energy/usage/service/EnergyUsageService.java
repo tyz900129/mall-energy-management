@@ -2,7 +2,9 @@ package com.wanyuecity.energy.usage.service;
 
 import com.wanyuecity.energy.core.BizException;
 import com.wanyuecity.energy.platform.adapter.PlatformAdapter;
+import com.wanyuecity.energy.platform.adapter.PlatformAdapterException;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
+import com.wanyuecity.energy.platform.dto.PlatformEnergyMetric;
 import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.entity.PlatformDeviceCurrent;
@@ -11,6 +13,7 @@ import com.wanyuecity.energy.platform.service.PlatformConfigService;
 import com.wanyuecity.energy.usage.service.dto.*;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j(topic = "platform-sync")
 public class EnergyUsageService {
     private final JdbcTemplate jdbc;
     private final PlatformDeviceCurrentMapper deviceMapper;
@@ -40,7 +44,7 @@ public class EnergyUsageService {
                 UPDATE energy_usage_sync_batch
                 SET monthly_points=(SELECT COUNT(*) FROM energy_usage_monthly m WHERE m.sync_batch_id=energy_usage_sync_batch.id),
                     daily_points=(SELECT COUNT(*) FROM energy_usage_daily d WHERE d.sync_batch_id=energy_usage_sync_batch.id),
-                    failed=GREATEST(failed,requested-succeeded),status='FAILED',
+                    failed=GREATEST(failed,requested-succeeded-no_data_devices),status='FAILED',
                     error_message=CONCAT_WS('\n',NULLIF(error_message,''),'服务重启导致同步中断，请重新执行'),
                     completed_at=COALESCE(completed_at,CURRENT_TIMESTAMP(3))
                 WHERE status='RUNNING'""");
@@ -209,15 +213,16 @@ public class EnergyUsageService {
         jdbc.update("INSERT INTO energy_usage_sync_batch(batch_no,start_date,end_date,group_id,requested,excluded_devices,status,started_at) VALUES(?,?,?,?,?,?,'RUNNING',?)",
                 batchNo, request.startDate(), request.endDate(), request.groupId(), current.size(), excludedDevices, LocalDateTime.now());
         Long batchId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-        int succeeded = 0, failed = 0;
+        int succeeded = 0, failed = 0, noData = 0;
         List<String> errors = new ArrayList<>();
         try {
             var connection = configService.connect();
+            Map<String, Metric> metricCache = new HashMap<>();
             Map<MetricKey, List<PlatformDevice>> groups = new LinkedHashMap<>();
             for (PlatformDeviceCurrent d : current) {
                 try {
                     String energyType = effectiveEnergyType(d);
-                    Metric metric = resolveMetric(d,energyType);
+                    Metric metric = resolveMetric(d, energyType, connection, metricCache);
                     groups.computeIfAbsent(new MetricKey(metric,energyType,d.getProductId(),d.getProductName()), k -> new ArrayList<>()).add(toPlatformDevice(d,energyType));
                 } catch (Exception ex) {
                     failed++; errors.add(label(d) + ": " + ex.getMessage());
@@ -229,15 +234,19 @@ public class EnergyUsageService {
                 for (int offset = 0; offset < devices.size(); offset += 50) {
                     List<PlatformDevice> batch = devices.subList(offset, Math.min(offset + 50, devices.size()));
                     BatchResult batchResult=syncDeviceBatch(connection,batch,entry.getKey(),request.startDate(),request.endDate(),batchId,offset/50+1,new SplitBudget(12));
-                    succeeded+=batchResult.succeeded();failed+=batchResult.failed();errors.addAll(batchResult.errors());
-                    updateSyncProgress(batchId,succeeded,failed);
+                    succeeded += batchResult.succeeded();
+                    failed += batchResult.failed();
+                    noData += batchResult.noData();
+                    errors.addAll(batchResult.errors());
+                    updateSyncProgress(batchId, succeeded, failed, noData);
                 }
             }
             int monthlyPoints=countMonthlyPoints(batchId),dailyPoints=countDailyPoints(batchId),purged=archiveAndPurgeDaily(batchId);
-            String status = failed == 0 ? "SUCCESS" : (succeeded > 0 ? "PARTIAL" : "FAILED");
-            jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,monthly_points=?,daily_points=?,purged_daily_points=?,status=?,error_message=?,completed_at=? WHERE id=?",
-                    succeeded, failed,monthlyPoints,dailyPoints,purged,status, truncate(String.join("\n", errors), 4000), LocalDateTime.now(), batchId);
-            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("selected",selected.size());result.put("requested",current.size());result.put("excludedDevices",excludedDevices);result.put("succeeded",succeeded);result.put("failed",failed);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
+            String status = failed == 0 ? "SUCCESS" : (succeeded > 0 || noData > 0 ? "PARTIAL" : "FAILED");
+            jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,no_data_devices=?,monthly_points=?,daily_points=?,purged_daily_points=?,status=?,error_message=?,completed_at=? WHERE id=?",
+                    succeeded, failed, noData, monthlyPoints, dailyPoints, purged, status,
+                    truncate(String.join("\n", errors), 4000), LocalDateTime.now(), batchId);
+            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("selected",selected.size());result.put("requested",current.size());result.put("excludedDevices",excludedDevices);result.put("succeeded",succeeded);result.put("failed",failed);result.put("noDataDevices",noData);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
         } catch (RuntimeException ex) {
             jdbc.update("UPDATE energy_usage_sync_batch SET failed=?,status='FAILED',error_message=?,completed_at=? WHERE id=?",
                     current.size(), truncate(ex.getMessage(), 4000), LocalDateTime.now(), batchId);
@@ -358,8 +367,79 @@ public class EnergyUsageService {
           """.formatted(bucket,valueFilter,deviceFilter),args.toArray());
     }
 
-    private void syncMonthlyChunks(PlatformConfigService.PlatformConnection c,List<PlatformDevice> devices,String energyType,Metric metric,LocalDate start,LocalDate end,Long batchId){LocalDate cursor=start.withDayOfMonth(1);while(!cursor.isAfter(end)){LocalDate yearEnd=LocalDate.of(cursor.getYear(),12,31);LocalDate chunkEnd=yearEnd.isAfter(end)?end:yearEnd;List<PlatformMonthlyUsage> points=platformAdapter.fetchMonthlyUsage(c.baseUrl(),c.token(),devices,energyType,metric.identifier(),metric.name(),cursor,chunkEnd);upsertMonthlyPoints(points,energyType,batchId);cursor=LocalDate.of(cursor.getYear()+1,1,1);}}
-    private BatchResult syncDeviceBatch(PlatformConfigService.PlatformConnection c,List<PlatformDevice> devices,MetricKey key,LocalDate start,LocalDate end,Long batchId,int batchNo,SplitBudget budget){try{syncMonthlyChunks(c,devices,key.energyType(),key.metric(),start,end,batchId);LocalDate dailyStart=start.isAfter(dailyRetentionStart())?start:dailyRetentionStart();LocalDate dailyEnd=end.isBefore(LocalDate.now())?end:LocalDate.now();if(!dailyEnd.isBefore(dailyStart))syncDateChunks(c,devices,key.energyType(),key.metric(),dailyStart,dailyEnd,batchId);return new BatchResult(devices.size(),0,List.of());}catch(Exception ex){if(devices.size()>1&&budget.consume()){int middle=devices.size()/2;BatchResult left=syncDeviceBatch(c,devices.subList(0,middle),key,start,end,batchId,batchNo,budget);BatchResult right=syncDeviceBatch(c,devices.subList(middle,devices.size()),key,start,end,batchId,batchNo,budget);List<String> combined=new ArrayList<>(left.errors());combined.addAll(right.errors());return new BatchResult(left.succeeded()+right.succeeded(),left.failed()+right.failed(),combined);}String suffix=devices.size()==1?"，设备 "+devices.get(0).getDeviceName()+"（"+devices.get(0).getPlatformDeviceId()+"）":"，设备批次 "+batchNo+"（"+devices.size()+" 台）";return new BatchResult(0,devices.size(),List.of("产品 "+productLabel(key)+suffix+": "+ex.getMessage()));}}
+    private Set<String> syncMonthlyChunks(PlatformConfigService.PlatformConnection c,
+                                           List<PlatformDevice> devices,
+                                           String energyType,
+                                           Metric metric,
+                                           LocalDate start,
+                                           LocalDate end,
+                                           Long batchId) {
+        Set<String> devicesWithData = new HashSet<>();
+        LocalDate cursor = start.withDayOfMonth(1);
+        while (!cursor.isAfter(end)) {
+            LocalDate yearEnd = LocalDate.of(cursor.getYear(), 12, 31);
+            LocalDate chunkEnd = yearEnd.isAfter(end) ? end : yearEnd;
+            List<PlatformMonthlyUsage> points = platformAdapter.fetchMonthlyUsage(c.baseUrl(), c.token(), devices,
+                    energyType, metric.identifier(), metric.name(), cursor, chunkEnd);
+            points.stream().map(PlatformMonthlyUsage::platformDeviceId).filter(Objects::nonNull).forEach(devicesWithData::add);
+            upsertMonthlyPoints(points, energyType, batchId);
+            cursor = LocalDate.of(cursor.getYear() + 1, 1, 1);
+        }
+        return devicesWithData;
+    }
+
+    private BatchResult syncDeviceBatch(PlatformConfigService.PlatformConnection c,
+                                         List<PlatformDevice> devices,
+                                         MetricKey key,
+                                         LocalDate start,
+                                         LocalDate end,
+                                         Long batchId,
+                                         int batchNo,
+                                         SplitBudget budget) {
+        Exception lastError = null;
+        int maxAttempts = devices.size() == 1 ? 3 : 2;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                Set<String> devicesWithData = new HashSet<>(
+                        syncMonthlyChunks(c, devices, key.energyType(), key.metric(), start, end, batchId));
+                LocalDate dailyStart = start.isAfter(dailyRetentionStart()) ? start : dailyRetentionStart();
+                LocalDate dailyEnd = end.isBefore(LocalDate.now()) ? end : LocalDate.now();
+                if (!dailyEnd.isBefore(dailyStart)) {
+                    devicesWithData.addAll(syncDateChunks(c, devices, key.energyType(), key.metric(), dailyStart, dailyEnd, batchId));
+                }
+                List<PlatformDevice> noDataDevices = devices.stream()
+                        .filter(device -> !devicesWithData.contains(device.getPlatformDeviceId())).toList();
+                List<String> notes = noDataDevices.isEmpty() ? List.of()
+                        : List.of("产品 " + productLabel(key) + "：" + noDataDevices.size()
+                        + " 台设备在所选时段无数据（" + summarizeDevices(noDataDevices) + "）");
+                return new BatchResult(devicesWithData.size(), 0, noDataDevices.size(), notes);
+            } catch (Exception ex) {
+                lastError = ex;
+                if (attempt < maxAttempts && isRetryable(ex)) {
+                    log.warn("usage fetch transient failure, productId={}, devices={}, attempt={}/{}: {}",
+                            key.productId(), devices.size(), attempt, maxAttempts, ex.getMessage());
+                    pauseBeforeRetry(attempt);
+                    continue;
+                }
+                break;
+            }
+        }
+        if (devices.size() > 1 && budget.consume()) {
+            int middle = devices.size() / 2;
+            BatchResult left = syncDeviceBatch(c, devices.subList(0, middle), key, start, end, batchId, batchNo, budget);
+            BatchResult right = syncDeviceBatch(c, devices.subList(middle, devices.size()), key, start, end, batchId, batchNo, budget);
+            List<String> combined = new ArrayList<>(left.errors());
+            combined.addAll(right.errors());
+            return new BatchResult(left.succeeded() + right.succeeded(), left.failed() + right.failed(),
+                    left.noData() + right.noData(), combined);
+        }
+        String suffix = devices.size() == 1
+                ? "，设备 " + devices.get(0).getDeviceName() + "（" + devices.get(0).getPlatformDeviceId() + "）"
+                : "，设备批次 " + batchNo + "（" + devices.size() + " 台）";
+        String message = lastError == null ? "未知错误" : lastError.getMessage();
+        return new BatchResult(0, devices.size(), 0,
+                List.of("产品 " + productLabel(key) + suffix + ": " + message));
+    }
     private void upsertMonthlyPoints(List<PlatformMonthlyUsage> points,String energyType,Long batchId){if(points.isEmpty())return;LocalDateTime syncedAt=LocalDateTime.now();transactionTemplate.executeWithoutResult(status->jdbc.batchUpdate("""
       INSERT INTO energy_usage_monthly(platform_device_id,usage_month,energy_type,identifier,identifier_name,usage_value,sync_batch_id,synced_at,raw_json)
       VALUES(?,?,?,?,?,?,?,?,CAST(? AS JSON)) ON DUPLICATE KEY UPDATE energy_type=VALUES(energy_type),identifier_name=VALUES(identifier_name),usage_value=VALUES(usage_value),sync_batch_id=VALUES(sync_batch_id),synced_at=VALUES(synced_at),raw_json=VALUES(raw_json)
@@ -378,17 +458,20 @@ public class EnergyUsageService {
       ON DUPLICATE KEY UPDATE usage_value=VALUES(usage_value),updated_at=CURRENT_TIMESTAMP(3)
       """,cutoff);return jdbc.update("DELETE FROM energy_usage_daily WHERE usage_date<?",cutoff);});return purged==null?0:purged;}
 
-    private void syncDateChunks(PlatformConfigService.PlatformConnection c, List<PlatformDevice> devices,
-                                String energyType, Metric metric, LocalDate start, LocalDate end, Long batchId) {
+    private Set<String> syncDateChunks(PlatformConfigService.PlatformConnection c, List<PlatformDevice> devices,
+                                       String energyType, Metric metric, LocalDate start, LocalDate end, Long batchId) {
+        Set<String> devicesWithData = new HashSet<>();
         LocalDate cursor = start;
         while (!cursor.isAfter(end)) {
             LocalDate chunkEnd = YearMonth.from(cursor).atEndOfMonth();
             if (chunkEnd.isAfter(end)) chunkEnd = end;
             List<PlatformDailyUsage> points = platformAdapter.fetchDailyUsage(c.baseUrl(), c.token(), devices,
                     energyType, metric.identifier(), metric.name(), cursor, chunkEnd);
+            points.stream().map(PlatformDailyUsage::platformDeviceId).filter(Objects::nonNull).forEach(devicesWithData::add);
             upsertDailyPoints(points, energyType, metric, batchId);
             cursor = chunkEnd.plusDays(1);
         }
+        return devicesWithData;
     }
 
     private void upsertDailyPoints(List<PlatformDailyUsage> points, String energyType, Metric metric, Long batchId) {
@@ -402,12 +485,53 @@ public class EnergyUsageService {
                 points,500,(ps,p)->{BigDecimal usage="READING".equals(metric.mode())?null:p.value();BigDecimal reading="READING".equals(metric.mode())?p.value():null;ps.setString(1,p.platformDeviceId());ps.setObject(2,p.usageDate());ps.setString(3,energyType);ps.setString(4,p.identifier());ps.setString(5,p.identifierName());ps.setBigDecimal(6,usage);ps.setBigDecimal(7,reading);ps.setString(8,metric.mode());ps.setLong(9,batchId);ps.setObject(10,syncedAt);ps.setString(11,p.rawJson());}));
     }
 
-    private Metric resolveMetric(PlatformDeviceCurrent d,String energyType) {
+    private Metric resolveMetric(PlatformDeviceCurrent d,
+                                 String energyType,
+                                 PlatformConfigService.PlatformConnection connection,
+                                 Map<String, Metric> metricCache) {
         if (blank(d.getProductId()) || blank(d.getCommAddress())) throw new IllegalArgumentException("缺少 productId 或通讯地址");
-        if ("ELECTRIC".equals(energyType)) return new Metric("11X", "正向有功电能", "USAGE");
-        if ("WATER".equals(energyType)) return new Metric("totalFlow", "累计流量", "USAGE");
-        if ("GAS".equals(energyType)) return new Metric("totalFlow", "累计用气量", "USAGE");
-        throw new IllegalArgumentException("无法自动识别设备能源类型");
+        if (!Set.of("ELECTRIC", "WATER", "GAS").contains(energyType)) {
+            throw new IllegalArgumentException("无法自动识别设备能源类型");
+        }
+        String cacheKey = d.getProductId() + "|" + energyType;
+        return metricCache.computeIfAbsent(cacheKey,
+                ignored -> loadSourceMetric(connection, d.getProductId(), energyType));
+    }
+
+    private Metric loadSourceMetric(PlatformConfigService.PlatformConnection connection,
+                                    String productId,
+                                    String energyType) {
+        String preferredIdentifier = switch (energyType) {
+            case "ELECTRIC" -> "11X";
+            case "WATER" -> "12L";
+            default -> null;
+        };
+        try {
+            List<PlatformEnergyMetric> available = platformAdapter.fetchCumulativeMetrics(
+                    connection.baseUrl(), connection.token(), productId);
+            Optional<PlatformEnergyMetric> selected = available.stream()
+                    .filter(metric -> preferredIdentifier != null
+                            && preferredIdentifier.equalsIgnoreCase(metric.identifier()))
+                    .findFirst()
+                    .or(() -> available.stream().findFirst());
+            if (selected.isPresent()) {
+                PlatformEnergyMetric metric = selected.get();
+                log.info("usage metric resolved, productId={}, energyType={}, identifier={}, name={}",
+                        productId, energyType, metric.identifier(), metric.identifierName());
+                return new Metric(metric.identifier(), metric.identifierName(), "USAGE");
+            }
+            log.warn("source product has no cumulative metric, productId={}, energyType={}, using fallback",
+                    productId, energyType);
+        } catch (RuntimeException ex) {
+            log.warn("source product metric lookup failed, productId={}, energyType={}, using fallback: {}",
+                    productId, energyType, ex.getMessage());
+        }
+        return switch (energyType) {
+            case "ELECTRIC" -> new Metric("11X", "正向有功电能", "USAGE");
+            case "WATER" -> new Metric("12L", "累积流量", "USAGE");
+            case "GAS" -> new Metric("totalFlow", "累计用气量", "USAGE");
+            default -> throw new IllegalArgumentException("无法自动识别设备能源类型");
+        };
     }
 
     private List<PlatformDeviceCurrent> selectDevices(Long groupId, List<String> ids) {
@@ -423,6 +547,31 @@ public class EnergyUsageService {
     }
 
     private String effectiveEnergyType(PlatformDeviceCurrent d){String product=Optional.ofNullable(d.getProductName()).orElse("").toUpperCase(Locale.ROOT);String productId=Optional.ofNullable(d.getProductId()).orElse("");if(Set.of("437","438").contains(productId)||product.contains("水表"))return "WATER";if(Set.of("436","608").contains(productId)||product.contains("DTSU")||product.contains("DDSU")||product.contains("电表"))return "ELECTRIC";if(product.contains("燃气")||product.contains("气表"))return "GAS";String source=Optional.ofNullable(d.getEnergyType()).orElse("").toUpperCase(Locale.ROOT);return Set.of("ELECTRIC","WATER","GAS").contains(source)?source:"OTHER";}
+    private boolean isRetryable(Exception ex) {
+        Throwable cursor = ex;
+        while (cursor != null) {
+            if (cursor instanceof PlatformAdapterException adapterException) {
+                return Set.of("HTTP_500", "HTTP_502", "HTTP_503", "HTTP_504", "IO_ERROR")
+                        .contains(adapterException.getCode());
+            }
+            cursor = cursor.getCause();
+        }
+        return false;
+    }
+    private void pauseBeforeRetry(int attempt) {
+        try {
+            Thread.sleep(300L * attempt);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("用量同步重试被中断", ex);
+        }
+    }
+    private String summarizeDevices(List<PlatformDevice> devices) {
+        String summary = devices.stream().limit(10)
+                .map(device -> blank(device.getDeviceName()) ? device.getPlatformDeviceId() : device.getDeviceName())
+                .reduce((left, right) -> left + "、" + right).orElse("-");
+        return devices.size() > 10 ? summary + "等" : summary;
+    }
     private String productLabel(MetricKey key){return (blank(key.productName())?"未知产品":key.productName())+"（"+key.productId()+"）";}
     private PlatformDevice toPlatformDevice(PlatformDeviceCurrent d,String energyType) {
         return PlatformDevice.builder().platformDeviceId(d.getPlatformDeviceId()).deviceName(d.getDeviceName())
@@ -440,7 +589,7 @@ public class EnergyUsageService {
     }
     private int countDailyPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_daily WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
     private int countMonthlyPoints(Long batchId) { return Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM energy_usage_monthly WHERE sync_batch_id=?", Integer.class, batchId)).orElse(0); }
-    private void updateSyncProgress(Long batchId,int succeeded,int failed){jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,monthly_points=?,daily_points=? WHERE id=?",succeeded,failed,countMonthlyPoints(batchId),countDailyPoints(batchId),batchId);}
+    private void updateSyncProgress(Long batchId,int succeeded,int failed,int noData){jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,no_data_devices=?,monthly_points=?,daily_points=? WHERE id=?",succeeded,failed,noData,countMonthlyPoints(batchId),countDailyPoints(batchId),batchId);}
     private int valueOrZero(Integer v) { return v == null ? 0 : v; }
     private String defaultColor(String v) { return blank(v) ? "#409EFF" : v; }
     private boolean blank(String v) { return v == null || v.isBlank(); }
@@ -449,7 +598,7 @@ public class EnergyUsageService {
     private BigDecimal decimal(Object v) { return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString()); }
     private record Metric(String identifier, String name, String mode) {}
     private record MetricKey(Metric metric, String energyType,String productId,String productName) {}
-    private record BatchResult(int succeeded,int failed,List<String> errors) {}
+    private record BatchResult(int succeeded,int failed,int noData,List<String> errors) {}
     private static final class SplitBudget{private int remaining;private SplitBudget(int remaining){this.remaining=remaining;}private boolean consume(){if(remaining<=0)return false;remaining--;return true;}}
     private record AnalysisFilter(String table,String dateField,String joins, String sql, List<Object> args) {}
 }

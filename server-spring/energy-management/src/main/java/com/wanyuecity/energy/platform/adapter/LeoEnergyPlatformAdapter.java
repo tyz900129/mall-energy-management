@@ -7,6 +7,7 @@ import com.wanyuecity.energy.platform.dto.PlatformAccountDeviceRelation;
 import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
+import com.wanyuecity.energy.platform.dto.PlatformEnergyMetric;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
@@ -202,6 +203,25 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
             log.warn("relations fetch: {}/{} account calls failed (skipped)", failed, accounts.size());
         }
         return out;
+    }
+
+    @Override
+    public List<PlatformEnergyMetric> fetchCumulativeMetrics(String baseUrl, String sessionToken, String productId) {
+        if (productId == null || productId.isBlank()) return List.of();
+        JsonNode response = getJson(baseUrl,
+                "/api/product/functions?ids=" + enc(productId) + "&valueTypeEnum=CUMULATIVE", sessionToken);
+        if (!isSuccess(response)) {
+            throw new PlatformAdapterException("PLATFORM_ERROR", "Product metric fetch failed: " + codeAndMessage(response));
+        }
+        JsonNode data = response.path("data");
+        if (!data.isArray()) return List.of();
+        List<PlatformEnergyMetric> metrics = new ArrayList<>();
+        for (JsonNode item : data) {
+            String identifier = item.path("identifier").asText("");
+            if (identifier.isBlank()) continue;
+            metrics.add(new PlatformEnergyMetric(identifier, item.path("identifierName").asText(identifier)));
+        }
+        return metrics;
     }
 
     @Override

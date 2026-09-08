@@ -112,6 +112,22 @@ class LeoEnergyPlatformAdapterTest {
     }
 
     @Test
+    void loadsCumulativeMetricFromProductConfiguration() throws Exception {
+        server.enqueue(json("{\"code\":\"200000\",\"data\":[{\"identifier\":\"12L\",\"identifierName\":\"累积流量\",\"productIds\":[437]}]}"));
+
+        var metrics = adapter.fetchCumulativeMetrics(server.url("/").toString(), "TOKEN", "437");
+
+        assertEquals(1, metrics.size());
+        assertEquals("12L", metrics.get(0).identifier());
+        assertEquals("累积流量", metrics.get(0).identifierName());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("/api/product/functions", request.getRequestUrl().encodedPath());
+        assertEquals("437", request.getRequestUrl().queryParameter("ids"));
+        assertEquals("CUMULATIVE", request.getRequestUrl().queryParameter("valueTypeEnum"));
+        assertEquals("TOKEN", request.getHeader("token"));
+    }
+
+    @Test
     void mapsYearReportColumnsToMonthlyUsage() throws Exception {
         server.enqueue(json("{\"code\":\"200000\",\"data\":{\"columnList\":[{\"prop\":\"_7\"},{\"prop\":\"_8\"}],\"valueList\":[{\"deviceId\":\"DEVICE-1\",\"_7\":\"318.75\",\"_8\":\"402.5\"}]}}"));
         PlatformDevice device = PlatformDevice.builder().platformDeviceId("DEVICE-1").deviceName("电表")

@@ -24,7 +24,7 @@
         </el-form-item>
       </el-form>
       <el-alert
-        :title="`测量点按产品自动识别；同步会跳过过滤名单中已启用的 ${activeExclusionCount} 台设备。月累计按年度获取，近三个月日明细每批最多 50 台。`"
+        :title="`测量点按产品自动识别；同步会跳过过滤名单中已启用的 ${activeExclusionCount} 台设备。源平台正常返回但所选时段没有读数的设备会单列为“无数据”，不会计为失败。`"
         type="info"
         :closable="false"
       />
@@ -39,6 +39,7 @@
         <el-table-column prop="requested" label="同步设备" width="90" />
         <el-table-column prop="excluded_devices" label="已过滤" width="80" />
         <el-table-column prop="succeeded" label="成功" width="75" />
+        <el-table-column prop="no_data_devices" label="无数据" width="80" />
         <el-table-column prop="failed" label="失败" width="75" />
         <el-table-column prop="monthly_points" label="月数据" width="85" />
         <el-table-column prop="daily_points" label="日数据" width="85" />
@@ -50,7 +51,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="error_message" label="错误信息" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="error_message" label="说明/错误" min-width="220" show-overflow-tooltip />
         <el-table-column label="执行时间" width="180"><template #default="{ row }">{{ formatDateTime(row.started_at) }}</template></el-table-column>
         <el-table-column label="完成时间" width="180"><template #default="{ row }">{{ formatDateTime(row.completed_at) }}</template></el-table-column>
       </el-table>
@@ -162,7 +163,7 @@ async function sync() {
   syncing.value = true
   try {
     const result: any = await energyApi.syncUsage(form)
-    ElMessage.success(`完成：同步 ${result.requested} 台，过滤 ${result.excludedDevices || 0} 台，成功 ${result.succeeded} 台，失败 ${result.failed} 台`)
+    ElMessage.success(`完成：同步 ${result.requested} 台，过滤 ${result.excludedDevices || 0} 台，成功 ${result.succeeded} 台，无数据 ${result.noDataDevices || 0} 台，失败 ${result.failed} 台`)
     await load()
   } finally {
     syncing.value = false
