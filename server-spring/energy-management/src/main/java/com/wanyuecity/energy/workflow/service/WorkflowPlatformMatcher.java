@@ -40,9 +40,9 @@ public class WorkflowPlatformMatcher {
    String status,reason=null;
    if("ACCOUNT_DISABLE".equals(c.getChangeType())){
     PlatformAccountCurrent a=accountMapper.selectOne(new QueryWrapper<PlatformAccountCurrent>().eq("account_number",c.getFromAccountNumber()).last("LIMIT 1"));
-    if(a==null){status="ACCOUNT_NOT_FOUND";reason="未找到待停用账户（不影响撤柜完成）";}
-    else if(isDisabled(a.getPlatformStatus()))status="MATCHED";
-    else {status="PENDING";reason="账户尚未停用（不影响撤柜完成）";}
+    if(a==null){status="MATCHED";reason="账户已停用或已从原平台移除";}
+    else if(isDisabled(a.getPlatformStatus())){status="MATCHED";reason="账户已停用";}
+    else {status="PENDING";reason="账户尚未停用";}
    }else if("DEVICE_UNBIND".equals(c.getChangeType())){
     total++;
     if(c.getFromAccountNumber()==null){status="MISMATCH";reason="缺少原计费账户快照";}
@@ -58,7 +58,7 @@ public class WorkflowPlatformMatcher {
     else if(c.getFromAccountNumber()==null){status="PENDING";reason="旧流程未保存原账户快照，设备尚未完成向新账户转移";}
     else {status="MISMATCH";reason="设备绑定的账户与目标账户不一致";}
    }
-   if(Set.of("MISMATCH","ACCOUNT_AMBIGUOUS","ACCOUNT_NOT_FOUND").contains(status)&&!"ACCOUNT_DISABLE".equals(c.getChangeType()))hardError=true;
+   if(Set.of("MISMATCH","ACCOUNT_AMBIGUOUS","ACCOUNT_NOT_FOUND").contains(status))hardError=true;
    results.add(new Result(c,actual,status,reason));
   }
   boolean beforeEffective=w.getRequestedBillingStartTime()!=null&&LocalDateTime.now().isBefore(w.getRequestedBillingStartTime());
