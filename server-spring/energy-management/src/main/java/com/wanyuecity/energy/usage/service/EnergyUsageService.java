@@ -315,7 +315,7 @@ public class EnergyUsageService {
         List<Object> args = new ArrayList<>(List.of(start, end));String sql = "",joins="";
         if (groupId != null) { sql += " AND a.group_id=?";args.add(groupId); }
         if (deviceId != null && !deviceId.isBlank()) { sql += " AND u.platform_device_id=?";args.add(deviceId.trim()); }
-        if(dimensionId!=null){joins=" JOIN device_dimension_assignment da ON da.platform_device_id=u.platform_device_id AND "+dateField+">=da.effective_from AND (da.effective_to IS NULL OR "+dateField+"<=da.effective_to) ";sql+=" AND da.dimension_id=?";args.add(dimensionId);if(dimensionValueId!=null){sql+=" AND da.dimension_value_id=?";args.add(dimensionValueId);}}
+        if(dimensionId!=null){joins=" JOIN device_dimension_assignment da ON da.platform_device_id=u.platform_device_id AND da.id=(SELECT MAX(current_assignment.id) FROM device_dimension_assignment current_assignment WHERE current_assignment.platform_device_id=da.platform_device_id AND current_assignment.dimension_id=da.dimension_id) ";sql+=" AND da.dimension_id=?";args.add(dimensionId);if(dimensionValueId!=null){sql+=" AND da.dimension_value_id=?";args.add(dimensionValueId);}}
         return new AnalysisFilter(table,dateField,joins, sql, args);
     }
 
@@ -344,29 +344,23 @@ public class EnergyUsageService {
     }
 
     private List<Map<String,Object>> dimensionBreakdown(LocalDate start,LocalDate end,String period,Long dimensionId,Long valueId,String deviceId){
-        String valueFilter=valueId==null?"":" AND x.dimension_value_id="+valueId;String deviceFilter=deviceId==null||deviceId.isBlank()?"":" AND x.platform_device_id=?";
-        List<Object> args=new ArrayList<>();Collections.addAll(args,start.withDayOfMonth(1),end.withDayOfMonth(1),dimensionId,dimensionId,start,end,dimensionId,start.withDayOfMonth(1),end.withDayOfMonth(1));if(!deviceFilter.isEmpty())args.add(deviceId.trim());
-        String bucket=bucketExpression(period,"x.usage_date");
+        boolean daily="WEEK".equals(period);String table=daily?"energy_usage_daily":"energy_usage_monthly";String dateField=daily?"x.usage_date":"x.usage_month";
+        LocalDate queryStart=daily?start:start.withDayOfMonth(1);LocalDate queryEnd=daily?end:end.withDayOfMonth(1);
+        String valueFilter=valueId==null?"":" AND a.dimension_value_id=?";String deviceFilter=deviceId==null||deviceId.isBlank()?"":" AND x.platform_device_id=?";
+        List<Object> args=new ArrayList<>(List.of(queryStart,queryEnd,dimensionId));if(valueId!=null)args.add(valueId);if(!deviceFilter.isEmpty())args.add(deviceId.trim());
+        String bucket=bucketExpression(period,dateField);
         return jdbc.queryForList("""
           SELECT %s period_start,v.id dimension_value_id,v.value_name dimension_value_name,v.color,
-            SUM(CASE WHEN UPPER(x.energy_type)='ELECTRIC' THEN x.usage_value ELSE 0 END) electric_usage,
-            SUM(CASE WHEN UPPER(x.energy_type)='WATER' THEN x.usage_value ELSE 0 END) water_usage
-          FROM (
-            SELECT s.platform_device_id,s.usage_month usage_date,s.energy_type,s.usage_value,s.dimension_value_id
-            FROM energy_usage_monthly_dimension s WHERE s.usage_month BETWEEN ? AND ? AND s.dimension_id=?
-            UNION ALL
-            SELECT d.platform_device_id,d.usage_date,d.energy_type,COALESCE(d.usage_value,0),a.dimension_value_id
-            FROM energy_usage_daily d JOIN device_dimension_assignment a ON a.platform_device_id=d.platform_device_id AND a.dimension_id=? AND d.usage_date>=a.effective_from AND (a.effective_to IS NULL OR d.usage_date<=a.effective_to)
-            WHERE d.usage_date BETWEEN ? AND ? AND NOT EXISTS(SELECT 1 FROM energy_usage_monthly_dimension s WHERE s.platform_device_id=d.platform_device_id AND s.usage_month=DATE_SUB(d.usage_date,INTERVAL DAYOFMONTH(d.usage_date)-1 DAY) AND s.identifier=d.identifier AND s.dimension_id=a.dimension_id)
-            UNION ALL
-            SELECT m.platform_device_id,m.usage_month,m.energy_type,COALESCE(m.usage_value,0),a.dimension_value_id
-            FROM energy_usage_monthly m JOIN device_dimension_assignment a ON a.platform_device_id=m.platform_device_id AND a.dimension_id=? AND LAST_DAY(m.usage_month)>=a.effective_from AND (a.effective_to IS NULL OR LAST_DAY(m.usage_month)<=a.effective_to)
-            WHERE m.usage_month BETWEEN ? AND ?
-              AND NOT EXISTS(SELECT 1 FROM energy_usage_monthly_dimension s WHERE s.platform_device_id=m.platform_device_id AND s.usage_month=m.usage_month AND s.identifier=m.identifier AND s.dimension_id=a.dimension_id)
-              AND NOT EXISTS(SELECT 1 FROM energy_usage_daily d WHERE d.platform_device_id=m.platform_device_id AND d.identifier=m.identifier AND d.usage_date BETWEEN m.usage_month AND LAST_DAY(m.usage_month))
-          ) x JOIN analysis_dimension_value v ON v.id=x.dimension_value_id
-          WHERE 1=1 %s %s GROUP BY period_start,v.id,v.value_name,v.color ORDER BY period_start,v.sort_order,v.id
-          """.formatted(bucket,valueFilter,deviceFilter),args.toArray());
+            SUM(CASE WHEN UPPER(x.energy_type)='ELECTRIC' THEN COALESCE(x.usage_value,0) ELSE 0 END) electric_usage,
+            SUM(CASE WHEN UPPER(x.energy_type)='WATER' THEN COALESCE(x.usage_value,0) ELSE 0 END) water_usage
+          FROM %s x
+          JOIN device_dimension_assignment a ON a.platform_device_id=x.platform_device_id
+            AND a.id=(SELECT MAX(current_assignment.id) FROM device_dimension_assignment current_assignment
+                      WHERE current_assignment.platform_device_id=a.platform_device_id AND current_assignment.dimension_id=a.dimension_id)
+          JOIN analysis_dimension_value v ON v.id=a.dimension_value_id
+          WHERE %s BETWEEN ? AND ? AND a.dimension_id=? %s %s
+          GROUP BY period_start,v.id,v.value_name,v.color,v.sort_order ORDER BY period_start,v.sort_order,v.id
+          """.formatted(bucket,table,dateField,valueFilter,deviceFilter),args.toArray());
     }
 
     private Set<String> syncMonthlyChunks(PlatformConfigService.PlatformConnection c,
