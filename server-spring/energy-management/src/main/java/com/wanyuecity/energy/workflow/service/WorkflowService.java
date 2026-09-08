@@ -11,6 +11,7 @@ import com.wanyuecity.energy.platform.entity.PlatformDeviceCurrent;
 import com.wanyuecity.energy.platform.mapper.PlatformAccountCurrentMapper;
 import com.wanyuecity.energy.platform.mapper.PlatformAccountDeviceCurrentMapper;
 import com.wanyuecity.energy.platform.mapper.PlatformDeviceCurrentMapper;
+import com.wanyuecity.energy.platform.service.MerchantNameParser;
 import com.wanyuecity.energy.stall.entity.Stall;
 import com.wanyuecity.energy.stall.mapper.StallMapper;
 import com.wanyuecity.energy.stalldevice.entity.StallDevice;
@@ -66,7 +67,7 @@ public class WorkflowService {
 
         List<Map<String,Object>> accounts = accountsByMerchantCode(req.getMerchantCode());
         out.setMerchantExists(!accounts.isEmpty());
-        if (!accounts.isEmpty()) out.setMerchantName(Objects.toString(accounts.get(0).get("account_name"), null));
+        if (!accounts.isEmpty()) out.setMerchantName(resolveMerchantName(req.getMerchantCode(), accounts));
         Set<String> merchantAccounts = new LinkedHashSet<>();
         accounts.forEach(a -> merchantAccounts.add(Objects.toString(a.get("account_number"), "")));
         out.setMerchantStalls(findMerchantStalls(merchantAccounts));
@@ -200,7 +201,22 @@ public class WorkflowService {
     }
 
     private List<Map<String,Object>> accountsByMerchantCode(String code) {
-        return jdbc.queryForList("SELECT p.account_number,p.account_name,p.mobile_phone,p.platform_status FROM platform_account_current p LEFT JOIN platform_account_local_profile l ON l.account_number=p.account_number WHERE COALESCE(NULLIF(l.merchant_code,''),p.merchant_code)=? AND (p.platform_status IS NULL OR UPPER(p.platform_status) NOT IN ('0','DISABLED','INACTIVE')) ORDER BY p.account_number", code);
+        return jdbc.queryForList("SELECT p.account_number,p.account_name,p.user_name,p.mobile_phone,p.platform_status FROM platform_account_current p LEFT JOIN platform_account_local_profile l ON l.account_number=p.account_number WHERE COALESCE(NULLIF(l.merchant_code,''),p.merchant_code)=? AND (p.platform_status IS NULL OR UPPER(p.platform_status) NOT IN ('0','DISABLED','INACTIVE')) ORDER BY p.account_number", code);
+    }
+
+    private String resolveMerchantName(String merchantCode, List<Map<String,Object>> accounts) {
+        Merchant local = merchantMapper.selectOne(new QueryWrapper<Merchant>()
+                .eq("merchant_code", merchantCode).last("LIMIT 1"));
+        if (local != null && hasText(local.getMerchantName())) return local.getMerchantName().trim();
+        for (Map<String,Object> account : accounts) {
+            String name = MerchantNameParser.extract(Objects.toString(account.get("user_name"), null), merchantCode);
+            if (hasText(name)) return name;
+        }
+        for (Map<String,Object> account : accounts) {
+            String name = MerchantNameParser.extract(Objects.toString(account.get("account_name"), null), merchantCode);
+            if (hasText(name)) return name;
+        }
+        return merchantCode;
     }
 
     private List<String> enabledAccountsForDevice(String deviceId) {
@@ -439,7 +455,13 @@ public class WorkflowService {
         PlatformAccountCurrent billingAccount=null;
         if(hasText(accountNumber))billingAccount=accountMapper.selectOne(new QueryWrapper<PlatformAccountCurrent>().eq("account_number",accountNumber).last("LIMIT 1"));
         if(billingAccount==null&&hasText(row.getMerchantCode()))billingAccount=accountMapper.selectOne(new QueryWrapper<PlatformAccountCurrent>().eq("merchant_code",row.getMerchantCode()).orderByDesc("id").last("LIMIT 1"));
-        v.setBillingAccountName(billingAccount==null?null:billingAccount.getAccountName());
+        String resolvedName;
+        if ("NEW_MERCHANT".equals(row.getWorkflowType())) resolvedName=MerchantNameParser.extract(row.getMerchantName(),row.getMerchantCode());
+        else if (billingAccount!=null&&hasText(billingAccount.getUserName())) resolvedName=MerchantNameParser.extract(billingAccount.getUserName(),row.getMerchantCode());
+        else resolvedName=MerchantNameParser.extract(row.getMerchantName(),row.getMerchantCode());
+        if (!hasText(resolvedName)&&billingAccount!=null) resolvedName=MerchantNameParser.extract(billingAccount.getAccountName(),row.getMerchantCode());
+        v.setMerchantName(hasText(resolvedName)?resolvedName:row.getMerchantName());
+        v.setBillingAccountName(billingAccount==null?null:(hasText(billingAccount.getUserName())?billingAccount.getUserName():billingAccount.getAccountName()));
         v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(row.getApplicantName());v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
     private SysUser findUser(String username){if(!hasText(username))return null;return userMapper.selectOne(new QueryWrapper<SysUser>().eq("username",username).last("LIMIT 1"));}
     private String nextWorkflowNo(){return "WF"+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))+UUID.randomUUID().toString().substring(0,4).toUpperCase();}

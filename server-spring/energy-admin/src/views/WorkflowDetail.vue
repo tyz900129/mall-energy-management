@@ -88,8 +88,10 @@ function deviceReference(d:any){
 }
 function deviceDescription(d:any){const reference=deviceReference(d);return `${reference.type}（${reference.label}${reference.value}）`}
 function exitMeterLabel(){const devices=verification.value?.devices?.length?verification.value.devices:(row.value.devices||[]).map((d:any)=>({energyType:d.energyTypeSnapshot})),types=new Set(devices.map((d:any)=>d.energyType));return types.has('WATER')&&types.has('ELECTRIC')?'水电表':types.has('WATER')?'水表':types.has('ELECTRIC')?'电表':'设备'}
-const merchantDisplayName=computed(()=>extractMerchantName(row.value.billingAccountName||row.value.merchantName,row.value.merchantCode)||row.value.merchantName||row.value.merchantCode||'')
-const standardAccountName=computed(()=>buildStandardAccountName(row.value.merchantCode,row.value.workflowType==='NEW_MERCHANT'?row.value.merchantName:(row.value.billingAccountName||row.value.merchantName)))
+const merchantDisplayName=computed(()=>extractMerchantName(row.value.merchantName||row.value.billingAccountName,row.value.merchantCode)||row.value.merchantName||row.value.merchantCode||'')
+const standardAccountName=computed(()=>row.value.workflowType==='NEW_MERCHANT'
+  ? buildStandardAccountName(row.value.merchantCode,row.value.merchantName)
+  : (row.value.billingAccountName||buildStandardAccountName(row.value.merchantCode,row.value.merchantName)))
 // 撤柜场景严格以铺位管理中的业态编码判断，避免铺位或商户名称中含“仓库”造成误判。
 function isWarehouse(){return String(row.value.stallBusinessType||'').trim().toUpperCase()==='CK'}
 const oaComment=computed(()=>{const location=`${row.value.floorName||row.value.floorCode||''}${row.value.stallCode||''}`,oldAccount=row.value.devices?.find((d:any)=>d.oldAccountNumber)?.oldAccountNumber;if(isExit.value){const warehouse=isWarehouse(),name=merchantDisplayName.value.replace(warehouse?/仓库$/:'',''),account=standardAccountName.value||row.value.billingAccountName||oldAccount||'原计费';return `${row.value.stallCode||''} 商户${name}${warehouse?'仓库撤柜':'撤柜移位'}，${exitMeterLabel()}需从${account}账户中移除。`}if(row.value.workflowType==='NEW_MERCHANT')return `商户${standardAccountName.value} ${location}，该铺位商户入驻，需要开设账户。`;const devices=(verification.value?.devices||[]).map(deviceDescription).join('、')||'核验设备',account=standardAccountName.value||row.value.billingAccountName||row.value.targetAccountNumber||'原有计费';return `商户${account} ${location}新增铺位入驻，需将${devices}添加至${account}账户中。`})

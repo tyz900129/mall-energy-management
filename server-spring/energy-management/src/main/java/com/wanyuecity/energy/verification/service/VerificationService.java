@@ -2,6 +2,7 @@ package com.wanyuecity.energy.verification.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.wanyuecity.energy.core.BizException;
+import com.wanyuecity.energy.platform.service.MerchantNameParser;
 import com.wanyuecity.energy.stall.entity.Stall;
 import com.wanyuecity.energy.stall.mapper.StallMapper;
 import com.wanyuecity.energy.verification.entity.*;
@@ -54,6 +55,6 @@ public class VerificationService {
  private Workflow requireWorkflow(Long id){Workflow w=workflowMapper.selectById(id);if(w==null)throw BizException.notFound("workflow not found");return w;}
  private List<FieldVerificationDevice> devices(Long taskId){return deviceMapper.selectList(new QueryWrapper<FieldVerificationDevice>().eq("verification_task_id",taskId).orderByAsc("id"));}
  private long photoCount(FieldVerificationDevice d,String type){return attachmentMapper.selectCount(new QueryWrapper<Attachment>().eq("business_type","VERIFICATION_DEVICE").eq("business_id",d.getId()).eq("photo_type",type));}
- private VerificationTaskView view(FieldVerificationTask t,boolean includeToken){Workflow w=requireWorkflow(t.getWorkflowId());Stall s=stallMapper.selectById(w.getStallId());VerificationTaskView v=new VerificationTaskView();v.setId(t.getId());v.setTaskNo(t.getTaskNo());v.setWorkflowId(w.getId());v.setWorkflowNo(w.getWorkflowNo());v.setWorkflowType(w.getWorkflowType());v.setMerchantCode(w.getMerchantCode());v.setMerchantName(w.getMerchantName());if(s!=null){v.setStallCode(s.getStallCode());v.setStallName(s.getStallName());}v.setStatus(t.getStatus());if(includeToken)v.setAccessToken(t.getAccessToken());v.setOpenedAt(t.getOpenedAt());v.setStartedAt(t.getStartedAt());v.setCompletedAt(t.getCompletedAt());v.setVerificationResult(t.getVerificationResult());v.setRemark(t.getRemark());v.setDevices(devices(t.getId()));return v;}
+ private VerificationTaskView view(FieldVerificationTask t,boolean includeToken){Workflow w=requireWorkflow(t.getWorkflowId());Stall s=stallMapper.selectById(w.getStallId());VerificationTaskView v=new VerificationTaskView();v.setId(t.getId());v.setTaskNo(t.getTaskNo());v.setWorkflowId(w.getId());v.setWorkflowNo(w.getWorkflowNo());v.setWorkflowType(w.getWorkflowType());v.setMerchantCode(w.getMerchantCode());String merchantName=MerchantNameParser.extract(w.getMerchantName(),w.getMerchantCode());v.setMerchantName(merchantName==null?w.getMerchantName():merchantName);if(s!=null){v.setStallCode(s.getStallCode());v.setStallName(s.getStallName());}v.setStatus(t.getStatus());if(includeToken)v.setAccessToken(t.getAccessToken());v.setOpenedAt(t.getOpenedAt());v.setStartedAt(t.getStartedAt());v.setCompletedAt(t.getCompletedAt());v.setVerificationResult(t.getVerificationResult());v.setRemark(t.getRemark());v.setDevices(devices(t.getId()));return v;}
  private String randomToken(){byte[] b=new byte[32];RANDOM.nextBytes(b);return Base64.getUrlEncoder().withoutPadding().encodeToString(b);} private String trim(String s){return s==null||s.isBlank()?null:s.trim();}
 }

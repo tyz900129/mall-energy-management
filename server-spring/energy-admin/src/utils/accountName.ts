@@ -7,6 +7,10 @@ function normalizedText(value: unknown) {
     .trim()
 }
 
+function stripStallPrefix(value: string) {
+  return value.replace(/^(?:[A-Z]{1,3}\d{2,5}[A-Z]?(?:[-+/]\d+)?|[A-Z]\d+-\d+)\s*-/i, '').trim()
+}
+
 /**
  * Extract a merchant/brand name from both standard and historical source-account names.
  * Historical examples include 3066-B1-814239-超市烤鸭 and 3066-优图碧彩妆-000249.
@@ -17,7 +21,7 @@ export function extractMerchantName(value: unknown, merchantCode: unknown) {
   if (!text) return ''
 
   const standard = /^3066-(\d{6})-(.+)$/i.exec(text)
-  if (standard?.[2]) return standard[2].trim()
+  if (standard?.[2]) return stripStallPrefix(standard[2])
 
   text = text.replace(/^3066-?/i, '').replace(/^-+|-+$/g, '').trim()
   if (/^\d{6}$/.test(code)) {
@@ -25,14 +29,14 @@ export function extractMerchantName(value: unknown, merchantCode: unknown) {
     const codeIndex = parts.findIndex(part => part === code)
     if (codeIndex >= 0) {
       const afterCode = parts.slice(codeIndex + 1).join('-').trim()
-      if (afterCode) return afterCode
+      if (afterCode) return stripStallPrefix(afterCode)
       const beforeCode = parts.slice(0, codeIndex).join('-').trim()
-      if (beforeCode) return beforeCode
+      if (beforeCode) return stripStallPrefix(beforeCode)
     }
   }
 
   // Some old accounts start with a stall code, for example B101-百品好炒货.
-  text = text.replace(/^(?:[A-Z]{1,3}\d{2,5}|[A-Z]\d+-\d+)\s*-/i, '').trim()
+  text = stripStallPrefix(text)
   return text === code ? '' : text
 }
 
