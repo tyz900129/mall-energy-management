@@ -17,6 +17,10 @@
             <el-option v-for="g in groups" :key="g.id" :label="g.group_name" :value="g.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="补采选项">
+          <el-checkbox v-model="form.includeExcluded">包含过滤设备</el-checkbox>
+          <el-checkbox v-model="form.monthlyOnly">仅同步月累计值</el-checkbox>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="syncing" :disabled="hasRunning" @click="sync">
             {{ hasRunning ? '已有同步正在执行' : '开始同步' }}
@@ -24,7 +28,9 @@
         </el-form-item>
       </el-form>
       <el-alert
-        :title="`测量点按产品自动识别；同步会跳过过滤名单中已启用的 ${activeExclusionCount} 台设备。源平台正常返回但所选时段没有读数的设备会单列为“无数据”，不会计为失败。`"
+        :title="form.includeExcluded
+          ? `历史补采将包含过滤名单中的 ${activeExclusionCount} 台设备；日常同步时请取消该选项。无历史数据的设备会记为“无数据”，不会计为失败。`
+          : `测量点按产品自动识别；同步会跳过过滤名单中已启用的 ${activeExclusionCount} 台设备。源平台正常返回但所选时段没有读数的设备会单列为“无数据”，不会计为失败。`"
         type="info"
         :closable="false"
       />
@@ -145,7 +151,7 @@ const now = new Date()
 const first = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 const last = new Date(now.getFullYear(), now.getMonth(), 0)
 const fmt = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-const form = reactive<any>({ startDate: fmt(first), endDate: fmt(last), groupId: undefined })
+const form = reactive<any>({ startDate: fmt(first), endDate: fmt(last), groupId: undefined, includeExcluded: false, monthlyOnly: false })
 const exclusionForm = reactive<{ deviceIds: string[]; reason: string }>({ deviceIds: [], reason: '离线设备，暂停用量同步' })
 
 async function load() {
@@ -158,8 +164,9 @@ async function load() {
 async function loadBatches() { batches.value = await energyApi.syncBatches() as any }
 
 async function sync() {
-  const excludedText = activeExclusionCount.value ? `，并跳过过滤名单中的 ${activeExclusionCount.value} 台设备` : ''
-  await ElMessageBox.confirm(`将按年度获取月累计值，只补充最近三个月日明细${excludedText}。确定开始？`, '历史用量同步')
+  const excludedText = form.includeExcluded ? `，包含过滤名单中的 ${activeExclusionCount.value} 台设备` : `，跳过过滤名单中的 ${activeExclusionCount.value} 台设备`
+  const detailText = form.monthlyOnly ? '，不获取每日明细' : '，并补充最近三个月日明细'
+  await ElMessageBox.confirm(`将逐月获取月累计值${detailText}${excludedText}。确定开始？`, '历史用量同步')
   syncing.value = true
   try {
     const result: any = await energyApi.syncUsage(form)

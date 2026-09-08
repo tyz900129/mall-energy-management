@@ -205,7 +205,9 @@ public class EnergyUsageService {
         List<PlatformDeviceCurrent> selected = selectDevices(request.groupId(), request.deviceIds());
         if (selected.isEmpty()) throw BizException.badRequest("没有符合条件的设备");
         Set<String> excludedIds = enabledSyncExclusionIds();
-        List<PlatformDeviceCurrent> current = selected.stream()
+        boolean includeExcluded = Boolean.TRUE.equals(request.includeExcluded());
+        boolean monthlyOnly = Boolean.TRUE.equals(request.monthlyOnly());
+        List<PlatformDeviceCurrent> current = includeExcluded ? selected : selected.stream()
                 .filter(device -> !excludedIds.contains(device.getPlatformDeviceId())).toList();
         int excludedDevices = selected.size() - current.size();
         if (current.isEmpty()) throw BizException.badRequest("所选设备均在同步过滤名单中，共 " + excludedDevices + " 台");
@@ -233,7 +235,7 @@ public class EnergyUsageService {
                 Metric metric = entry.getKey().metric();
                 for (int offset = 0; offset < devices.size(); offset += 50) {
                     List<PlatformDevice> batch = devices.subList(offset, Math.min(offset + 50, devices.size()));
-                    BatchResult batchResult=syncDeviceBatch(connection,batch,entry.getKey(),request.startDate(),request.endDate(),batchId,offset/50+1,new SplitBudget(12));
+                    BatchResult batchResult=syncDeviceBatch(connection,batch,entry.getKey(),request.startDate(),request.endDate(),batchId,offset/50+1,new SplitBudget(12),monthlyOnly);
                     succeeded += batchResult.succeeded();
                     failed += batchResult.failed();
                     noData += batchResult.noData();
@@ -246,7 +248,7 @@ public class EnergyUsageService {
             jdbc.update("UPDATE energy_usage_sync_batch SET succeeded=?,failed=?,no_data_devices=?,monthly_points=?,daily_points=?,purged_daily_points=?,status=?,error_message=?,completed_at=? WHERE id=?",
                     succeeded, failed, noData, monthlyPoints, dailyPoints, purged, status,
                     truncate(String.join("\n", errors), 4000), LocalDateTime.now(), batchId);
-            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("selected",selected.size());result.put("requested",current.size());result.put("excludedDevices",excludedDevices);result.put("succeeded",succeeded);result.put("failed",failed);result.put("noDataDevices",noData);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
+            Map<String,Object> result=new LinkedHashMap<>();result.put("batchNo",batchNo);result.put("status",status);result.put("selected",selected.size());result.put("requested",current.size());result.put("includedFilteredDevices",includeExcluded?selected.stream().filter(device->excludedIds.contains(device.getPlatformDeviceId())).count():0);result.put("excludedDevices",excludedDevices);result.put("monthlyOnly",monthlyOnly);result.put("succeeded",succeeded);result.put("failed",failed);result.put("noDataDevices",noData);result.put("monthlyPoints",monthlyPoints);result.put("dailyPoints",dailyPoints);result.put("purgedDailyPoints",purged);result.put("dailyRetentionStart",dailyRetentionStart());return result;
         } catch (RuntimeException ex) {
             jdbc.update("UPDATE energy_usage_sync_batch SET failed=?,status='FAILED',error_message=?,completed_at=? WHERE id=?",
                     current.size(), truncate(ex.getMessage(), 4000), LocalDateTime.now(), batchId);
@@ -377,13 +379,13 @@ public class EnergyUsageService {
         Set<String> devicesWithData = new HashSet<>();
         LocalDate cursor = start.withDayOfMonth(1);
         while (!cursor.isAfter(end)) {
-            LocalDate yearEnd = LocalDate.of(cursor.getYear(), 12, 31);
-            LocalDate chunkEnd = yearEnd.isAfter(end) ? end : yearEnd;
+            LocalDate monthEnd = YearMonth.from(cursor).atEndOfMonth();
+            LocalDate chunkEnd = monthEnd.isAfter(end) ? end : monthEnd;
             List<PlatformMonthlyUsage> points = platformAdapter.fetchMonthlyUsage(c.baseUrl(), c.token(), devices,
                     energyType, metric.identifier(), metric.name(), cursor, chunkEnd);
             points.stream().map(PlatformMonthlyUsage::platformDeviceId).filter(Objects::nonNull).forEach(devicesWithData::add);
             upsertMonthlyPoints(points, energyType, batchId);
-            cursor = LocalDate.of(cursor.getYear() + 1, 1, 1);
+            cursor = cursor.plusMonths(1);
         }
         return devicesWithData;
     }
@@ -395,7 +397,8 @@ public class EnergyUsageService {
                                          LocalDate end,
                                          Long batchId,
                                          int batchNo,
-                                         SplitBudget budget) {
+                                         SplitBudget budget,
+                                         boolean monthlyOnly) {
         Exception lastError = null;
         int maxAttempts = devices.size() == 1 ? 3 : 2;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -404,7 +407,7 @@ public class EnergyUsageService {
                         syncMonthlyChunks(c, devices, key.energyType(), key.metric(), start, end, batchId));
                 LocalDate dailyStart = start.isAfter(dailyRetentionStart()) ? start : dailyRetentionStart();
                 LocalDate dailyEnd = end.isBefore(LocalDate.now()) ? end : LocalDate.now();
-                if (!dailyEnd.isBefore(dailyStart)) {
+                if (!monthlyOnly && !dailyEnd.isBefore(dailyStart)) {
                     devicesWithData.addAll(syncDateChunks(c, devices, key.energyType(), key.metric(), dailyStart, dailyEnd, batchId));
                 }
                 List<PlatformDevice> noDataDevices = devices.stream()
@@ -426,8 +429,8 @@ public class EnergyUsageService {
         }
         if (devices.size() > 1 && budget.consume()) {
             int middle = devices.size() / 2;
-            BatchResult left = syncDeviceBatch(c, devices.subList(0, middle), key, start, end, batchId, batchNo, budget);
-            BatchResult right = syncDeviceBatch(c, devices.subList(middle, devices.size()), key, start, end, batchId, batchNo, budget);
+            BatchResult left = syncDeviceBatch(c, devices.subList(0, middle), key, start, end, batchId, batchNo, budget, monthlyOnly);
+            BatchResult right = syncDeviceBatch(c, devices.subList(middle, devices.size()), key, start, end, batchId, batchNo, budget, monthlyOnly);
             List<String> combined = new ArrayList<>(left.errors());
             combined.addAll(right.errors());
             return new BatchResult(left.succeeded() + right.succeeded(), left.failed() + right.failed(),

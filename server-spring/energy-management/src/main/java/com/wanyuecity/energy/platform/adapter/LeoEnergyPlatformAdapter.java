@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -310,10 +311,55 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
         var func = root.putArray("funcList").addObject();var productIds = func.putArray("productIds");
         devices.stream().map(PlatformDevice::getProductId).filter(v -> v != null && !v.isBlank()).distinct().forEach(v -> { try { productIds.add(Long.parseLong(v)); } catch (Exception ex) { productIds.add(v); } });
         func.put("identifier", identifier);func.put("identifierName", identifierName);func.put("label", identifierName);func.put("value", identifier);
-        JsonNode response = postJson(baseUrl, "/api/devices/show/energy-report-data", sessionToken, root);
+        JsonNode response;
+        try {
+            response = postJson(baseUrl, "/api/devices/show/energy-report-data", sessionToken, root);
+        } catch (PlatformAdapterException ex) {
+            if (!"HTTP_500".equals(ex.getCode())) throw ex;
+            log.info("monthly usage unavailable; falling back to daily aggregation, yearMonth={}, devices={}",
+                    YearMonth.from(startDate), devices.size());
+            root.put("timeType", "month");
+            JsonNode dailyResponse = postJson(baseUrl, "/api/devices/show/energy-report-data", sessionToken, root);
+            if (!isSuccess(dailyResponse)) {
+                throw new PlatformAdapterException("PLATFORM_ERROR",
+                        "Daily aggregation fallback failed: " + codeAndMessage(dailyResponse));
+            }
+            return aggregateDailyResponseByMonth(dailyResponse, startDate, endDate, identifier, identifierName);
+        }
         if (!isSuccess(response)) throw new PlatformAdapterException("PLATFORM_ERROR", "Monthly usage fetch failed: " + codeAndMessage(response));
         JsonNode values=response.path("data").path("valueList");if(!values.isArray())return List.of();List<PlatformMonthlyUsage> out=new ArrayList<>();
         for(JsonNode row:values){String deviceId=firstText(row,"deviceId","id");for(int month=startDate.getMonthValue();month<=endDate.getMonthValue();month++){JsonNode value=row.path("_"+month);if(value.isMissingNode()||value.isNull()||value.asText("").isBlank())continue;try{out.add(new PlatformMonthlyUsage(deviceId,LocalDate.of(startDate.getYear(),month,1),identifier,identifierName,new BigDecimal(value.asText()),row.toString()));}catch(NumberFormatException ignored){log.warn("non-numeric monthly usage ignored, deviceId={}, month={}, value={}",deviceId,month,value.asText());}}}
+        return out;
+    }
+
+    private List<PlatformMonthlyUsage> aggregateDailyResponseByMonth(JsonNode response,
+                                                                      LocalDate startDate,
+                                                                      LocalDate endDate,
+                                                                      String identifier,
+                                                                      String identifierName) {
+        JsonNode values = response.path("data").path("valueList");
+        if (!values.isArray()) return List.of();
+        List<PlatformMonthlyUsage> out = new ArrayList<>();
+        for (JsonNode row : values) {
+            String deviceId = firstText(row, "deviceId", "id");
+            BigDecimal total = BigDecimal.ZERO;
+            boolean hasValue = false;
+            for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
+                JsonNode value = row.path("_" + day.getDayOfMonth());
+                if (value.isMissingNode() || value.isNull() || value.asText("").isBlank()) continue;
+                try {
+                    total = total.add(new BigDecimal(value.asText()));
+                    hasValue = true;
+                } catch (NumberFormatException ignored) {
+                    log.warn("non-numeric daily usage ignored during monthly aggregation, deviceId={}, date={}, value={}",
+                            deviceId, day, value.asText());
+                }
+            }
+            if (hasValue) {
+                out.add(new PlatformMonthlyUsage(deviceId, startDate.withDayOfMonth(1), identifier,
+                        identifierName, total, row.toString()));
+            }
+        }
         return out;
     }
 
