@@ -4,7 +4,8 @@
     <el-alert v-if="row.status==='DRAFT'" title="草稿尚未进入现场核验；提交时系统会重新检查铺位设备与计费账户。" type="warning" show-icon :closable="false" />
     <el-card style="margin-top:12px"><template #header>基本信息</template>
       <el-descriptions :column="3" border><el-descriptions-item label="流程编号">{{row.workflowNo}}</el-descriptions-item><el-descriptions-item label="业务类型">{{typeLabel(row.workflowType)}}</el-descriptions-item><el-descriptions-item label="状态"><el-tag :type="statusType(row.status)">{{statusLabel(row.status)}}</el-tag></el-descriptions-item>
-        <el-descriptions-item label="商户">{{row.merchantCode}} - {{row.merchantName}}</el-descriptions-item><el-descriptions-item label="铺位">{{row.stallCode}} - {{row.stallName}}</el-descriptions-item><el-descriptions-item :label="row.workflowType==='MERCHANT_EXIT'?'计划解绑时间':'计划启用时间'">{{formatDateTime(row.requestedBillingStartTime)}}</el-descriptions-item>
+        <el-descriptions-item label="商户">{{row.merchantCode}} - {{merchantDisplayName}}</el-descriptions-item><el-descriptions-item label="铺位">{{row.stallCode}} - {{row.stallName}}</el-descriptions-item><el-descriptions-item :label="row.workflowType==='MERCHANT_EXIT'?'计划解绑时间':'计划启用时间'">{{formatDateTime(row.requestedBillingStartTime)}}</el-descriptions-item>
+        <el-descriptions-item v-if="!isExit" label="标准账户名称" :span="3">{{standardAccountName||'商户代码或名称不完整'}}</el-descriptions-item>
         <el-descriptions-item label="联系人">{{row.contactName}}</el-descriptions-item><el-descriptions-item label="联系电话">{{row.contactPhone}}</el-descriptions-item><el-descriptions-item label="申请人">{{row.applicantName}}</el-descriptions-item><el-descriptions-item label="备注" :span="3">{{row.remark||'-'}}</el-descriptions-item></el-descriptions>
     </el-card>
     <el-card class="platform-info-card" style="margin-top:12px"><template #header><div class="oa-head"><span>OA 流程与完结信息</span><el-tag v-if="canEditPlatformInfo" type="warning">管理员维护</el-tag></div></template>
@@ -53,6 +54,7 @@ import { computed,onMounted,ref } from 'vue'; import { useRoute,useRouter } from
 import { enumLabel, formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 import { verificationApi } from '@/api/verification'
+import { buildStandardAccountName, extractMerchantName } from '@/utils/accountName'
 const route=useRoute(),router=useRouter(),row=ref<any>({}),evidence=ref<any>({runs:[],resolutions:[]}),loading=ref(false),acting=ref(false),savingPlatformInfo=ref<'oa'|'remark'|''>(''),isMobile=ref(window.innerWidth<=768); const labels:Record<string,string>={DRAFT:'草稿',FIELD_CHECK_PENDING:'待现场核验',FIELD_CHECKING:'核验中',FIELD_VERIFIED:'现场核验通过',FIELD_EXCEPTION:'现场异常',WAITING_PLATFORM_CHANGE:'等待平台处理',PLATFORM_VERIFYING:'平台核对中',VERIFIED:'平台验证通过',PARTIAL_MATCH:'部分匹配',EXCEPTION:'异常',RESOLVED_EXCEPTION:'异常已关闭',CANCELLED:'已取消',COMPLETED:'已完成'}
 const userStore=useUserStore();const canOperate=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT'].includes(r)));const canViewEvidence=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'].includes(r)));const canResolve=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(r)))
 const isSuperAdmin=computed(()=>userStore.user?.roles?.includes('SUPER_ADMIN'))
@@ -67,12 +69,30 @@ function oaDeviceNumber(d:any){
   if(d.energyType==='WATER')return d.expectedSerialNumber||d.onsiteSerialNumber||d.onsiteMeterNumber||d.expectedCommAddress||'未记录'
   return d.expectedCommAddress||d.onsiteMeterNumber||d.expectedSerialNumber||d.onsiteSerialNumber||'未记录'
 }
-function deviceDescription(d:any){const water=d.energyType==='WATER',type=water?'水表':'电表',label=water?'序列号':'表号/通讯地址';return `${type}（${label}${oaDeviceNumber(d)}）`}
+function deviceReference(d:any){
+  if(d.energyType==='WATER'){
+    if(d.expectedSerialNumber)return {type:'水表',label:'序列号',value:d.expectedSerialNumber}
+    if(d.onsiteSerialNumber)return {type:'水表',label:'序列号',value:d.onsiteSerialNumber}
+    if(d.onsiteMeterNumber)return {type:'水表',label:'表号',value:d.onsiteMeterNumber}
+    if(d.expectedCommAddress)return {type:'水表',label:'通讯地址',value:d.expectedCommAddress}
+    return {type:'水表',label:'编号',value:'未记录'}
+  }
+  if(d.energyType==='ELECTRIC'){
+    if(d.expectedCommAddress)return {type:'电表',label:'通讯地址',value:d.expectedCommAddress}
+    if(d.onsiteMeterNumber)return {type:'电表',label:'表号',value:d.onsiteMeterNumber}
+    if(d.expectedSerialNumber)return {type:'电表',label:'序列号',value:d.expectedSerialNumber}
+    if(d.onsiteSerialNumber)return {type:'电表',label:'序列号',value:d.onsiteSerialNumber}
+    return {type:'电表',label:'编号',value:'未记录'}
+  }
+  return {type:'设备',label:'编号',value:d.expectedSerialNumber||d.expectedCommAddress||d.platformDeviceId||'未记录'}
+}
+function deviceDescription(d:any){const reference=deviceReference(d);return `${reference.type}（${reference.label}${reference.value}）`}
 function exitMeterLabel(){const devices=verification.value?.devices?.length?verification.value.devices:(row.value.devices||[]).map((d:any)=>({energyType:d.energyTypeSnapshot})),types=new Set(devices.map((d:any)=>d.energyType));return types.has('WATER')&&types.has('ELECTRIC')?'水电表':types.has('WATER')?'水表':types.has('ELECTRIC')?'电表':'设备'}
-function cleanMerchantName(){const raw=String(row.value.merchantName||'').trim(),clean=raw.replace(/^\d{4}[-－]\d{6}[-－]\s*/,'').replace(/^\d{6}[-－]\s*/,'');return clean||raw||row.value.merchantCode||''}
+const merchantDisplayName=computed(()=>extractMerchantName(row.value.billingAccountName||row.value.merchantName,row.value.merchantCode)||row.value.merchantName||row.value.merchantCode||'')
+const standardAccountName=computed(()=>buildStandardAccountName(row.value.merchantCode,row.value.workflowType==='NEW_MERCHANT'?row.value.merchantName:(row.value.billingAccountName||row.value.merchantName)))
 // 撤柜场景严格以铺位管理中的业态编码判断，避免铺位或商户名称中含“仓库”造成误判。
 function isWarehouse(){return String(row.value.stallBusinessType||'').trim().toUpperCase()==='CK'}
-const oaComment=computed(()=>{const location=`${row.value.floorName||row.value.floorCode||''}${row.value.stallCode||''}`,merchant=`商户${row.value.merchantCode||''}-${row.value.merchantName||''}`,oldAccount=row.value.devices?.find((d:any)=>d.oldAccountNumber)?.oldAccountNumber;if(isExit.value){const warehouse=isWarehouse(),name=cleanMerchantName().replace(warehouse?/仓库$/:'','');return `${row.value.stallCode||''} 商户${name}${warehouse?'仓库撤柜':'撤柜移位'}，${exitMeterLabel()}需从${row.value.billingAccountName||oldAccount||'原计费'}账户中移除。`}if(row.value.workflowType==='NEW_MERCHANT')return `${merchant} ${location}，该铺位商户入驻装修需开设账户。`;const devices=(verification.value?.devices||[]).map(deviceDescription).join('、')||'核验设备';return `${merchant} ${location}商户新增铺位入驻装修需将${devices}添加至${row.value.billingAccountName||row.value.targetAccountNumber||'原有计费'}账户中。`})
+const oaComment=computed(()=>{const location=`${row.value.floorName||row.value.floorCode||''}${row.value.stallCode||''}`,oldAccount=row.value.devices?.find((d:any)=>d.oldAccountNumber)?.oldAccountNumber;if(isExit.value){const warehouse=isWarehouse(),name=merchantDisplayName.value.replace(warehouse?/仓库$/:'',''),account=standardAccountName.value||row.value.billingAccountName||oldAccount||'原计费';return `${row.value.stallCode||''} 商户${name}${warehouse?'仓库撤柜':'撤柜移位'}，${exitMeterLabel()}需从${account}账户中移除。`}if(row.value.workflowType==='NEW_MERCHANT')return `商户${standardAccountName.value} ${location}，该铺位商户入驻，需要开设账户。`;const devices=(verification.value?.devices||[]).map(deviceDescription).join('、')||'核验设备',account=standardAccountName.value||row.value.billingAccountName||row.value.targetAccountNumber||'原有计费';return `商户${account} ${location}新增铺位入驻，需将${devices}添加至${account}账户中。`})
 async function copyOaComment(){await navigator.clipboard.writeText(oaComment.value);ElMessage.success('申请批注已复制')}
 async function saveOaProcessNo(){savingPlatformInfo.value='oa';try{row.value=await workflowApi.updateOaProcessNo(row.value.id,row.value.oaProcessNo||'');ElMessage.success('OA流程编号已保存')}finally{savingPlatformInfo.value=''}}
 async function saveCompletionRemark(){savingPlatformInfo.value='remark';try{row.value=await workflowApi.updateCompletionRemark(row.value.id,row.value.completionRemark||'');ElMessage.success('完结备注已保存')}finally{savingPlatformInfo.value=''}}
