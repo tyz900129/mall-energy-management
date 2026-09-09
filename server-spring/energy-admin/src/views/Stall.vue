@@ -79,7 +79,7 @@
 import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { stallApi } from '@/api/merchant'
-import { dictionaryApi, type DictionaryItem, type DictionaryType } from '@/api/system'
+import { dictionaryApi, type DictionaryItem } from '@/api/system'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 
@@ -89,8 +89,8 @@ const total = ref(0)
 const loading = ref(false)
 const submitting = ref(false)
 const exporting=ref(false),importing=ref(false),fileInput=ref<HTMLInputElement>();const userStore=useUserStore();const isAdmin=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(r)));const isSuperAdmin=computed(()=>userStore.user?.roles?.includes('SUPER_ADMIN'));const canExport=computed(()=>isAdmin.value||userStore.user?.roles?.includes('VIEWER'))
-const dictionaries=reactive<Record<DictionaryType,DictionaryItem[]>>({FLOOR:[],AREA:[],BUSINESS_TYPE:[],BUSINESS_CATEGORY:[],METER_LOCATION:[],WATER_METER_CALIBER:[],DRAINAGE_PIPE_CALIBER:[],EXHAUST_FAN:[],FRESH_AIR_UNIT:[],AIR_CONDITIONER_SPEC:[],NATURAL_GAS_CALIBER:[],GAS_SHUTOFF_LOCATION:[],POWER_NODE_TYPE:[]})
-function dictLabel(type:DictionaryType,value:string){return dictionaries[type].find(d=>d.itemValue===value)?.itemLabel||value||'-'}
+type StallDictionaryType='FLOOR'|'BUSINESS_TYPE';const dictionaries=reactive<Record<StallDictionaryType,DictionaryItem[]>>({FLOOR:[],BUSINESS_TYPE:[]})
+function dictLabel(type:StallDictionaryType,value:string){return dictionaries[type].find(d=>d.itemValue===value)?.itemLabel||value||'-'}
 const page = reactive({ pageNum: 1, pageSize: 20 })
 const query = reactive<{ keyword: string; status: string; floorCode: string; businessType: string }>({
   keyword: '', status: '', floorCode: '', businessType: ''
@@ -145,6 +145,6 @@ function statusLabel(s: string) {
 function statusTag(s: string) {
   return ({ OCCUPIED: 'success', AVAILABLE: '', MAINTENANCE: 'warning', DECOMMISSIONED: 'info' } as any)[s] || ''
 }
-onMounted(async()=>{await Promise.all((['FLOOR','BUSINESS_TYPE'] as DictionaryType[]).map(async t=>{dictionaries[t]=await dictionaryApi.list(t) as any}));await load()})
+onMounted(async()=>{await Promise.all((['FLOOR','BUSINESS_TYPE'] as StallDictionaryType[]).map(async t=>{dictionaries[t]=await dictionaryApi.list(t) as any}));await load()})
 </script>
 <style scoped>.form-tip{font-size:12px;color:#909399;line-height:20px}.header-actions{display:flex;align-items:center;gap:8px}.header-actions :deep(.el-button+.el-button){margin-left:0}@media(max-width:768px){.header-actions{flex-wrap:wrap;justify-content:flex-end}}</style>

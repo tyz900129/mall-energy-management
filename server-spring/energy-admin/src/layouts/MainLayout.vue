@@ -17,7 +17,14 @@
           <el-menu-item v-if="canApply" index="/workflow/new-merchant">水电费变更</el-menu-item>
           <el-menu-item v-if="canApply" index="/workflow/merchant-query">商户账户查询</el-menu-item>
         </el-sub-menu>
-        <el-menu-item v-if="canPowerTopology" index="/power/topology"><el-icon><Share /></el-icon><template #title>配电拓扑管理</template></el-menu-item>
+        <el-sub-menu v-if="canPowerTopology" index="/facility-topology">
+          <template #title><el-icon><Share /></el-icon><span>机电拓扑管理</span></template>
+          <el-menu-item index="/power/topology">配电拓扑管理</el-menu-item>
+          <el-menu-item index="/facility/water-supply">供水拓扑管理</el-menu-item>
+          <el-menu-item index="/facility/drainage">排水拓扑管理</el-menu-item>
+          <el-menu-item index="/facility/oil-exhaust">排油烟拓扑管理</el-menu-item>
+          <el-menu-item index="/facility/fresh-air">补风机拓扑管理</el-menu-item>
+        </el-sub-menu>
         <el-sub-menu v-if="canUsageMenu" index="/energy">
           <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
           <el-menu-item v-if="canGeneral" index="/energy/devices">设备分析维度</el-menu-item>
