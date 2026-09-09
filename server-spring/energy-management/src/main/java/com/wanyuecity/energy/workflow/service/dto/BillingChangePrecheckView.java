@@ -9,6 +9,8 @@ public class BillingChangePrecheckView {
     private String workflowType;
     private String merchantCode;
     private String merchantName;
+    private String originalContactPhone;
+    private boolean phoneDifferent;
     private boolean merchantExists;
     private boolean allowed;
     private boolean hasWaterMeter;

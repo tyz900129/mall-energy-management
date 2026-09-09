@@ -11,8 +11,8 @@
         <el-col v-if="form.workflowType==='NEW_MERCHANT'" :xs="24" :sm="12"><el-form-item label="商户名称" prop="merchantName"><el-input v-model="form.merchantName" maxlength="100" placeholder="请输入商户或品牌名称" @input="invalidate(false)" /></el-form-item></el-col>
         <el-col v-if="form.workflowType==='NEW_MERCHANT'" :xs="24" :sm="24"><el-form-item label="生成账户名称"><el-input :model-value="proposedAccountName" disabled placeholder="填写商户代码和商户名称后自动生成" /><div class="account-name-hint">统一格式：3066-六位商户代码-商户名称</div></el-form-item></el-col>
         <el-col v-if="form.workflowType==='NEW_MERCHANT'" :xs="24" :sm="12"><el-form-item label="商户联系人" prop="contactName" required><el-input v-model="form.contactName" placeholder="必填" /></el-form-item></el-col>
-        <el-col v-if="form.workflowType==='NEW_MERCHANT'" :xs="24" :sm="12"><el-form-item label="联系人电话" prop="contactPhone" required><el-input v-model="form.contactPhone" inputmode="tel" placeholder="必填" /></el-form-item></el-col>
-        <el-col v-if="form.workflowType==='EXISTING_MERCHANT_ADD_STALL'" :xs="24" :sm="24"><el-alert title="联系人电话将自动调用原系统商户账户手机号；原系统没有联系人姓名，本流程无需填写联系人姓名。" type="info" :closable="false" show-icon /></el-col>
+        <el-col v-if="form.workflowType!=='MERCHANT_EXIT'" :xs="24" :sm="12"><el-form-item label="联系人电话" prop="contactPhone" required><el-input v-model="form.contactPhone" inputmode="tel" maxlength="32" placeholder="请输入本次联系手机号" @input="invalidate(false)" /></el-form-item></el-col>
+        <el-col v-if="form.workflowType==='EXISTING_MERCHANT_ADD_STALL'" :xs="24" :sm="24"><el-alert title="请填写联系人电话，系统将与原账户手机号比较；号码不一致时可申请修改短信通知号码。" type="info" :closable="false" show-icon /></el-col>
         <el-col :xs="24" :sm="12"><el-form-item :label="form.workflowType==='MERCHANT_EXIT'?'解除绑定时间':'启用时间'" prop="effectiveTime"><input v-if="isMobile" v-model="mobileDateTime" class="native-date" type="datetime-local" step="60" @change="onMobileDateTimeChange" /><el-date-picker v-else v-model="form.effectiveTime" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DDTHH:mm:00" style="width:100%" /></el-form-item></el-col></el-row>
       <el-form-item v-if="form.workflowType==='MERCHANT_EXIT'" label="已绑定铺位" prop="stallId"><el-select v-model="form.stallId" filterable style="width:100%" placeholder="请先输入商户代码并查询" @change="invalidate(false)"><el-option v-for="s in merchantStalls" :key="s.stallId" :label="`${s.stallCode}${s.stallName?' - '+s.stallName:''}（${s.deviceIds.length}台设备）`" :value="s.stallId" /></el-select></el-form-item>
       <el-form-item v-else label="铺位编码" prop="stallId"><el-select v-model="form.stallId" filterable style="width:100%" @change="invalidate(false)"><el-option v-for="s in stalls" :key="s.id" :label="s.stallCode" :value="s.id" /></el-select></el-form-item>
@@ -20,6 +20,7 @@
       <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item>
     </el-form><div class="actions"><el-button type="primary" plain :loading="checking" @click="precheck">{{ form.workflowType==='MERCHANT_EXIT'&&!form.stallId?'查询商户铺位':'执行变更检查' }}</el-button><el-button type="primary" :disabled="!check?.allowed" :loading="saving" @click="create">创建流程草稿</el-button></div></el-card>
     <el-card v-if="check" class="result-card"><template #header><div class="check-title"><span>检查结果</span><el-tag :type="check.allowed?'success':'danger'">{{ check.allowed?'可以创建流程':'暂不能创建' }}</el-tag></div></template>
+      <div v-if="form.workflowType==='EXISTING_MERCHANT_ADD_STALL'" class="bound"><b>原系统手机号：</b>{{check.originalContactPhone||'未登记'}}<span v-if="form.contactPhone"> · {{check.phoneDifferent?'与填写号码不一致':'与填写号码一致'}}</span></div>
       <div v-if="check.merchantStalls.length" class="bound"><b>该商户当前关联铺位：</b><el-tag v-for="s in check.merchantStalls" :key="s.stallId" class="stall-tag">{{s.stallCode}}</el-tag></div>
       <el-alert v-for="notice in check.notices||[]" :key="notice" :title="notice" type="warning" :closable="false" show-icon class="reason" />
       <el-alert v-for="reason in check.reasons" :key="reason" :title="reason" :type="check.requiresWaterConfirmation?'warning':'error'" :closable="false" show-icon class="reason" />
@@ -28,14 +29,14 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'; import { useRouter } from 'vue-router'; import { ElMessage, type FormInstance } from 'element-plus'; import { stallApi } from '@/api/merchant'; import { workflowApi, type BillingChangePrecheck } from '@/api/workflow'; import { enumLabel } from '@/utils/format'; import { buildStandardAccountName } from '@/utils/accountName'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'; import { useRouter } from 'vue-router'; import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'; import { stallApi } from '@/api/merchant'; import { workflowApi, type BillingChangePrecheck } from '@/api/workflow'; import { enumLabel } from '@/utils/format'; import { buildStandardAccountName } from '@/utils/accountName'
 const router=useRouter(),formRef=ref<FormInstance>(),stalls=ref<any[]>([]),merchantStalls=ref<any[]>([]),check=ref<BillingChangePrecheck|null>(null),checking=ref(false),saving=ref(false),requestKey=ref(''),isMobile=ref(window.innerWidth<=768),mobileDateTime=ref('')
 const workflowTypes=[{value:'NEW_MERCHANT',label:'新商户开户'},{value:'EXISTING_MERCHANT_ADD_STALL',label:'已有商户增加铺位'},{value:'MERCHANT_EXIT',label:'已有商户撤柜'}]
-const form=reactive({workflowType:'NEW_MERCHANT',merchantCode:'',merchantName:'',contactName:'',contactPhone:'',stallId:null as number|null,effectiveTime:'',usesWater:undefined as boolean|undefined,remark:''})
+const form=reactive({workflowType:'NEW_MERCHANT',merchantCode:'',merchantName:'',contactName:'',contactPhone:'',stallId:null as number|null,effectiveTime:'',usesWater:undefined as boolean|undefined,remark:'',originalContactPhone:'',updateSmsPhone:undefined as boolean|undefined})
 const proposedAccountName=computed(()=>/^\d{6}$/.test(form.merchantCode)&&form.merchantName.trim()?buildStandardAccountName(form.merchantCode,form.merchantName):'')
-const rules={merchantCode:[{required:true,message:'请输入商户代码'},{pattern:/^\d{6}$/,message:'必须为6位数字'}],merchantName:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入商户名称')):cb()}],contactName:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入商户联系人')):cb()}],contactPhone:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入联系人电话')):cb()}],stallId:[{required:true,message:'请选择铺位'}],effectiveTime:[{required:true,message:'请选择日期'}]}
-function invalidate(clearStalls=true){check.value=null;if(!saving.value)requestKey.value='';if(clearStalls&&form.workflowType==='MERCHANT_EXIT'){merchantStalls.value=[];form.stallId=null}}
-function changeType(){check.value=null;requestKey.value='';merchantStalls.value=[];form.stallId=null;form.usesWater=undefined}
+const rules={merchantCode:[{required:true,message:'请输入商户代码'},{pattern:/^\d{6}$/,message:'必须为6位数字'}],merchantName:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入商户名称')):cb()}],contactName:[{validator:(_:any,v:string,cb:any)=>form.workflowType==='NEW_MERCHANT'&&!v?.trim()?cb(new Error('请输入商户联系人')):cb()}],contactPhone:[{validator:(_:any,v:string,cb:any)=>form.workflowType!=='MERCHANT_EXIT'&&!v?.trim()?cb(new Error('请输入联系人电话')):cb()}],stallId:[{required:true,message:'请选择铺位'}],effectiveTime:[{required:true,message:'请选择日期'}]}
+function invalidate(clearStalls=true){form.updateSmsPhone=undefined;check.value=null;if(!saving.value)requestKey.value='';if(clearStalls&&form.workflowType==='MERCHANT_EXIT'){merchantStalls.value=[];form.stallId=null}}
+function changeType(){form.contactPhone='';form.originalContactPhone='';form.updateSmsPhone=undefined;check.value=null;requestKey.value='';merchantStalls.value=[];form.stallId=null;form.usesWater=undefined}
 function onMobileDateTimeChange(){form.effectiveTime=mobileDateTime.value?(mobileDateTime.value.length===16?`${mobileDateTime.value}:00`:mobileDateTime.value):'';check.value=null;if(!saving.value)requestKey.value=''}
 function onResize(){isMobile.value=window.innerWidth<=768}
 async function precheck(){if(!/^\d{6}$/.test(form.merchantCode)){ElMessage.warning('请先填写6位商户代码');return}if(form.workflowType!=='MERCHANT_EXIT'&&!form.stallId){ElMessage.warning('请选择铺位编码');return}checking.value=true;try{const r:any=await workflowApi.precheckBillingChange(form);check.value=r;merchantStalls.value=r.merchantStalls||[];if(r.hasWaterMeter&&form.usesWater===undefined)ElMessage.warning('检测到水表，请确认新商户是否用水')}finally{checking.value=false}}
@@ -46,6 +47,19 @@ async function create(){
   try{
     await formRef.value?.validate()
     if(!check.value?.allowed){ElMessage.warning('请先完成检查并处理提示事项');return}
+    if(form.workflowType==='EXISTING_MERCHANT_ADD_STALL'){
+      const latest:any=await workflowApi.precheckBillingChange(form)
+      check.value=latest
+      if(!latest.allowed){ElMessage.warning('检查结果发生变化，请处理提示后重试');return}
+      form.originalContactPhone=latest.originalContactPhone||''
+      form.updateSmsPhone=false
+      if(latest.phoneDifferent){
+        try{
+          await ElMessageBox.confirm(`填写号码：${form.contactPhone}；原系统号码：${form.originalContactPhone||'未登记'}。是否申请修改短信通知号码？`,'短信通知号码确认',{confirmButtonText:'是，申请修改',cancelButtonText:'否，保留原号码',distinguishCancelAndClose:true,closeOnClickModal:false})
+          form.updateSmsPhone=true
+        }catch(action){if(action!=='cancel')return}
+      }
+    }
     if(!requestKey.value)requestKey.value=newRequestKey()
     const r:any=await workflowApi.createBillingChange({...form,requestKey:requestKey.value})
     ElMessage.success('水电费变更流程草稿已创建')

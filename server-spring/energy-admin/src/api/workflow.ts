@@ -21,6 +21,7 @@ export interface NewMerchantPrecheck {
 }
 
 export interface BillingChangePrecheck {
+  originalContactPhone?: string; phoneDifferent?: boolean
   workflowType: string; merchantCode: string; merchantName?: string; merchantExists: boolean
   allowed: boolean; hasWaterMeter: boolean; requiresWaterConfirmation: boolean; reasons: string[]; notices: string[]
   merchantStalls: Array<{stallId:number;stallCode:string;stallName?:string;deviceIds:string[]}>

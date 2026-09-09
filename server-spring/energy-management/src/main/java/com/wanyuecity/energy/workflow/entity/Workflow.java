@@ -15,6 +15,8 @@ public class Workflow {
     private String merchantName;
     private String contactName;
     private String contactPhone;
+    private String originalContactPhone;
+    private Boolean updateSmsPhone;
     private Long stallId;
     private String targetAccountNumber;
     private LocalDateTime requestedBillingStartTime;

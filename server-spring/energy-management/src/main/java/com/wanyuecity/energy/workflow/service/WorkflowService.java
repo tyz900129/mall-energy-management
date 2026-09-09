@@ -67,6 +67,11 @@ public class WorkflowService {
 
         List<Map<String,Object>> accounts = accountsByMerchantCode(req.getMerchantCode());
         out.setMerchantExists(!accounts.isEmpty());
+        if ("EXISTING_MERCHANT_ADD_STALL".equals(type)) {
+            String original = SmsPhoneComparison.snapshot(accounts.stream().map(a -> Objects.toString(a.get("mobile_phone"), "")).toList());
+            out.setOriginalContactPhone(original);
+            out.setPhoneDifferent(hasText(req.getContactPhone()) && SmsPhoneComparison.differs(req.getContactPhone(), original));
+        }
         if (!accounts.isEmpty()) out.setMerchantName(resolveMerchantName(req.getMerchantCode(), accounts));
         Set<String> merchantAccounts = new LinkedHashSet<>();
         accounts.forEach(a -> merchantAccounts.add(Objects.toString(a.get("account_number"), "")));
@@ -139,8 +144,10 @@ public class WorkflowService {
         if ("EXISTING_MERCHANT_ADD_STALL".equals(check.getWorkflowType())) {
             List<Map<String,Object>> sourceAccounts = accountsByMerchantCode(req.getMerchantCode());
             row.setContactName(null);
-            row.setContactPhone(sourceAccounts.stream().map(a -> Objects.toString(a.get("mobile_phone"), ""))
-                    .filter(this::hasText).findFirst().orElse(null));
+            String original = SmsPhoneComparison.snapshot(sourceAccounts.stream().map(a -> Objects.toString(a.get("mobile_phone"), "")).toList());
+            row.setUpdateSmsPhone(SmsPhoneComparison.validate(req.getContactPhone(), original, req.getOriginalContactPhone(), req.getUpdateSmsPhone()));
+            row.setOriginalContactPhone(original);
+            row.setContactPhone(SmsPhoneComparison.normalize(req.getContactPhone()));
         } else {
             row.setContactName(hasText(req.getContactName()) ? req.getContactName().trim() : null);
             row.setContactPhone(hasText(req.getContactPhone()) ? req.getContactPhone().trim() : null);
@@ -462,7 +469,7 @@ public class WorkflowService {
         if (!hasText(resolvedName)&&billingAccount!=null) resolvedName=MerchantNameParser.extract(billingAccount.getAccountName(),row.getMerchantCode());
         v.setMerchantName(hasText(resolvedName)?resolvedName:row.getMerchantName());
         v.setBillingAccountName(billingAccount==null?null:(hasText(billingAccount.getUserName())?billingAccount.getUserName():billingAccount.getAccountName()));
-        v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(row.getApplicantName());v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
+        v.setOriginalContactPhone(row.getOriginalContactPhone());v.setUpdateSmsPhone(row.getUpdateSmsPhone());v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(row.getApplicantName());v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
     private SysUser findUser(String username){if(!hasText(username))return null;return userMapper.selectOne(new QueryWrapper<SysUser>().eq("username",username).last("LIMIT 1"));}
     private String nextWorkflowNo(){return "WF"+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))+UUID.randomUUID().toString().substring(0,4).toUpperCase();}
     private boolean hasText(String s){return s!=null&&!s.isBlank();}

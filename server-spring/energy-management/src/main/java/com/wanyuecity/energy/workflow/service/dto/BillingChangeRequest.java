@@ -14,6 +14,8 @@ public class BillingChangeRequest {
     private String merchantName;
     private String contactName;
     private String contactPhone;
+    private Boolean updateSmsPhone;
+    private String originalContactPhone;
     private Long stallId;
     private LocalDateTime effectiveTime;
     private Boolean usesWater;
