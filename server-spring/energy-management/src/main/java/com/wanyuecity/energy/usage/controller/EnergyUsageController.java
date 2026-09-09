@@ -21,7 +21,7 @@ public class EnergyUsageController {
     private final EnergyUsageService service;
     private final AnalysisDimensionService dimensionService;
 
-    @GetMapping("/dimensions") public ApiResponse<List<Map<String,Object>>> dimensions(){return ApiResponse.ok(dimensionService.dimensions());}
+    @GetMapping("/dimensions") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')") public ApiResponse<List<Map<String,Object>>> dimensions(){return ApiResponse.ok(dimensionService.dimensions());}
     @PostMapping("/dimensions") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Map<String,Object>> createDimension(@Valid @RequestBody AnalysisDimensionRequest r){return ApiResponse.ok(dimensionService.createDimension(r));}
     @PutMapping("/dimensions/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> updateDimension(@PathVariable Long id,@Valid @RequestBody AnalysisDimensionRequest r){dimensionService.updateDimension(id,r);return ApiResponse.ok(null);}
     @DeleteMapping("/dimensions/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> deleteDimension(@PathVariable Long id){dimensionService.deleteDimension(id);return ApiResponse.ok(null);}
@@ -58,7 +58,7 @@ public class EnergyUsageController {
     public ApiResponse<Void> updateExclusion(@PathVariable String deviceId,@Valid @RequestBody UsageSyncExclusionUpdateRequest r) { service.updateSyncExclusion(deviceId,r); return ApiResponse.ok(null); }
     @DeleteMapping("/usage/sync-exclusions/{deviceId}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> deleteExclusion(@PathVariable String deviceId) { service.deleteSyncExclusion(deviceId); return ApiResponse.ok(null); }
-    @GetMapping("/analysis") public ApiResponse<Map<String,Object>> analysis(
+    @GetMapping("/analysis") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')") public ApiResponse<Map<String,Object>> analysis(
             @RequestParam LocalDate startDate,@RequestParam LocalDate endDate,
             @RequestParam(defaultValue="MONTH") String period,
             @RequestParam(required=false) Long groupId,@RequestParam(required=false) String deviceId,

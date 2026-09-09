@@ -17,13 +17,13 @@
           <el-menu-item v-if="canApply" index="/workflow/new-merchant">水电费变更</el-menu-item>
           <el-menu-item v-if="canApply" index="/workflow/merchant-query">商户账户查询</el-menu-item>
         </el-sub-menu>
-        <el-menu-item v-if="canGeneral" index="/power/topology"><el-icon><Share /></el-icon><template #title>配电拓扑管理</template></el-menu-item>
-        <el-sub-menu v-if="canGeneral" index="/energy">
+        <el-menu-item v-if="canPowerTopology" index="/power/topology"><el-icon><Share /></el-icon><template #title>配电拓扑管理</template></el-menu-item>
+        <el-sub-menu v-if="canUsageMenu" index="/energy">
           <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
-          <el-menu-item index="/energy/devices">设备分析维度</el-menu-item>
-          <el-menu-item index="/energy/sync">历史用量同步</el-menu-item>
+          <el-menu-item v-if="canGeneral" index="/energy/devices">设备分析维度</el-menu-item>
+          <el-menu-item v-if="canGeneral" index="/energy/sync">历史用量同步</el-menu-item>
           <el-menu-item index="/energy/dashboard">数据大屏</el-menu-item>
-          <el-menu-item index="/energy/analysis">用量分析</el-menu-item>
+          <el-menu-item v-if="canGeneral" index="/energy/analysis">用量分析</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="canPlatform" index="/platform">
           <template #title>
@@ -120,6 +120,8 @@ const canApply=computed(()=>isAdmin.value||roles.value.includes('APPLICANT'))
 const canWorkflow=computed(()=>isAdmin.value||roles.value.some(r=>['APPLICANT','DEVICE_VERIFIER','VIEWER'].includes(r)))
 const canMerchant=computed(()=>isAdmin.value||roles.value.some(r=>['DEVICE_VERIFIER','VIEWER'].includes(r)))
 const canGeneral=computed(()=>isAdmin.value||roles.value.includes('VIEWER'))
+const canPowerTopology=computed(()=>canGeneral.value||roles.value.includes('DEVICE_VERIFIER'))
+const canUsageMenu=computed(()=>canGeneral.value||roles.value.includes('DEVICE_VERIFIER'))
 const canPlatform=computed(()=>isAdmin.value||roles.value.includes('VIEWER'))
 const canAudit=computed(()=>isAdmin.value||roles.value.includes('VIEWER'))
 
