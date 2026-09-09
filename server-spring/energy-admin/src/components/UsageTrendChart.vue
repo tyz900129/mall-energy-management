@@ -6,12 +6,13 @@
         <line v-for="tick in ticks" :key="tick.y" x1="62" :y1="tick.y" x2="742" :y2="tick.y" />
         <text v-for="tick in ticks" :key="`label-${tick.y}`" x="54" :y="tick.y + 4" text-anchor="end">{{ compact(tick.value) }}</text>
       </g>
-      <polyline v-if="previousPoints" class="previous-line" :points="previousPoints" fill="none" />
-      <polyline v-if="currentPoints" class="current-line" :style="{ stroke: color }" :points="currentPoints" fill="none" />
+      <path class="previous-line" :d="linePath(previousKey)" fill="none" />
+      <path class="current-line" :style="{ stroke: color }" :d="linePath(valueKey)" fill="none" />
       <g v-for="(point, index) in pointRows" :key="point.month">
-        <circle v-if="point.current > 0" :cx="point.x" :cy="point.currentY" r="4" :style="{ fill: color }">
+        <circle v-if="point.current != null" :cx="point.x" :cy="point.currentY" r="4" :style="{ fill: color }">
           <title>{{ point.monthLabel }}：{{ number(point.current) }} {{ unit }}</title>
         </circle>
+        <circle v-if="rows[index][previousKey] != null" :cx="point.x" :cy="y(Number(rows[index][previousKey]))" r="3" fill="#94a3b8"><title>去年同期 {{ point.monthLabel }}：{{ number(Number(rows[index][previousKey])) }} {{ unit }}</title></circle>
         <text v-if="showLabel(index)" :x="point.x" y="270" text-anchor="middle">{{ point.shortLabel }}</text>
       </g>
     </svg>
@@ -24,20 +25,26 @@ import { computed } from 'vue'
 const props = defineProps<{ rows: any[]; valueKey: string; previousKey: string; color: string; unit: string; title: string }>()
 const left = 62, right = 742, top = 18, bottom = 238
 const values = computed(() => props.rows.flatMap(row => [Number(row[props.valueKey]) || 0, Number(row[props.previousKey]) || 0]))
-const maximum = computed(() => Math.max(0, ...values.value))
-const hasData = computed(() => maximum.value > 0)
+const maximum = computed(() => Math.max(1, ...values.value))
+const hasData = computed(() => props.rows.some(row => row[props.valueKey] != null || row[props.previousKey] != null))
 const y = (value: number) => bottom - (maximum.value ? value / maximum.value * (bottom - top) : 0)
 const x = (index: number) => props.rows.length <= 1 ? (left + right) / 2 : left + index / (props.rows.length - 1) * (right - left)
 const pointRows = computed(() => props.rows.map((row, index) => ({
   month: row.month,
   monthLabel: row.monthLabel,
-  shortLabel: String(row.month).slice(5).replace('-', '/'),
-  current: Number(row[props.valueKey]) || 0,
+  shortLabel: String(row.month).slice(2).replace('-', '/'),
+  current: row[props.valueKey] == null ? null : Number(row[props.valueKey]),
   x: x(index),
   currentY: y(Number(row[props.valueKey]) || 0)
 })))
-const currentPoints = computed(() => pointRows.value.map(point => `${point.x},${point.currentY}`).join(' '))
-const previousPoints = computed(() => props.rows.map((row, index) => `${x(index)},${y(Number(row[props.previousKey]) || 0)}`).join(' '))
+function linePath(key: string) {
+  let connected=false
+  return props.rows.map((row,index) => {
+    if (row[key] == null) { connected=false; return '' }
+    const command=connected?'L':'M'; connected=true
+    return `${command} ${x(index)} ${y(Number(row[key]))}`
+  }).join(' ')
+}
 const ticks = computed(() => Array.from({ length: 5 }, (_, index) => ({ value: maximum.value * (4 - index) / 4, y: top + index * (bottom - top) / 4 })))
 function showLabel(index: number) { const step = Math.max(1, Math.ceil(props.rows.length / 8)); return index % step === 0 || index === props.rows.length - 1 }
 function number(value: number) { return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }
