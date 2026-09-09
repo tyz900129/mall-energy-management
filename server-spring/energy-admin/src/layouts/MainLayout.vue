@@ -22,6 +22,7 @@
           <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
           <el-menu-item index="/energy/devices">设备分析维度</el-menu-item>
           <el-menu-item index="/energy/sync">历史用量同步</el-menu-item>
+          <el-menu-item index="/energy/dashboard">数据大屏</el-menu-item>
           <el-menu-item index="/energy/analysis">用量分析</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="canPlatform" index="/platform">

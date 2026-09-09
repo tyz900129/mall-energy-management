@@ -19,6 +19,7 @@ const routes = [
       { path: 'platform/sync/log', name: 'PlatformSyncLog', component: () => import('@/views/PlatformSyncLog.vue'), meta: { title: '同步日志详情', icon: 'Document',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/devices', name: 'DeviceGroup', component: () => import('@/views/DeviceGroup.vue'), meta: { title: '设备分析维度', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/sync', name: 'UsageSync', component: () => import('@/views/UsageSync.vue'), meta: { title: '历史用量同步', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
+      { path: 'energy/dashboard', name: 'UsageDashboard', component: () => import('@/views/UsageDashboard.vue'), meta: { title: '用量数据大屏', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/analysis', name: 'UsageAnalysis', component: () => import('@/views/UsageAnalysis.vue'), meta: { title: '用量分析', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'power/topology', name: 'PowerTopology', component: () => import('@/views/PowerTopology.vue'), meta: { title: '配电拓扑管理', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'exception', name: 'DataException', component: () => import('@/views/DataException.vue'), meta: { title: '异常中心', icon: 'Warning',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
