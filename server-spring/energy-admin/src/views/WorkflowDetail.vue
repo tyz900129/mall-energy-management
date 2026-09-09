@@ -30,12 +30,14 @@
         <el-descriptions-item v-if="!isExit" label="楼层">{{row.floorName||row.floorCode||'未维护'}}</el-descriptions-item>
         <el-descriptions-item :label="isExit?'停用日期':'启用日期'">{{formatDateTime(row.requestedBillingStartTime)}}</el-descriptions-item>
       </el-descriptions>
+      <el-alert title="实际读数按“表盘读数 × 倍率”计算；单相电表和水表按 1 倍计算。" type="info" :closable="false" show-icon style="margin-top:14px" />
       <el-table :data="verification.devices||[]" border style="margin-top:14px">
         <el-table-column prop="deviceNameSnapshot" label="设备名称" min-width="150" />
         <el-table-column label="类型" width="80"><template #default="{row:d}">{{d.energyType==='WATER'?'水表':'电表'}}</template></el-table-column>
         <el-table-column label="序列号/表号（自动识别）" min-width="190"><template #default="{row:d}">{{oaDeviceNumber(d)}}</template></el-table-column>
-        <el-table-column v-if="!isExit" label="互感器倍率" width="110"><template #default="{row:d}">{{d.energyType==='ELECTRIC'?(d.onsiteMultiplier??(d.meterPhase==='THREE_PHASE'?'未填写':'1')):'-'}}</template></el-table-column>
-        <el-table-column :label="isExit?'停用读数':'启用读数'" width="140"><template #default="{row:d}">{{d.onsiteReading??'未填写'}} {{d.readingUnit||''}}</template></el-table-column>
+        <el-table-column label="倍率" width="90"><template #default="{row:d}">{{oaMultiplier(d)}}</template></el-table-column>
+        <el-table-column :label="isExit?'表盘停用读数':'表盘启用读数'" width="150"><template #default="{row:d}">{{d.onsiteReading??'未填写'}} {{d.readingUnit||''}}</template></el-table-column>
+        <el-table-column :label="isExit?'实际停用读数':'实际启用读数'" width="150"><template #default="{row:d}">{{oaActualReading(d)}} {{d.onsiteReading==null?'':(d.readingUnit||'')}}</template></el-table-column>
         <el-table-column label="核查照片" min-width="220"><template #default="{row:d}"><div class="oa-photos"><span v-if="!devicePhotos(d.id).length">未上传</span><span v-for="p in devicePhotos(d.id)" :key="p.id" class="oa-photo"><el-image :src="p.url" :preview-src-list="devicePhotos(d.id).map((x:any)=>x.url)" fit="cover" /><a :href="p.url" :download="p.fileName">下载</a></span></div></template></el-table-column>
       </el-table>
     </el-card>
@@ -68,6 +70,19 @@ function devicePhotos(id:number){return oaPhotos.value[id]||[]}
 function oaDeviceNumber(d:any){
   if(d.energyType==='WATER')return d.expectedSerialNumber||d.onsiteSerialNumber||d.onsiteMeterNumber||d.expectedCommAddress||'未记录'
   return d.expectedCommAddress||d.onsiteMeterNumber||d.expectedSerialNumber||d.onsiteSerialNumber||'未记录'
+}
+function oaMultiplier(d:any){
+  if(d.energyType!=='ELECTRIC')return '-'
+  if(d.onsiteMultiplier!==null&&d.onsiteMultiplier!==undefined)return d.onsiteMultiplier
+  return d.meterPhase==='THREE_PHASE'?'未填写':'1'
+}
+function oaActualReading(d:any){
+  if(d.onsiteReading===null||d.onsiteReading===undefined)return '未填写'
+  const reading=Number(d.onsiteReading)
+  const multiplier=d.energyType==='ELECTRIC'&&d.meterPhase==='THREE_PHASE'?Number(d.onsiteMultiplier):1
+  if(!Number.isFinite(reading))return '读数无效'
+  if(!Number.isFinite(multiplier)||multiplier<=0)return '倍率未填写'
+  return Number((reading*multiplier).toFixed(7)).toString()
 }
 function deviceReference(d:any){
   if(d.energyType==='WATER'){
