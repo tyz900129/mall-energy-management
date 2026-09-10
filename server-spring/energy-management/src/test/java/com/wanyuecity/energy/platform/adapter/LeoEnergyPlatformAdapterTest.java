@@ -66,6 +66,20 @@ class LeoEnergyPlatformAdapterTest {
     }
 
     @Test
+    void enrichesMissingAccountPhoneFromDetailEndpoint() throws Exception {
+        server.enqueue(json("{\"code\":\"200000\",\"data\":{\"total\":1,\"list\":[{\"id\":\"ACCOUNT-ID\",\"accountNumber\":\"3066-000001\",\"userName\":\"商户\",\"mobilePhone\":\"\"}]}}"));
+        server.enqueue(json("{\"code\":\"200000\",\"data\":{\"id\":\"ACCOUNT-ID\",\"accountNumber\":\"3066-000001\",\"userName\":\"商户\",\"mobilePhone\":\"13800138000\"}}"));
+
+        var accounts = adapter.fetchAccounts(server.url("/").toString(), "TOKEN", "4801");
+
+        assertEquals(1, accounts.size());
+        assertEquals("13800138000", accounts.get(0).getMobilePhone());
+        server.takeRequest();
+        RecordedRequest detail = server.takeRequest();
+        assertTrue(detail.getPath().startsWith("/api/account/?id=ACCOUNT-ID"));
+    }
+
+    @Test
     void relationUsesDeviceIdInsteadOfRelationRowId() throws Exception {
         server.enqueue(json("{\"code\":\"200000\",\"data\":{\"total\":1,\"list\":[{\"id\":\"ACCOUNT-ID\",\"accountNumber\":\"ACCOUNT-1\"}]}}"));
         server.enqueue(json("{\"code\":\"200000\",\"data\":[{\"id\":\"RELATION-ID\",\"deviceId\":\"DEVICE-1\"}]}"));

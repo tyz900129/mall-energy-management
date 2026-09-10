@@ -108,9 +108,58 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
 
     @Override
     public List<PlatformAccount> fetchAccounts(String baseUrl, String sessionToken, String spaceId) {
+        List<PlatformAccount> summaries = fetchAccountSummaries(baseUrl, sessionToken, spaceId);
+        if (summaries.isEmpty()) return summaries;
+
+        // 部分账户在分页摘要中不返回手机号，详情接口才有完整的短信通知号码。
+        // 只补查缺号账户，避免每次同步对全部账户重复发起详情请求。
+        List<Integer> missingIndexes = new ArrayList<>();
+        List<java.util.concurrent.Callable<PlatformAccount>> tasks = new ArrayList<>();
+        for (int i = 0; i < summaries.size(); i++) {
+            PlatformAccount summary = summaries.get(i);
+            if (summary.getMobilePhone() == null || summary.getMobilePhone().isBlank()) {
+                missingIndexes.add(i);
+                tasks.add(() -> fetchAccountDetail(baseUrl, sessionToken, summary));
+            }
+        }
+        if (tasks.isEmpty()) return summaries;
+
+        List<PlatformAccount> enriched = new ArrayList<>(summaries);
+        try {
+            long timeout = Math.max(60L, (long) defaultTimeoutMs / 1000L * 2L) * Math.max(1, tasks.size());
+            List<java.util.concurrent.Future<PlatformAccount>> futures =
+                    platformHttpExecutor.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+            for (int i = 0; i < futures.size(); i++) {
+                var future = futures.get(i);
+                if (!future.isCancelled()) {
+                    try { enriched.set(missingIndexes.get(i), future.get()); }
+                    catch (Exception ignored) { /* 保留分页摘要 */ }
+                }
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return summaries;
+        }
+        return enriched;
+    }
+
+    private List<PlatformAccount> fetchAccountSummaries(String baseUrl, String sessionToken, String spaceId) {
         return paginate(baseUrl, sessionToken,
                 "/api/account/page?spaceId=" + enc(spaceId) + "&type=all&name=&mobilePhone=",
                 "data", "list", this::mapAccount);
+    }
+
+    private PlatformAccount fetchAccountDetail(String baseUrl, String token, PlatformAccount summary) {
+        try {
+            String id = summary.getPlatformAccountId();
+            if (id == null || id.isBlank()) return summary;
+            JsonNode resp = getJson(baseUrl, "/api/account/?id=" + enc(id), token);
+            if (!isSuccess(resp) || !resp.path("data").isObject()) return summary;
+            return mergeAccount(summary, resp.path("data"));
+        } catch (Exception ex) {
+            log.warn("account detail fetch failed, accountId={}: {}", summary.getPlatformAccountId(), ex.getMessage());
+            return summary;
+        }
     }
 
     @Override
@@ -163,7 +212,8 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
         // accounts * latency. A task that fails is logged and skipped —
         // a missing account in the relation table is preferable to a
         // full-batch failure.
-        List<PlatformAccount> accounts = fetchAccounts(baseUrl, sessionToken, spaceId);
+        // 绑定关系只需要账户 ID 和编号，不必为缺号账户再次补查详情。
+        List<PlatformAccount> accounts = fetchAccountSummaries(baseUrl, sessionToken, spaceId);
         if (accounts.isEmpty()) {
             return List.of();
         }
@@ -568,6 +618,21 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 .deviceSystemName(n.path("deviceSystemName").asText(""))
                 .energyType(mapEnergyType(n.path("deviceSystemName").asText("")))
                 .energyTypeName(n.path("deviceSystemName").asText(""))
+                .build();
+    }
+
+    private PlatformAccount mergeAccount(PlatformAccount summary, JsonNode detail) {
+        PlatformAccount d = mapAccount(detail);
+        return PlatformAccount.builder()
+                .platformAccountId(prefer(d.getPlatformAccountId(), summary.getPlatformAccountId()))
+                .accountNumber(prefer(d.getAccountNumber(), summary.getAccountNumber()))
+                .accountName(prefer(d.getAccountName(), summary.getAccountName()))
+                .userName(prefer(d.getUserName(), summary.getUserName()))
+                .mobilePhone(prefer(d.getMobilePhone(), summary.getMobilePhone()))
+                .balance(d.getBalance() != null ? d.getBalance() : summary.getBalance())
+                .arrears(d.getArrears() != null ? d.getArrears() : summary.getArrears())
+                .platformStatus(prefer(d.getPlatformStatus(), summary.getPlatformStatus()))
+                .sourceSpaceId(prefer(d.getSourceSpaceId(), summary.getSourceSpaceId()))
                 .build();
     }
 
