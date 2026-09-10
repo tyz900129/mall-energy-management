@@ -53,6 +53,7 @@ public class FacilityTopologyService {
         node.setSystemType(systemType);
         apply(node, request);
         mapper.insert(node);
+        keepSingleStallConnection(systemType, node.getId(), node.getStallId());
         return view(node);
     }
 
@@ -63,6 +64,7 @@ public class FacilityTopologyService {
         validate(systemType, request, id);
         apply(node, request);
         mapper.updateById(node);
+        keepSingleStallConnection(systemType, node.getId(), node.getStallId());
         return view(node);
     }
 
@@ -156,6 +158,22 @@ public class FacilityTopologyService {
         node.setOperatingStatus(blankToNull(request.getOperatingStatus()) == null ? "NORMAL" : request.getOperatingStatus());
         node.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
         node.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+    }
+
+    /**
+     * 一个铺位在同一种设施拓扑中只保留一个直接接入节点。节点改绑时只解除
+     * 旧节点的铺位关系，不删除任何拓扑节点或工程参数。
+     */
+    private void keepSingleStallConnection(String systemType, Long nodeId, Long stallId) {
+        if (stallId == null) return;
+        List<FacilityTopologyNode> previous = mapper.selectList(new LambdaQueryWrapper<FacilityTopologyNode>()
+            .eq(FacilityTopologyNode::getSystemType, systemType)
+            .eq(FacilityTopologyNode::getStallId, stallId)
+            .ne(FacilityTopologyNode::getId, nodeId));
+        for (FacilityTopologyNode old : previous) {
+            old.setStallId(null);
+            mapper.updateById(old);
+        }
     }
 
     private List<FacilityTopologyNode> allNodes(String systemType) {

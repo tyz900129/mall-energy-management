@@ -16,15 +16,17 @@ import com.wanyuecity.energy.system.entity.PowerSwitchSpecification;
 import com.wanyuecity.energy.system.service.BusinessDictionaryService;
 import com.wanyuecity.energy.system.mapper.AirConditionerSpecificationMapper;
 import com.wanyuecity.energy.system.service.AirConditionerSpecificationService;
+import com.wanyuecity.energy.facility.entity.FacilityTopologyNode;
+import com.wanyuecity.energy.facility.mapper.FacilityTopologyNodeMapper;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service @RequiredArgsConstructor
 public class StallEngineeringService {
-    private final StallMapper stallMapper; private final StallEngineeringProfileMapper mapper; private final StallEngineeringCableMapper cableMapper; private final StallEngineeringAirConditionerMapper airConditionerMapper; private final CableSpecificationMapper specificationMapper; private final PowerSwitchSpecificationMapper switchSpecificationMapper; private final AirConditionerSpecificationMapper airConditionerSpecificationMapper;private final AirConditionerSpecificationService airConditionerSpecificationService;private final BusinessDictionaryService dictionaryService;
+    private final StallMapper stallMapper; private final StallEngineeringProfileMapper mapper; private final StallEngineeringCableMapper cableMapper; private final StallEngineeringAirConditionerMapper airConditionerMapper; private final CableSpecificationMapper specificationMapper; private final PowerSwitchSpecificationMapper switchSpecificationMapper; private final AirConditionerSpecificationMapper airConditionerSpecificationMapper;private final AirConditionerSpecificationService airConditionerSpecificationService;private final BusinessDictionaryService dictionaryService;private final FacilityTopologyNodeMapper facilityTopologyNodeMapper;
     public StallEngineeringView get(Long stallId){Stall stall=requireStall(stallId);StallEngineeringProfile profile=mapper.selectOne(new LambdaQueryWrapper<StallEngineeringProfile>().eq(StallEngineeringProfile::getStallId,stallId).last("LIMIT 1"));if(profile==null){profile=new StallEngineeringProfile();profile.setStallId(stallId);defaults(profile);}return view(stall,profile);}
-    @Transactional public StallEngineeringView save(Long stallId,StallEngineeringRequest req){Stall stall=requireStall(stallId);validateConditional(req);validateCables(req.getCables());validateAirConditioners(req.getAirConditioners());StallEngineeringProfile row=mapper.selectOne(new LambdaQueryWrapper<StallEngineeringProfile>().eq(StallEngineeringProfile::getStallId,stallId).last("LIMIT 1"));boolean create=row==null;if(create){row=new StallEngineeringProfile();row.setStallId(stallId);}BeanUtils.copyProperties(req,row);row.setLoadPowerKw(null);defaults(row);clearDisabled(row);if(create)mapper.insert(row);else mapper.updateById(row);replaceCables(row.getId(),req.getCables());replaceAirConditioners(row.getId(),req.getAirConditioners());syncLegacyCableFields(row,req.getCables());return view(stall,row);}
+    @Transactional public StallEngineeringView save(Long stallId,StallEngineeringRequest req){Stall stall=requireStall(stallId);prepareTopologyFields(stallId,req);validateConditional(req);validateCables(req.getCables());validateAirConditioners(req.getAirConditioners());StallEngineeringProfile row=mapper.selectOne(new LambdaQueryWrapper<StallEngineeringProfile>().eq(StallEngineeringProfile::getStallId,stallId).last("LIMIT 1"));boolean create=row==null;if(create){row=new StallEngineeringProfile();row.setStallId(stallId);}BeanUtils.copyProperties(req,row);row.setLoadPowerKw(null);defaults(row);clearDisabled(row);if(create)mapper.insert(row);else mapper.updateById(row);replaceCables(row.getId(),req.getCables());replaceAirConditioners(row.getId(),req.getAirConditioners());syncLegacyCableFields(row,req.getCables());syncTopologyLinks(stallId,req);return view(stall,row);}
     private void validateCables(List<StallCableRequest> cables){if(cables==null)return;for(var item:cables){var spec=specificationMapper.selectById(item.getCableSpecificationId());if(spec==null)throw BizException.badRequest("所选电缆规格不存在");if(!Integer.valueOf(1).equals(spec.getStatus()))throw BizException.badRequest("电缆规格已停用："+spec.getCableModel()+" "+spec.getSpecification());if(item.getPowerSwitchSpecificationId()==null)throw BizException.badRequest("每套供配电回路必须选择供电端开关");var sw=switchSpecificationMapper.selectById(item.getPowerSwitchSpecificationId());if(sw==null||!Integer.valueOf(1).equals(sw.getStatus()))throw BizException.badRequest("所选供电端开关不存在或已停用");if(blank(item.getMeterLocationCode())||!dictionaryService.isEnabled("METER_LOCATION",item.getMeterLocationCode()))throw BizException.badRequest("每套供配电回路必须选择有效的电表位置");}}
     private void replaceCables(Long profileId,List<StallCableRequest> cables){if(cables==null)return;cableMapper.delete(new LambdaQueryWrapper<StallEngineeringCable>().eq(StallEngineeringCable::getStallEngineeringProfileId,profileId));for(var item:cables){var row=new StallEngineeringCable();row.setStallEngineeringProfileId(profileId);row.setCableSpecificationId(item.getCableSpecificationId());row.setPowerSwitchSpecificationId(item.getPowerSwitchSpecificationId());row.setQuantity(1);row.setSwitchQuantity(1);row.setMeterLocationCode(item.getMeterLocationCode());cableMapper.insert(row);}}
     private void syncLegacyCableFields(StallEngineeringProfile profile,List<StallCableRequest> cables){if(cables==null)return;profile.setCableQuantity(cables.size());profile.setCableModel(cables.stream().map(x->specificationMapper.selectById(x.getCableSpecificationId())).filter(Objects::nonNull).map(x->x.getCableModel()+" "+x.getSpecification()).collect(Collectors.joining("；")));mapper.updateById(profile);}
@@ -34,7 +36,100 @@ public class StallEngineeringService {
     private void replaceAirConditioners(Long profileId,List<StallAirConditionerRequest> rows){if(rows==null)return;airConditionerMapper.delete(new LambdaQueryWrapper<StallEngineeringAirConditioner>().eq(StallEngineeringAirConditioner::getStallEngineeringProfileId,profileId));for(var item:rows){var spec=airConditionerSpecificationService.requireEnabled(item.getAirConditionerSpecificationId());var row=new StallEngineeringAirConditioner();row.setStallEngineeringProfileId(profileId);row.setAirConditionerSpecificationId(spec.getId());row.setEquipmentSpecCode(spec.getSpecCode());row.setFanCoilQuantity(0);row.setHangingCabinetQuantity(0);row.setAirOutletQuantity(item.getAirOutletQuantity());airConditionerMapper.insert(row);}}
     private void defaults(StallEngineeringProfile r){if(r.getCableQuantity()==null)r.setCableQuantity(0);if(r.getAirConditionerQuantity()==null)r.setAirConditionerQuantity(0);if(r.getFanCoilQuantity()==null)r.setFanCoilQuantity(0);if(r.getHangingCabinetQuantity()==null)r.setHangingCabinetQuantity(0);if(r.getAirOutletQuantity()==null)r.setAirOutletQuantity(0);if(r.getGasPipeQuantity()==null)r.setGasPipeQuantity(0);if(r.getGasAlarmQuantity()==null)r.setGasAlarmQuantity(0);if(r.getWaterSupply()==null)r.setWaterSupply(false);if(r.getDrainageAvailable()==null)r.setDrainageAvailable(false);if(r.getExhaustDuctAvailable()==null)r.setExhaustDuctAvailable(false);if(r.getFreshAirDuctAvailable()==null)r.setFreshAirDuctAvailable(false);if(r.getGasConditionAvailable()==null)r.setGasConditionAvailable(false);if(r.getNaturalGasUsed()==null)r.setNaturalGasUsed(false);if(r.getGasConnected()==null)r.setGasConnected(false);if(r.getGasAlarm()==null)r.setGasAlarm(false);if(r.getAutoShutoffValve()==null)r.setAutoShutoffValve(false);if(r.getGasAccepted()==null)r.setGasAccepted(false);}
     private void clearDisabled(StallEngineeringProfile r){if(!r.getWaterSupply()){r.setWaterMeterCaliber(null);r.setWaterMeterLocation(null);}if(!r.getDrainageAvailable()){r.setDrainagePipeCaliber(null);r.setDrainagePipelineNo(null);}if(!r.getExhaustDuctAvailable()){r.setExhaustDuctNo(null);r.setExhaustFanCode(null);}if(!r.getFreshAirDuctAvailable()){r.setFreshAirDuctNo(null);r.setFreshAirUnitCode(null);}if(r.getNaturalGasUsed()){r.setGasConditionAvailable(true);r.setGasType("NATURAL_GAS");r.setGasPipeCaliber(r.getNaturalGasCaliberCode());r.setAutoShutoffValve(true);}else{r.setGasConditionAvailable(false);r.setNaturalGasCaliberCode(null);r.setGasShutoffLocationCode(null);r.setGasConnected(false);r.setGasType(null);r.setGasPipeQuantity(0);r.setGasPipeCaliber(null);r.setGasPipelineNo(null);r.setGasInterfaceLocation(null);r.setGasMeterNo(null);r.setGasMeterModel(null);r.setGasMeterLocation(null);r.setDesignGasFlow(null);r.setDesignGasLoadKw(null);r.setGasValveNo(null);r.setGasAlarm(false);r.setGasAlarmQuantity(0);r.setAutoShutoffValve(false);r.setGasAccepted(false);r.setGasAcceptanceDate(null);r.setGasAcceptanceOrg(null);}}
-    private StallEngineeringView view(Stall s,StallEngineeringProfile p){StallEngineeringView v=new StallEngineeringView();v.setStallId(s.getId());v.setStallCode(s.getStallCode());v.setStallName(s.getStallName());v.setFloorCode(s.getFloorCode());v.setBusinessType(s.getBusinessType());v.setProfile(p);List<StallCableView> cables=p.getId()==null?List.of():cableMapper.selectList(new LambdaQueryWrapper<StallEngineeringCable>().eq(StallEngineeringCable::getStallEngineeringProfileId,p.getId())).stream().map(this::cableView).filter(Objects::nonNull).collect(Collectors.toList());v.setCables(cables);v.setAirConditioners(p.getId()==null?List.of():airConditionerMapper.selectList(new LambdaQueryWrapper<StallEngineeringAirConditioner>().eq(StallEngineeringAirConditioner::getStallEngineeringProfileId,p.getId())).stream().map(this::airConditionerView).filter(Objects::nonNull).toList());v.setTotalCableCurrentA(cables.stream().map(StallCableView::getTotalCurrentA).reduce(BigDecimal.ZERO,BigDecimal::add));v.setTotalCablePowerKw(cables.stream().map(StallCableView::getTotalPowerKw).reduce(BigDecimal.ZERO,BigDecimal::add));return v;}
+
+    private void prepareTopologyFields(Long stallId, StallEngineeringRequest req) {
+        FacilityTopologyNode water = Boolean.TRUE.equals(req.getWaterSupply()) ? selectedTopologyNode(req.getWaterSupplyTopologyNodeId(), "WATER_SUPPLY", stallId) : null;
+        if (Boolean.TRUE.equals(req.getWaterSupply()) && water != null) {
+            req.setWaterMeterLocation(blank(water.getLocation()) ? water.getNodeCode() : water.getLocation());
+        }
+        FacilityTopologyNode drainage = Boolean.TRUE.equals(req.getDrainageAvailable()) ? selectedTopologyNode(req.getDrainageTopologyNodeId(), "DRAINAGE", stallId) : null;
+        if (Boolean.TRUE.equals(req.getDrainageAvailable()) && drainage != null) {
+            req.setDrainagePipelineNo(drainage.getNodeCode());
+            if (blank(req.getDrainagePipeCaliber()) && !blank(drainage.getLineSpecCode())) req.setDrainagePipeCaliber(drainage.getLineSpecCode());
+        }
+        FacilityTopologyNode exhaust = Boolean.TRUE.equals(req.getExhaustDuctAvailable()) ? selectedTopologyNode(req.getOilExhaustTopologyNodeId(), "OIL_EXHAUST", stallId) : null;
+        if (Boolean.TRUE.equals(req.getExhaustDuctAvailable()) && exhaust != null && !blank(exhaust.getEquipmentSpecCode())) {
+            req.setExhaustFanCode(exhaust.getEquipmentSpecCode());
+        }
+        FacilityTopologyNode freshAir = Boolean.TRUE.equals(req.getFreshAirDuctAvailable()) ? selectedTopologyNode(req.getFreshAirTopologyNodeId(), "FRESH_AIR", stallId) : null;
+        if (Boolean.TRUE.equals(req.getFreshAirDuctAvailable()) && freshAir != null && !blank(freshAir.getEquipmentSpecCode())) {
+            req.setFreshAirUnitCode(freshAir.getEquipmentSpecCode());
+        }
+    }
+
+    private FacilityTopologyNode selectedTopologyNode(Long nodeId, String systemType, Long stallId) {
+        if (nodeId == null) return null;
+        FacilityTopologyNode node = facilityTopologyNodeMapper.selectById(nodeId);
+        if (node == null || !systemType.equals(node.getSystemType())) throw BizException.badRequest("所选设施拓扑接入节点不存在或类型不正确");
+        if (node.getStallId() != null && !stallId.equals(node.getStallId())) throw BizException.badRequest("所选设施拓扑节点已关联其他铺位");
+        return node;
+    }
+
+    private void syncTopologyLinks(Long stallId, StallEngineeringRequest req) {
+        syncTopologyLink(stallId, "WATER_SUPPLY", req.getWaterSupply(), req.getWaterSupplyTopologyNodeId());
+        syncTopologyLink(stallId, "DRAINAGE", req.getDrainageAvailable(), req.getDrainageTopologyNodeId());
+        syncTopologyLink(stallId, "OIL_EXHAUST", req.getExhaustDuctAvailable(), req.getOilExhaustTopologyNodeId());
+        syncTopologyLink(stallId, "FRESH_AIR", req.getFreshAirDuctAvailable(), req.getFreshAirTopologyNodeId());
+    }
+
+    private void syncTopologyLink(Long stallId, String systemType, Boolean enabled, Long targetNodeId) {
+        List<FacilityTopologyNode> current = facilityTopologyNodeMapper.selectList(new LambdaQueryWrapper<FacilityTopologyNode>()
+            .eq(FacilityTopologyNode::getSystemType, systemType)
+            .eq(FacilityTopologyNode::getStallId, stallId));
+        if (!Boolean.TRUE.equals(enabled)) {
+            current.forEach(node -> { node.setStallId(null); facilityTopologyNodeMapper.updateById(node); });
+            return;
+        }
+        // 兼容仍在缓存中的旧版页面：启用但未传节点 ID 时保留现有关系。
+        if (targetNodeId == null) return;
+        current.stream().filter(node -> !targetNodeId.equals(node.getId())).forEach(node -> {
+            node.setStallId(null);
+            facilityTopologyNodeMapper.updateById(node);
+        });
+        FacilityTopologyNode target = selectedTopologyNode(targetNodeId, systemType, stallId);
+        if (!stallId.equals(target.getStallId())) {
+            target.setStallId(stallId);
+            facilityTopologyNodeMapper.updateById(target);
+        }
+    }
+
+    private StallEngineeringView view(Stall s,StallEngineeringProfile p){StallEngineeringView v=new StallEngineeringView();v.setStallId(s.getId());v.setStallCode(s.getStallCode());v.setStallName(s.getStallName());v.setFloorCode(s.getFloorCode());v.setBusinessType(s.getBusinessType());applyTopologyProjection(v,p,s.getId());v.setProfile(p);List<StallCableView> cables=p.getId()==null?List.of():cableMapper.selectList(new LambdaQueryWrapper<StallEngineeringCable>().eq(StallEngineeringCable::getStallEngineeringProfileId,p.getId())).stream().map(this::cableView).filter(Objects::nonNull).collect(Collectors.toList());v.setCables(cables);v.setAirConditioners(p.getId()==null?List.of():airConditionerMapper.selectList(new LambdaQueryWrapper<StallEngineeringAirConditioner>().eq(StallEngineeringAirConditioner::getStallEngineeringProfileId,p.getId())).stream().map(this::airConditionerView).filter(Objects::nonNull).toList());v.setTotalCableCurrentA(cables.stream().map(StallCableView::getTotalCurrentA).reduce(BigDecimal.ZERO,BigDecimal::add));v.setTotalCablePowerKw(cables.stream().map(StallCableView::getTotalPowerKw).reduce(BigDecimal.ZERO,BigDecimal::add));return v;}
+
+    private void applyTopologyProjection(StallEngineeringView view, StallEngineeringProfile profile, Long stallId) {
+        FacilityTopologyNode water = linkedTopologyNode(stallId, "WATER_SUPPLY");
+        FacilityTopologyNode drainage = linkedTopologyNode(stallId, "DRAINAGE");
+        FacilityTopologyNode exhaust = linkedTopologyNode(stallId, "OIL_EXHAUST");
+        FacilityTopologyNode freshAir = linkedTopologyNode(stallId, "FRESH_AIR");
+        if (water != null) {
+            view.setWaterSupplyTopologyNodeId(water.getId());
+            profile.setWaterSupply(true);
+            if (blank(profile.getWaterMeterLocation())) profile.setWaterMeterLocation(blank(water.getLocation()) ? water.getNodeCode() : water.getLocation());
+        }
+        if (drainage != null) {
+            view.setDrainageTopologyNodeId(drainage.getId());
+            profile.setDrainageAvailable(true);
+            if (blank(profile.getDrainagePipelineNo())) profile.setDrainagePipelineNo(drainage.getNodeCode());
+            if (blank(profile.getDrainagePipeCaliber()) && !blank(drainage.getLineSpecCode())) profile.setDrainagePipeCaliber(drainage.getLineSpecCode());
+        }
+        if (exhaust != null) {
+            view.setOilExhaustTopologyNodeId(exhaust.getId());
+            profile.setExhaustDuctAvailable(true);
+            if (blank(profile.getExhaustFanCode()) && !blank(exhaust.getEquipmentSpecCode())) profile.setExhaustFanCode(exhaust.getEquipmentSpecCode());
+        }
+        if (freshAir != null) {
+            view.setFreshAirTopologyNodeId(freshAir.getId());
+            profile.setFreshAirDuctAvailable(true);
+            if (blank(profile.getFreshAirUnitCode()) && !blank(freshAir.getEquipmentSpecCode())) profile.setFreshAirUnitCode(freshAir.getEquipmentSpecCode());
+        }
+    }
+
+    private FacilityTopologyNode linkedTopologyNode(Long stallId, String systemType) {
+        return facilityTopologyNodeMapper.selectOne(new LambdaQueryWrapper<FacilityTopologyNode>()
+            .eq(FacilityTopologyNode::getSystemType, systemType)
+            .eq(FacilityTopologyNode::getStallId, stallId)
+            .orderByAsc(FacilityTopologyNode::getId)
+            .last("LIMIT 1"));
+    }
     private StallAirConditionerView airConditionerView(StallEngineeringAirConditioner link){var spec=airConditionerSpecificationMapper.selectById(link.getAirConditionerSpecificationId());if(spec==null)return null;return new StallAirConditionerView(spec.getId(),spec.getSpecCode(),spec.getModel(),spec.getEquipmentType(),airConditionerTypeName(spec.getEquipmentType()),spec.getRatedPowerKw(),spec.getAirflowCmh(),zero(link.getAirOutletQuantity()));}
     private String airConditionerTypeName(String type){return switch(type){case "FAN_COIL"->"风机盘管";case "HANGING_CABINET"->"吊柜式空调";default->"其他";};}
     private StallCableView cableView(StallEngineeringCable link){CableSpecification spec=specificationMapper.selectById(link.getCableSpecificationId());if(spec==null)return null;var v=new StallCableView();v.setCableSpecificationId(spec.getId());v.setSpecCode(spec.getSpecCode());v.setCableModel(spec.getCableModel());v.setSpecification(spec.getSpecification());v.setRatedCurrentA(spec.getRatedCurrentA());v.setRatedPowerKw(spec.getRatedPowerKw());v.setQuantity(1);v.setTotalCurrentA(spec.getRatedCurrentA());v.setTotalPowerKw(spec.getRatedPowerKw());v.setSwitchQuantity(1);v.setMeterLocationCode(link.getMeterLocationCode());v.setMeterLocationName(dictionaryService.label("METER_LOCATION",link.getMeterLocationCode()));if(link.getPowerSwitchSpecificationId()!=null){PowerSwitchSpecification sw=switchSpecificationMapper.selectById(link.getPowerSwitchSpecificationId());if(sw!=null){v.setPowerSwitchSpecificationId(sw.getId());v.setSwitchSpecCode(sw.getSpecCode());v.setSwitchBrand(sw.getBrand());v.setSwitchModel(sw.getSwitchModel());v.setSwitchPoleCount(sw.getPoleCount());v.setSwitchRatedCurrentA(sw.getRatedCurrentA());v.setSwitchBreakingCapacityKa(sw.getBreakingCapacityKa());v.setSwitchType(sw.getSwitchType());v.setSwitchMatchStatus(sw.getRatedCurrentA().compareTo(spec.getRatedCurrentA())<=0?"匹配":"开关额定电流超过电缆载流量");}}return v;}private int zero(Integer v){return v==null?0:v;}private boolean blank(String v){return v==null||v.isBlank();}
