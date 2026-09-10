@@ -19,9 +19,8 @@ public final class SmsPhoneComparison {
     }
     public static boolean validate(String phone, String source, String confirmedSource, Boolean decision) {
         if (!normalize(phone).matches("\\+?\\d{7,15}")) throw BizException.badRequest("请填写有效的联系人电话");
-        if (!differs(phone, source)) return false;
         if (!Objects.equals(source, confirmedSource)) throw BizException.badRequest("原系统手机号已变化，请重新执行变更检查并确认短信通知号码");
-        if (decision == null) throw BizException.badRequest("联系电话与原系统不一致，请确认是否修改短信通知号码");
-        return decision;
+        if (decision == null) throw BizException.badRequest("请确认是否需要修改短信通知号码");
+        return Boolean.TRUE.equals(decision);
     }
 }

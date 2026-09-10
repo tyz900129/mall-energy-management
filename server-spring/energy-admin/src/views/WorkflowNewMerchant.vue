@@ -12,7 +12,7 @@
         <el-col v-if="form.workflowType==='NEW_MERCHANT'" :xs="24" :sm="24"><el-form-item label="生成账户名称"><el-input :model-value="proposedAccountName" disabled placeholder="填写商户代码和商户名称后自动生成" /><div class="account-name-hint">统一格式：3066-六位商户代码-商户名称</div></el-form-item></el-col>
         <el-col v-if="form.workflowType==='NEW_MERCHANT'" :xs="24" :sm="12"><el-form-item label="商户联系人" prop="contactName" required><el-input v-model="form.contactName" placeholder="必填" /></el-form-item></el-col>
         <el-col v-if="form.workflowType!=='MERCHANT_EXIT'" :xs="24" :sm="12"><el-form-item label="联系人电话" prop="contactPhone" required><el-input v-model="form.contactPhone" inputmode="tel" maxlength="32" placeholder="请输入本次联系手机号" @input="invalidate(false)" /></el-form-item></el-col>
-        <el-col v-if="form.workflowType==='EXISTING_MERCHANT_ADD_STALL'" :xs="24" :sm="24"><el-alert title="请填写联系人电话，系统将与原账户手机号比较；号码不一致时可申请修改短信通知号码。" type="info" :closable="false" show-icon /></el-col>
+        <el-col v-if="form.workflowType==='EXISTING_MERCHANT_ADD_STALL'" :xs="24" :sm="24"><el-alert title="请填写联系人电话。创建草稿前系统会明确提示号码一致或不一致，并由申请人确认是否修改短信通知号码。" type="info" :closable="false" show-icon /></el-col>
         <el-col :xs="24" :sm="12"><el-form-item :label="form.workflowType==='MERCHANT_EXIT'?'解除绑定时间':'启用时间'" prop="effectiveTime"><input v-if="isMobile" v-model="mobileDateTime" class="native-date" type="datetime-local" step="60" @change="onMobileDateTimeChange" /><el-date-picker v-else v-model="form.effectiveTime" type="datetime" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DDTHH:mm:00" style="width:100%" /></el-form-item></el-col></el-row>
       <el-form-item v-if="form.workflowType==='MERCHANT_EXIT'" label="已绑定铺位" prop="stallId"><el-select v-model="form.stallId" filterable style="width:100%" placeholder="请先输入商户代码并查询" @change="invalidate(false)"><el-option v-for="s in merchantStalls" :key="s.stallId" :label="`${s.stallCode}${s.stallName?' - '+s.stallName:''}（${s.deviceIds.length}台设备）`" :value="s.stallId" /></el-select></el-form-item>
       <el-form-item v-else label="铺位编码" prop="stallId"><el-select v-model="form.stallId" filterable style="width:100%" @change="invalidate(false)"><el-option v-for="s in stalls" :key="s.id" :label="s.stallCode" :value="s.id" /></el-select></el-form-item>
@@ -29,7 +29,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'; import { useRouter } from 'vue-router'; import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'; import { stallApi } from '@/api/merchant'; import { workflowApi, type BillingChangePrecheck } from '@/api/workflow'; import { enumLabel } from '@/utils/format'; import { buildStandardAccountName } from '@/utils/accountName'
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'; import { useRouter } from 'vue-router'; import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'; import { stallApi } from '@/api/merchant'; import { workflowApi, type BillingChangePrecheck } from '@/api/workflow'; import { enumLabel } from '@/utils/format'; import { buildStandardAccountName } from '@/utils/accountName'
 const router=useRouter(),formRef=ref<FormInstance>(),stalls=ref<any[]>([]),merchantStalls=ref<any[]>([]),check=ref<BillingChangePrecheck|null>(null),checking=ref(false),saving=ref(false),requestKey=ref(''),isMobile=ref(window.innerWidth<=768),mobileDateTime=ref('')
 const workflowTypes=[{value:'NEW_MERCHANT',label:'新商户开户'},{value:'EXISTING_MERCHANT_ADD_STALL',label:'已有商户增加铺位'},{value:'MERCHANT_EXIT',label:'已有商户撤柜'}]
 const form=reactive({workflowType:'NEW_MERCHANT',merchantCode:'',merchantName:'',contactName:'',contactPhone:'',stallId:null as number|null,effectiveTime:'',usesWater:undefined as boolean|undefined,remark:'',originalContactPhone:'',updateSmsPhone:undefined as boolean|undefined})
@@ -52,13 +52,19 @@ async function create(){
       check.value=latest
       if(!latest.allowed){ElMessage.warning('检查结果发生变化，请处理提示后重试');return}
       form.originalContactPhone=latest.originalContactPhone||''
-      form.updateSmsPhone=false
-      if(latest.phoneDifferent){
-        try{
-          await ElMessageBox.confirm(`填写号码：${form.contactPhone}；原系统号码：${form.originalContactPhone||'未登记'}。是否申请修改短信通知号码？`,'短信通知号码确认',{confirmButtonText:'是，申请修改',cancelButtonText:'否，保留原号码',distinguishCancelAndClose:true,closeOnClickModal:false})
-          form.updateSmsPhone=true
-        }catch(action){if(action!=='cancel')return}
-      }
+      form.updateSmsPhone=undefined
+      const comparison=latest.phoneDifferent?'不一致':'一致'
+      const comparisonColor=latest.phoneDifferent?'#e6a23c':'#67c23a'
+      const message=h('div',{style:'line-height:1.8'},[
+        h('p',{style:`margin:0 0 8px;font-weight:600;color:${comparisonColor}`},`比对结果：联系电话与原账户短信通知号码${comparison}`),
+        h('p',{style:'margin:0'},`原账户短信通知号码：${form.originalContactPhone||'未登记'}`),
+        h('p',{style:'margin:0 0 8px'},`本次填写联系电话：${form.contactPhone}`),
+        h('p',{style:'margin:0'},'请确认：是否申请将短信通知号码更换为本次填写的联系电话？')
+      ])
+      try{
+        await ElMessageBox.confirm(message,'短信通知号码确认',{confirmButtonText:'申请更换',cancelButtonText:'保持不变',distinguishCancelAndClose:true,closeOnClickModal:false,type:latest.phoneDifferent?'warning':'success'})
+        form.updateSmsPhone=true
+      }catch(action){if(action==='cancel')form.updateSmsPhone=false;else return}
     }
     if(!requestKey.value)requestKey.value=newRequestKey()
     const r:any=await workflowApi.createBillingChange({...form,requestKey:requestKey.value})

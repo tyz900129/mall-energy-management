@@ -5,10 +5,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SmsPhoneComparisonTest {
-    @Test void equivalentNumbersDoNotRequestChanges() {
+    @Test void equivalentNumbersStillRequireAnExplicitChoice() {
         String source=SmsPhoneComparison.snapshot(List.of("+86 138-0013-8000", "13800138000"));
         assertEquals("13800138000",source);
-        assertFalse(SmsPhoneComparison.validate("13800138000", source, null, null));
+        assertThrows(RuntimeException.class,()->SmsPhoneComparison.validate("13800138000",source,source,null));
+        assertFalse(SmsPhoneComparison.validate("13800138000",source,source,false));
+        assertTrue(SmsPhoneComparison.validate("13800138000",source,source,true));
     }
     @Test void changedNumberRequiresAnExplicitChoiceAgainstCurrentSource() {
         assertThrows(RuntimeException.class,()->SmsPhoneComparison.validate("13900139000","13800138000","13800138000",null));
