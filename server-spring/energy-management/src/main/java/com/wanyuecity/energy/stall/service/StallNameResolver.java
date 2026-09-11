@@ -5,6 +5,7 @@ import com.wanyuecity.energy.platform.entity.PlatformAccountCurrent;
 import com.wanyuecity.energy.platform.entity.PlatformAccountDeviceCurrent;
 import com.wanyuecity.energy.platform.mapper.PlatformAccountCurrentMapper;
 import com.wanyuecity.energy.platform.mapper.PlatformAccountDeviceCurrentMapper;
+import com.wanyuecity.energy.platform.service.MerchantNameParser;
 import com.wanyuecity.energy.stall.entity.Stall;
 import com.wanyuecity.energy.stall.mapper.StallMapper;
 import com.wanyuecity.energy.stalldevice.entity.StallDevice;
@@ -20,8 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** 以本地铺位—设备绑定关系为入口，派生设备当前所属的启用计费账户名称。 */
 @Service
@@ -30,10 +29,6 @@ import java.util.regex.Pattern;
 public class StallNameResolver {
     public static final String PENDING_NAME = "待同步账户";
     public static final String AMBIGUOUS_NAME = "多账户待核对";
-    private static final Pattern BILLING_ACCOUNT_NAME = Pattern.compile(
-            "^3066\\s*[-—－_]\\s*\\d{6}\\s*[-—－_]\\s*(.+)$",
-            Pattern.CASE_INSENSITIVE);
-
     private final StallMapper stallMapper;
     private final PlatformAccountCurrentMapper accountMapper;
     private final StallDeviceMapper stallDeviceMapper;
@@ -126,15 +121,10 @@ public class StallNameResolver {
     }
 
     private String displayName(PlatformAccountCurrent account) {
-        if (account.getAccountName() != null && !account.getAccountName().isBlank()) {
-            String accountName = account.getAccountName().trim();
-            Matcher matcher = BILLING_ACCOUNT_NAME.matcher(accountName);
-            // 标准计费账户名为 3066-六位商户代码-商户名称，铺位只展示商户名称。
-            if (matcher.matches() && !matcher.group(1).isBlank()) return matcher.group(1).trim();
-            return accountName;
-        }
-        if (account.getUserName() != null && !account.getUserName().isBlank()) return account.getUserName().trim();
-        return account.getAccountNumber();
+        // 源平台 user_name 是“账户名称”，标准格式为 3066-六位商户代码-商户名称。
+        // account_name 是“当前商户”旧字段，历史数据常带其它铺位号，不能用于铺位名称。
+        String merchantName = MerchantNameParser.extract(account.getUserName(), account.getMerchantCode());
+        return merchantName == null || merchantName.isBlank() ? PENDING_NAME : merchantName.trim();
     }
 
     @Transactional

@@ -46,7 +46,7 @@ class StallNameResolverTest {
         Stall stall=new Stall();stall.setId(1L);stall.setStallCode("仓库A");stall.setStallName(StallNameResolver.PENDING_NAME);
         StallDevice binding=new StallDevice();binding.setPlatformDeviceId("D1");
         PlatformAccountDeviceCurrent relation=new PlatformAccountDeviceCurrent();relation.setAccountNumber("A1");
-        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setAccountName("仓库租户");account.setPlatformStatus("1");
+        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setMerchantCode("000001");account.setUserName("3066-000001-仓库租户");account.setAccountName("其它铺位-错误旧名称");account.setPlatformStatus("1");
         when(stallMapper.selectById(1L)).thenReturn(stall);
         when(stallDeviceMapper.listActiveByStall(1L)).thenReturn(List.of(binding));
         when(relationMapper.selectList(any())).thenReturn(List.of(relation));
@@ -59,7 +59,7 @@ class StallNameResolverTest {
         Stall stall=new Stall();stall.setId(1L);stall.setStallCode("L528");stall.setStallName(StallNameResolver.PENDING_NAME);
         StallDevice binding=new StallDevice();binding.setPlatformDeviceId("D1");
         PlatformAccountDeviceCurrent relation=new PlatformAccountDeviceCurrent();relation.setAccountNumber("A1");
-        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setAccountName("3066-006804-柳真真");account.setPlatformStatus("1");
+        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setMerchantCode("006804");account.setUserName("3066-006804-柳真真");account.setAccountName("L6-0063-错误旧名称");account.setPlatformStatus("1");
         when(stallMapper.selectById(1L)).thenReturn(stall);
         when(stallDeviceMapper.listActiveByStall(1L)).thenReturn(List.of(binding));
         when(relationMapper.selectList(any())).thenReturn(List.of(relation));
@@ -68,11 +68,24 @@ class StallNameResolverTest {
     }
 
     @Test
+    void doesNotUseLegacyCurrentMerchantFieldAsStallName() {
+        Stall stall=new Stall();stall.setId(1L);stall.setStallCode("L423");stall.setStallName("L314-CONVERSE");
+        StallDevice binding=new StallDevice();binding.setPlatformDeviceId("D1");
+        PlatformAccountDeviceCurrent relation=new PlatformAccountDeviceCurrent();relation.setAccountNumber("A1");
+        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setMerchantCode("000092");account.setAccountName("L314-CONVERSE");account.setPlatformStatus("1");
+        when(stallMapper.selectById(1L)).thenReturn(stall);
+        when(stallDeviceMapper.listActiveByStall(1L)).thenReturn(List.of(binding));
+        when(relationMapper.selectList(any())).thenReturn(List.of(relation));
+        when(accountMapper.selectList(any())).thenReturn(List.of(account));
+        assertEquals(StallNameResolver.PENDING_NAME,resolver.refresh(1L));
+    }
+
+    @Test
     void ignoresDisabledAccountFromBoundDevice() {
         Stall stall=new Stall();stall.setId(1L);stall.setStallCode("L1");stall.setStallName("旧名称");
         StallDevice binding=new StallDevice();binding.setPlatformDeviceId("D1");
         PlatformAccountDeviceCurrent relation=new PlatformAccountDeviceCurrent();relation.setAccountNumber("A1");
-        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setAccountName("已停用账户");account.setPlatformStatus("DISABLED");
+        PlatformAccountCurrent account=new PlatformAccountCurrent();account.setAccountNumber("A1");account.setUserName("3066-000001-已停用账户");account.setPlatformStatus("DISABLED");
         when(stallMapper.selectById(1L)).thenReturn(stall);
         when(stallDeviceMapper.listActiveByStall(1L)).thenReturn(List.of(binding));
         when(relationMapper.selectList(any())).thenReturn(List.of(relation));

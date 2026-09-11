@@ -82,7 +82,7 @@ public class StallDeviceService {
         }
         log.info("stall-device bound: stall={}, device={}, by={}",
                 stall.getStallCode(), dev.getPlatformDeviceId(), req.getBoundBy());
-        // 仅按铺位编码刷新源平台账户资料；不使用设备的账户关系反推租户。
+        // 绑定后立即按设备关联的唯一启用计费账户刷新铺位商户名称。
         stall.setStallName(stallNameResolver.refresh(stall.getId()));
         return toView(row, stall, dev);
     }
