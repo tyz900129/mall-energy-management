@@ -14,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -25,10 +27,20 @@ public class WorkflowPlatformMatcher {
  private final PlatformAccountCurrentMapper accountMapper; private final PlatformAccountDeviceCurrentMapper relationMapper;
  private final JdbcTemplate jdbc;
  private final NotificationService notificationService;
+ private final PlatformTransactionManager transactionManager;
 
- @Transactional public int matchAfterSync(Long batchId){
+ public int matchAfterSync(Long batchId){
   List<Workflow> workflows=workflowMapper.selectList(new QueryWrapper<Workflow>().in("status",List.of("FIELD_VERIFIED","WAITING_PLATFORM_CHANGE","PLATFORM_VERIFYING","PARTIAL_MATCH","EXCEPTION")));
-  int completed=0; for(Workflow w:workflows){try{if(match(w,batchId))completed++;}catch(Exception e){log.error("workflow match failed: workflowId={}, batchId={}",w.getId(),batchId,e);}}return completed;
+  TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+  transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  int completed=0;
+  for(Workflow w:workflows){
+   try{
+    Boolean matched=transaction.execute(status->match(w,batchId));
+    if(Boolean.TRUE.equals(matched))completed++;
+   }catch(Exception e){log.error("workflow match failed: workflowId={}, batchId={}",w.getId(),batchId,e);}
+  }
+  return completed;
  }
  private boolean match(Workflow w,Long batchId){
   if(exists(w.getId(),batchId))return false;
@@ -65,7 +77,13 @@ public class WorkflowPlatformMatcher {
   String overall=beforeEffective?"PENDING":matched==total&&total>0?"MATCHED":matched>0?"PARTIAL_MATCH":hardError?"MISMATCH":"PENDING";
   String summary=(beforeEffective?"未到预期生效时间；":"")+"匹配 "+matched+"/"+total+" 项设备变更";
   Long runId=insertRun(w.getId(),batchId,overall,matched,total,summary);
-  LocalDateTime now=LocalDateTime.now(); for(Result r:results){jdbc.update("INSERT INTO workflow_match_detail(match_run_id,expected_change_id,platform_device_id,expected_account_number,actual_account_numbers,match_status,reason) VALUES(?,?,?,?,?,?,?)",runId,r.change.getId(),r.change.getPlatformDeviceId(),target,String.join(",",r.actual),r.status,r.reason);r.change.setToAccountNumber(target);r.change.setActualAccountNumber(String.join(",",r.actual));r.change.setVerifyStatus(r.status);r.change.setVerifiedAt(now);r.change.setExceptionReason(r.reason);changeMapper.updateById(r.change);}
+  LocalDateTime now=LocalDateTime.now();
+  for(Result r:results){
+   String expectedAccount="DEVICE_BIND".equals(r.change.getChangeType())?target:r.change.getFromAccountNumber();
+   String actualAccounts=String.join(",",r.actual);
+   jdbc.update("INSERT INTO workflow_match_detail(match_run_id,expected_change_id,platform_device_id,expected_account_number,actual_account_numbers,match_status,reason) VALUES(?,?,?,?,?,?,?)",runId,r.change.getId(),r.change.getPlatformDeviceId(),expectedAccount,actualAccounts,r.status,r.reason);
+   jdbc.update("UPDATE workflow_expected_change SET to_account_number=?,actual_account_number=?,verify_status=?,verified_at=?,exception_reason=? WHERE id=?",target,actualAccounts,r.status,now,r.reason,r.change.getId());
+  }
   w.setTargetAccountNumber(target);w.setWaitingPlatformAt(w.getWaitingPlatformAt()==null?now:w.getWaitingPlatformAt());w.setVerifiedAt(now);
   if("MATCHED".equals(overall)){w.setStatus("COMPLETED");w.setCompletedAt(now);}else if("PARTIAL_MATCH".equals(overall))w.setStatus("PARTIAL_MATCH");else if("MISMATCH".equals(overall))w.setStatus("EXCEPTION");else w.setStatus("WAITING_PLATFORM_CHANGE");workflowMapper.updateById(w);if("MATCHED".equals(overall))notificationService.notifyWorkflowCompleted(w.getId());return "MATCHED".equals(overall);
  }
