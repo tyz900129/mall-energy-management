@@ -3,9 +3,11 @@ package com.wanyuecity.energy.usage.controller;
 import com.wanyuecity.energy.core.ApiResponse;
 import com.wanyuecity.energy.usage.service.EnergyUsageService;
 import com.wanyuecity.energy.usage.service.AnalysisDimensionService;
+import com.wanyuecity.energy.usage.service.UtilityBillService;
 import com.wanyuecity.energy.usage.service.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +22,7 @@ import java.util.Map;
 public class EnergyUsageController {
     private final EnergyUsageService service;
     private final AnalysisDimensionService dimensionService;
+    private final UtilityBillService utilityBillService;
 
     @GetMapping("/dimensions") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')") public ApiResponse<List<Map<String,Object>>> dimensions(){return ApiResponse.ok(dimensionService.dimensions());}
     @PostMapping("/dimensions") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Map<String,Object>> createDimension(@Valid @RequestBody AnalysisDimensionRequest r){return ApiResponse.ok(dimensionService.createDimension(r));}
@@ -45,6 +48,16 @@ public class EnergyUsageController {
     }
     @PostMapping("/devices/assign") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Integer> assign(@Valid @RequestBody DeviceGroupAssignRequest r) { return ApiResponse.ok(service.assign(r)); }
+    @GetMapping("/bills") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')")
+    public ApiResponse<List<Map<String,Object>>> bills(@RequestParam(required=false) String startMonth,@RequestParam(required=false) String endMonth) { return ApiResponse.ok(utilityBillService.list(startMonth,endMonth)); }
+    @GetMapping("/bills/trend") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')")
+    public ApiResponse<List<UtilityBillService.TrendRow>> billTrend(@RequestParam String startMonth,@RequestParam String endMonth,@RequestParam(defaultValue="MONTH") String period) { return ApiResponse.ok(utilityBillService.trend(startMonth,endMonth,period)); }
+    @PostMapping("/bills") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
+    public ApiResponse<Map<String,Object>> createBill(@Valid @RequestBody UtilityBillRequest r, Authentication auth) { return ApiResponse.ok(utilityBillService.create(r,auth==null?null:auth.getName())); }
+    @PutMapping("/bills/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
+    public ApiResponse<Map<String,Object>> updateBill(@PathVariable Long id,@Valid @RequestBody UtilityBillRequest r,Authentication auth) { return ApiResponse.ok(utilityBillService.update(id,r,auth==null?null:auth.getName())); }
+    @DeleteMapping("/bills/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
+    public ApiResponse<Void> deleteBill(@PathVariable Long id) { utilityBillService.delete(id); return ApiResponse.ok(null); }
     @GetMapping("/metrics") public ApiResponse<List<Map<String,Object>>> metrics() { return ApiResponse.ok(service.metrics()); }
     @PutMapping("/metrics") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> metric(@Valid @RequestBody EnergyMetricRequest r) { service.saveMetric(r); return ApiResponse.ok(null); }

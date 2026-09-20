@@ -13,7 +13,7 @@ public class BusinessDictionary {
     private String itemLabel;
     private Integer sortOrder;
     private Integer status;
-    private String remark;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS) private String remark;
     @TableField(fill = FieldFill.INSERT) private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE) private LocalDateTime updatedAt;
 }

@@ -19,6 +19,7 @@ const routes = [
       { path: 'platform/sync/log', name: 'PlatformSyncLog', component: () => import('@/views/PlatformSyncLog.vue'), meta: { title: '同步日志详情', icon: 'Document',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/devices', name: 'DeviceGroup', component: () => import('@/views/DeviceGroup.vue'), meta: { title: '设备分析维度', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/sync', name: 'UsageSync', component: () => import('@/views/UsageSync.vue'), meta: { title: '历史用量同步', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
+      { path: 'energy/bills', name: 'UtilityBill', component: () => import('@/views/UtilityBill.vue'), meta: { title: '水电账单录入', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'energy/dashboard', name: 'UsageDashboard', component: () => import('@/views/UsageDashboard.vue'), meta: { title: '用量数据大屏', roles:['SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER'] } },
       { path: 'energy/analysis', name: 'UsageAnalysis', component: () => import('@/views/UsageAnalysis.vue'), meta: { title: '用量分析', roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } },
       { path: 'power/topology', name: 'PowerTopology', component: () => import('@/views/PowerTopology.vue'), meta: { title: '配电拓扑管理', roles:['SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER'] } },
@@ -35,6 +36,7 @@ const routes = [
       { path: 'system/dictionary', name: 'BusinessDictionary', component: () => import('@/views/BusinessDictionary.vue'), meta: { title: '基础字典', icon: 'List',roles:['SUPER_ADMIN','SYSTEM_ADMIN'] } },
       { path: 'system/webhook', name: 'WebhookConfig', component: () => import('@/views/WebhookConfig.vue'), meta: { title: 'Webhook 通知', icon: 'Bell',roles:['SUPER_ADMIN','SYSTEM_ADMIN'] } },
       { path: 'system/audit', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '操作审计', icon: 'DocumentChecked',roles:['SUPER_ADMIN','SYSTEM_ADMIN','VIEWER'] } }
+      ,{ path: 'system/migration', name: 'SystemMigration', component: () => import('@/views/SystemMigration.vue'), meta: { title: '数据迁移', icon: 'Switch',roles:['SUPER_ADMIN'] } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }

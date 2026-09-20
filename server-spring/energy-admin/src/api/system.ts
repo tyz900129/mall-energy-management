@@ -22,11 +22,15 @@ export const systemRoleApi = { list: () => http.get<SystemRole[]>('/api/v1/roles
 
 export type DictionaryType = 'FLOOR'|'AREA'|'BUSINESS_TYPE'|'BUSINESS_CATEGORY'|'METER_LOCATION'|'WATER_METER_CALIBER'|'DRAINAGE_PIPE_CALIBER'|'EXHAUST_FAN'|'FRESH_AIR_UNIT'|'AIR_CONDITIONER_SPEC'|'NATURAL_GAS_CALIBER'|'GAS_SHUTOFF_LOCATION'|'POWER_NODE_TYPE'|'WATER_SUPPLY_NODE_TYPE'|'DRAINAGE_NODE_TYPE'|'OIL_EXHAUST_NODE_TYPE'|'FRESH_AIR_NODE_TYPE'|'WATER_SUPPLY_PIPE_SPEC'|'AIR_DUCT_SPEC'|'DRAINAGE_MEDIUM'
 export interface DictionaryItem { id:number; dictType:DictionaryType; itemValue:string; itemLabel:string; sortOrder:number; status:number; remark?:string; updatedAt?:string }
+export interface DictionaryImportResult { total:number; created:number; updated:number }
 export const dictionaryApi = {
   list: (type:DictionaryType, enabledOnly=true) => http.get<DictionaryItem[]>('/api/v1/dictionaries',{params:{type,enabledOnly}}),
   create: (data:Partial<DictionaryItem>) => http.post('/api/v1/dictionaries',data),
   update: (id:number,data:Partial<DictionaryItem>) => http.put(`/api/v1/dictionaries/${id}`,data),
-  remove: (id:number) => http.delete(`/api/v1/dictionaries/${id}`)
+  remove: (id:number) => http.delete(`/api/v1/dictionaries/${id}`),
+  exportExcel: (type:string) => http.get<Blob>('/api/v1/dictionaries/excel/export',{params:{type},responseType:'blob'}),
+  template: (type:string) => http.get<Blob>('/api/v1/dictionaries/excel/template',{params:{type},responseType:'blob'}),
+  importExcel: (type:string,file:File) => {const data=new FormData();data.append('file',file);return http.post<DictionaryImportResult>('/api/v1/dictionaries/excel/import',data,{params:{type},headers:{'Content-Type':'multipart/form-data'},timeout:120000})}
 }
 export interface CableSpecification { id:number;specCode:string;cableModel:string;specification:string;ratedCurrentA:number;ratedPowerKw:number;status:number;sortOrder:number;remark?:string }
 export const cableSpecificationApi = {

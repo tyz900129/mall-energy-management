@@ -29,6 +29,7 @@
           <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
           <el-menu-item v-if="canGeneral" index="/energy/devices">设备分析维度</el-menu-item>
           <el-menu-item v-if="canGeneral" index="/energy/sync">历史用量同步</el-menu-item>
+          <el-menu-item v-if="canGeneral" index="/energy/bills">水电账单录入</el-menu-item>
           <el-menu-item index="/energy/dashboard">数据大屏</el-menu-item>
           <el-menu-item v-if="canGeneral" index="/energy/analysis">用量分析</el-menu-item>
         </el-sub-menu>
@@ -67,6 +68,7 @@
           <template #title>Webhook 通知</template>
         </el-menu-item>
         <el-menu-item v-if="canAudit" index="/system/audit"><el-icon><DocumentChecked /></el-icon><template #title>操作审计</template></el-menu-item>
+        <el-menu-item v-if="isSuperAdmin" index="/system/migration"><el-icon><Switch /></el-icon><template #title>数据迁移</template></el-menu-item>
       </el-menu>
     </el-aside>
     <el-container class="content-container">
@@ -110,7 +112,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Lightning, Odometer, Connection, OfficeBuilding, Grid, Link, User, UserFilled, Expand, Fold, Warning, Tickets, Bell, DocumentChecked, List, DataAnalysis, Share
+  Lightning, Odometer, Connection, OfficeBuilding, Grid, Link, User, UserFilled, Expand, Fold, Warning, Tickets, Bell, DocumentChecked, List, DataAnalysis, Share, Switch
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 

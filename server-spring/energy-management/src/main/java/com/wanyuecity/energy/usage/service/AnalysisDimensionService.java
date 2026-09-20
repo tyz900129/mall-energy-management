@@ -60,12 +60,16 @@ public class AnalysisDimensionService {
   if(energyType!=null&&!energyType.isBlank()){sql.append(" AND UPPER(d.energy_type)=?");args.add(energyType.trim().toUpperCase(Locale.ROOT));}
   sql.append(" ORDER BY d.device_name,d.platform_device_id");return jdbc.queryForList(sql.toString(),args.toArray());
  }
- @Transactional public int assign(DeviceDimensionAssignRequest r){requireDimension(r.dimensionId());Map<String,Object> value=requireValue(r.dimensionValueId());if(((Number)value.get("dimension_id")).longValue()!=r.dimensionId())throw BizException.badRequest("所选分类不属于当前维度");int changed=0;for(String deviceId:new LinkedHashSet<>(r.deviceIds()))changed+=assignOne(deviceId,r.dimensionId(),r.dimensionValueId());return changed;}
+ @Transactional public int assign(DeviceDimensionAssignRequest r){
+  requireDimension(r.dimensionId());
+  if(r.dimensionValueId()!=null){Map<String,Object> value=requireValue(r.dimensionValueId());if(((Number)value.get("dimension_id")).longValue()!=r.dimensionId())throw BizException.badRequest("所选分类不属于当前维度");}
+  int changed=0;for(String deviceId:new LinkedHashSet<>(r.deviceIds()))changed+=assignOne(deviceId,r.dimensionId(),r.dimensionValueId());return changed;
+ }
  private int assignOne(String deviceId,Long dimensionId,Long valueId){
   List<Map<String,Object>> current=jdbc.queryForList("SELECT dimension_value_id FROM device_dimension_assignment WHERE platform_device_id=? AND dimension_id=? ORDER BY id DESC LIMIT 1",deviceId,dimensionId);
-  boolean unchanged=!current.isEmpty()&&((Number)current.get(0).get("dimension_value_id")).longValue()==valueId;
+  boolean unchanged=valueId==null?current.isEmpty():!current.isEmpty()&&((Number)current.get(0).get("dimension_value_id")).longValue()==valueId;
   jdbc.update("DELETE FROM device_dimension_assignment WHERE platform_device_id=? AND dimension_id=?",deviceId,dimensionId);
-  jdbc.update("INSERT INTO device_dimension_assignment(platform_device_id,dimension_id,dimension_value_id,effective_from,effective_to) VALUES(?,?,?,'1970-01-01',NULL)",deviceId,dimensionId,valueId);
+  if(valueId!=null)jdbc.update("INSERT INTO device_dimension_assignment(platform_device_id,dimension_id,dimension_value_id,effective_from,effective_to) VALUES(?,?,?,'1970-01-01',NULL)",deviceId,dimensionId,valueId);
   return unchanged?0:1;
  }
  private void requireDimension(Long id){if(count("SELECT COUNT(*) FROM analysis_dimension WHERE id=?",id)==0)throw BizException.badRequest("分析维度不存在");}private Map<String,Object> requireValue(Long id){List<Map<String,Object>> rows=jdbc.queryForList("SELECT * FROM analysis_dimension_value WHERE id=?",id);if(rows.isEmpty())throw BizException.badRequest("维度分类不存在");return rows.get(0);}private long count(String sql,Object arg){Long n=jdbc.queryForObject(sql,Long.class,arg);return n==null?0:n;}private int zero(Integer n){return n==null?0:n;}private int status(Integer n){return n==null?1:n;}private String code(String s){return s.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_]","_");}private String color(String s){return s==null||s.isBlank()?"#409EFF":s.trim();}

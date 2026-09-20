@@ -6,6 +6,6 @@ import java.time.LocalDateTime;
 @Data @TableName("cable_specification")
 public class CableSpecification {
  @TableId(type=IdType.AUTO) private Long id; private String specCode; private String cableModel; private String specification;
- private BigDecimal ratedCurrentA; private BigDecimal ratedPowerKw; private Integer status; private Integer sortOrder; private String remark;
+ private BigDecimal ratedCurrentA; private BigDecimal ratedPowerKw; private Integer status; private Integer sortOrder; @TableField(updateStrategy=FieldStrategy.ALWAYS) private String remark;
  private LocalDateTime createdAt; private LocalDateTime updatedAt;
 }

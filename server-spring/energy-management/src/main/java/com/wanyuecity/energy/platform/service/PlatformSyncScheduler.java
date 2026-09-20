@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import com.wanyuecity.energy.system.migration.MigrationMaintenance;
 
 /**
  * Daily 02:00 trigger for {@link PlatformSyncService#runScheduled()}. The
@@ -17,9 +18,14 @@ import org.springframework.stereotype.Component;
 public class PlatformSyncScheduler {
 
     private final PlatformSyncService syncService;
+    private final MigrationMaintenance migrationMaintenance;
 
     @Scheduled(cron = "${energy.platform.sync-cron:0 0 2 * * ?}")
     public void runDaily() {
+        if (migrationMaintenance.isActive()) {
+            log.info("scheduled platform sync skipped during system migration");
+            return;
+        }
         try {
             log.info("scheduled platform sync starting");
             syncService.runScheduled();

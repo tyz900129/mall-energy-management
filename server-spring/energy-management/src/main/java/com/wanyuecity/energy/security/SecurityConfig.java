@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import com.wanyuecity.energy.system.audit.AuditMutationFilter;
+import com.wanyuecity.energy.system.migration.MigrationMaintenance;
+import com.wanyuecity.energy.system.migration.MigrationMaintenanceFilter;
 import com.wanyuecity.energy.system.service.AuditLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.cors.CorsConfiguration;
@@ -21,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.util.Arrays;
 
 /**
@@ -37,6 +40,8 @@ public class SecurityConfig {
     private final JsonAccessDeniedHandler accessDeniedHandler;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private MigrationMaintenance migrationMaintenance = new MigrationMaintenance();
     @Value("${energy.cors.allowed-origins:http://localhost:5173}") private String allowedOrigins;
 
     @Bean
@@ -72,12 +77,14 @@ public class SecurityConfig {
                                 "/actuator/info",
                                 "/files/**"
                                 ,"/api/v1/verification/tasks/**"
+                                ,"/api/v1/system/migration/exports/*/download"
                         ).permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new AuditMutationFilter(auditLogService,objectMapper),JwtAuthenticationFilter.class);
+                .addFilterAfter(new MigrationMaintenanceFilter(migrationMaintenance, objectMapper), JwtAuthenticationFilter.class)
+                .addFilterAfter(new AuditMutationFilter(auditLogService,objectMapper), MigrationMaintenanceFilter.class);
         return http.build();
     }
 

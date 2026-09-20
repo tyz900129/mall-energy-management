@@ -57,6 +57,10 @@ energy:
   upload:
     base-dir: ${ENERGY_UPLOAD_BASE:/home/admin/energy-deploy/uploads}
     url-prefix: /energy/files
+  migration:
+    base-dir: ${ENERGY_MIGRATION_BASE:/home/admin/energy-deploy/migration}
+    max-package-bytes: ${ENERGY_MIGRATION_MAX_PACKAGE_BYTES:21474836480}
+    retention-hours: ${ENERGY_MIGRATION_RETENTION_HOURS:24}
   jwt:
     secret: ${JWT_SECRET}
     expire-minutes: 720
