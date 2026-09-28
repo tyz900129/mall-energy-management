@@ -4,6 +4,7 @@ import com.wanyuecity.energy.system.controller.AuthController;
 import com.wanyuecity.energy.system.service.SysUserService;
 import com.wanyuecity.energy.system.service.AuditLogService;
 import com.wanyuecity.energy.system.service.DeviceCredentialService;
+import com.wanyuecity.energy.system.service.PermissionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -50,6 +51,9 @@ class SecurityConfigTest {
 
     @MockBean
     private DeviceCredentialService deviceCredentialService;
+
+    @MockBean
+    private PermissionService permissionService;
 
     @Test
     void pingIsPublicAndReturnsPong() throws Exception {

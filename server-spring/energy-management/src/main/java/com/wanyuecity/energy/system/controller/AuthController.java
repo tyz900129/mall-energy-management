@@ -8,6 +8,7 @@ import com.wanyuecity.energy.system.entity.SysUser;
 import com.wanyuecity.energy.system.service.SysUserService;
 import com.wanyuecity.energy.system.service.AuditLogService;
 import com.wanyuecity.energy.system.service.DeviceCredentialService;
+import com.wanyuecity.energy.system.service.PermissionService;
 import com.wanyuecity.energy.system.service.dto.DeviceLoginRequest;
 import com.wanyuecity.energy.system.service.dto.RegisterRequest;
 import com.wanyuecity.energy.system.service.dto.LoginRequest;
@@ -43,6 +44,7 @@ public class AuthController {
     private final JwtTokenProvider tokenProvider;
     private final AuditLogService auditLogService;
     private final DeviceCredentialService deviceCredentialService;
+    private final PermissionService permissionService;
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
@@ -94,7 +96,8 @@ public class AuthController {
         auditLogin(user.getUsername(),user.getId(),true,null,http);
 
         LoginResponse.UserInfo info = new LoginResponse.UserInfo(
-                user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), roles);
+                user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), user.getPhone(), roles,
+                List.copyOf(permissionService.effectivePermissionCodes(user.getId())));
         return new LoginResponse(token, tokenProvider.getExpireMinutes(), info);
     }
     private void auditLogin(String username,Long userId,boolean success,String reason,HttpServletRequest http){try{String result="{\"success\":"+success+(reason==null?"":",\"reason\":\""+reason+"\"")+"}";auditLogService.record(username,userId,"LOGIN","AUTH",userId==null?null:userId.toString(),null,result,http.getRemoteAddr(),http.getHeader("User-Agent"));}catch(Exception e){log.error("login audit persistence failed: {}",e.getClass().getSimpleName());}}
@@ -112,7 +115,8 @@ public class AuthController {
         }
         List<String> roles = userService.findRoleCodes(user.getId());
         LoginResponse.UserInfo info = new LoginResponse.UserInfo(
-                user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), roles);
+                user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), user.getPhone(), roles,
+                List.copyOf(permissionService.effectivePermissionCodes(user.getId())));
         return ApiResponse.ok(info);
     }
 

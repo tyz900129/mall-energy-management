@@ -9,6 +9,8 @@
       <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px; margin-left: 8px">
         <el-option label="在用" value="OCCUPIED" />
         <el-option label="空置" value="AVAILABLE" />
+        <el-option label="装修中" value="RENOVATING" />
+        <el-option label="撤场施工中" value="EXIT_CONSTRUCTION" />
         <el-option label="维护" value="MAINTENANCE" />
         <el-option label="停用" value="DECOMMISSIONED" />
       </el-select>
@@ -62,6 +64,8 @@
           <el-select v-model="form.status" style="width: 100%">
             <el-option label="在用 OCCUPIED" value="OCCUPIED" />
             <el-option label="空置 AVAILABLE" value="AVAILABLE" />
+            <el-option label="装修中 RENOVATING" value="RENOVATING" />
+            <el-option label="撤场施工中 EXIT_CONSTRUCTION" value="EXIT_CONSTRUCTION" />
             <el-option label="维护 MAINTENANCE" value="MAINTENANCE" />
             <el-option label="停用 DECOMMISSIONED" value="DECOMMISSIONED" />
           </el-select>
@@ -140,10 +144,10 @@ async function onExport(){exporting.value=true;try{const blob:any=await stallApi
 async function onImport(e:Event){const input=e.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;importing.value=true;try{const r:any=await stallApi.importExcel(file);const errors=(r.errors||[]).join('\n');await ElMessageBox.alert(`成功：${r.successCount} 条\n失败：${r.failureCount} 条${errors?'\n\n'+errors:''}`,'导入结果',{confirmButtonText:'确定'});await load()}finally{importing.value=false;input.value=''}}
 
 function statusLabel(s: string) {
-  return { OCCUPIED: '在用', AVAILABLE: '空置', MAINTENANCE: '维护', DECOMMISSIONED: '停用' }[s] || s
+  return { OCCUPIED: '在用', AVAILABLE: '空置', RENOVATING: '装修中', EXIT_CONSTRUCTION: '撤场施工中', MAINTENANCE: '维护', DECOMMISSIONED: '停用' }[s] || s
 }
 function statusTag(s: string) {
-  return ({ OCCUPIED: 'success', AVAILABLE: '', MAINTENANCE: 'warning', DECOMMISSIONED: 'info' } as any)[s] || ''
+  return ({ OCCUPIED: 'success', AVAILABLE: '', RENOVATING: 'warning', EXIT_CONSTRUCTION: 'warning', MAINTENANCE: 'warning', DECOMMISSIONED: 'info' } as any)[s] || ''
 }
 onMounted(async()=>{await Promise.all((['FLOOR','BUSINESS_TYPE'] as StallDictionaryType[]).map(async t=>{dictionaries[t]=await dictionaryApi.list(t) as any}));await load()})
 </script>

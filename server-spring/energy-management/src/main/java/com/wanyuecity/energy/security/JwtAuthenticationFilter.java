@@ -14,11 +14,13 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.wanyuecity.energy.system.service.PermissionService;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * Extracts the JWT from the {@code Authorization} header, validates it, and populates
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
+    private final PermissionService permissionService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -42,13 +45,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 try {
                     String username = claims.getSubject();
                     Object rolesObj = claims.get("roles");
-                    Collection<SimpleGrantedAuthority> authorities = List.of();
+                    Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
                     if (rolesObj instanceof List<?> raw) {
-                        authorities = raw.stream()
+                        authorities.addAll(raw.stream()
                                 .map(String::valueOf)
                                 .map(code -> new SimpleGrantedAuthority("ROLE_" + code))
-                                .collect(Collectors.toList());
+                                .collect(Collectors.toList()));
                     }
+                    Object uidValue = claims.get("uid");
+                    Number uid = uidValue instanceof Number number ? number : null;
+                    if (uid != null) permissionService.effectivePermissionCodes(uid.longValue()).stream()
+                            .map(SimpleGrantedAuthority::new).forEach(authorities::add);
                     UsernamePasswordAuthenticationToken auth =
                             new UsernamePasswordAuthenticationToken(username, null, authorities);
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

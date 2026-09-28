@@ -3,10 +3,13 @@ package com.wanyuecity.energy.system.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wanyuecity.energy.core.ApiResponse;
 import com.wanyuecity.energy.system.service.SysUserService;
+import com.wanyuecity.energy.system.service.PermissionService;
 import com.wanyuecity.energy.system.service.dto.SysUserPasswordRequest;
 import com.wanyuecity.energy.system.service.dto.SysUserRoleAssignRequest;
 import com.wanyuecity.energy.system.service.dto.SysUserUpsertRequest;
 import com.wanyuecity.energy.system.service.dto.SysUserView;
+import com.wanyuecity.energy.system.service.dto.UserPermissionProfile;
+import com.wanyuecity.energy.system.service.dto.UserPermissionUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 /**
  * User admin endpoints. Distinct from {@link AuthController} which handles login.
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SysUserAdminController {
 
     private final SysUserService userService;
+    private final PermissionService permissionService;
 
     @GetMapping
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -76,5 +81,20 @@ public class SysUserAdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysUserView> assignRoles(@PathVariable Long id, @Valid @RequestBody SysUserRoleAssignRequest req) {
         return ApiResponse.ok(userService.assignRoles(id, req.getRoleIds()));
+    }
+
+    @GetMapping("/{id}/permissions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<UserPermissionProfile> permissions(@PathVariable Long id) {
+        return ApiResponse.ok(permissionService.profile(id));
+    }
+
+    @PutMapping("/{id}/permissions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<UserPermissionProfile> updatePermissions(@PathVariable Long id,
+                                                                 @Valid @RequestBody UserPermissionUpdateRequest req,
+                                                                 Authentication authentication) {
+        return ApiResponse.ok(permissionService.replaceOverrides(id, req,
+                authentication == null ? null : authentication.getName()));
     }
 }

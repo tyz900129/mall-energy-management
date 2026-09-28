@@ -42,6 +42,9 @@ public class MigrationService {
     private static final Set<String> COUNT_TABLES = Set.of(
             "sys_user", "platform_merchant_account", "stall", "platform_device",
             "stall_device_binding", "workflow", "field_verification_task", "attachment",
+            "construction_workflow_detail", "construction_inspection", "construction_acceptance",
+            "inspection_type", "inspection_template", "inspection_plan", "inspection_plan_target", "inspection_task", "inspection_issue", "inspection_reminder_log",
+            "inspection_equipment_category", "inspection_equipment", "inspection_category_template",
             "energy_usage_monthly", "energy_usage_daily", "energy_utility_bill");
 
     private final DataSourceProperties dataSourceProperties;

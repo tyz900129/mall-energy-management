@@ -1,4 +1,4 @@
-CREATE TABLE device_group (
+CREATE TABLE IF NOT EXISTS device_group (
   id           BIGINT PRIMARY KEY AUTO_INCREMENT,
   group_name   VARCHAR(100) NOT NULL,
   color        VARCHAR(16) NOT NULL DEFAULT '#409EFF',
@@ -9,7 +9,7 @@ CREATE TABLE device_group (
   UNIQUE KEY uk_device_group_name (group_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE device_group_assignment (
+CREATE TABLE IF NOT EXISTS device_group_assignment (
   platform_device_id VARCHAR(64) PRIMARY KEY,
   group_id           BIGINT NOT NULL,
   assigned_by        BIGINT,
@@ -19,7 +19,7 @@ CREATE TABLE device_group_assignment (
   CONSTRAINT fk_dga_group FOREIGN KEY (group_id) REFERENCES device_group(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE device_energy_metric (
+CREATE TABLE IF NOT EXISTS device_energy_metric (
   id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
   product_id         VARCHAR(64) NOT NULL,
   energy_type        VARCHAR(16) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE device_energy_metric (
   UNIQUE KEY uk_dem_product_energy (product_id, energy_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE energy_usage_sync_batch (
+CREATE TABLE IF NOT EXISTS energy_usage_sync_batch (
   id             BIGINT PRIMARY KEY AUTO_INCREMENT,
   batch_no       VARCHAR(32) NOT NULL,
   start_date     DATE NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE energy_usage_sync_batch (
   KEY idx_eusb_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE energy_usage_daily (
+CREATE TABLE IF NOT EXISTS energy_usage_daily (
   id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
   platform_device_id VARCHAR(64) NOT NULL,
   usage_date         DATE NOT NULL,

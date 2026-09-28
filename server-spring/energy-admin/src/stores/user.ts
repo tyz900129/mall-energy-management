@@ -39,5 +39,9 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('device_login_token')
   }
 
-  return { token, user, login, autoLogin, fetchMe, logout }
+  function hasPermission(code: string) {
+    return !!user.value?.permissions?.includes(code)
+  }
+
+  return { token, user, login, autoLogin, fetchMe, logout, hasPermission }
 })

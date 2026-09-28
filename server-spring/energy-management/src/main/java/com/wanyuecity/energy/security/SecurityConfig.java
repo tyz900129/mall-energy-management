@@ -77,6 +77,9 @@ public class SecurityConfig {
                                 "/actuator/info",
                                 "/files/**"
                                 ,"/api/v1/verification/tasks/**"
+                                ,"/api/v1/construction-public/**"
+                                ,"/api/v1/inspections/public-qr/**"
+                                ,"/api/v1/inspection-equipment/public-qr/**"
                                 ,"/api/v1/system/migration/exports/*/download"
                         ).permitAll()
                         .requestMatchers("/error").permitAll()

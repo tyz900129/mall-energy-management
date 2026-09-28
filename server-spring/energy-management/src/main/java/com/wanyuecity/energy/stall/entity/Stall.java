@@ -27,7 +27,7 @@ public class Stall {
     private String businessType;
     private String businessCategory;
 
-    /** AVAILABLE / OCCUPIED / MAINTENANCE / DECOMMISSIONED */
+    /** AVAILABLE / RENOVATING / EXIT_CONSTRUCTION / OCCUPIED / MAINTENANCE / DECOMMISSIONED */
     private String status;
 
     /** Denormalized "who is in this stall right now" pointer. NULL = empty. */

@@ -6,7 +6,9 @@ export interface UserInfo {
   username: string
   displayName?: string
   email?: string
+  phone?: string
   roles: string[]
+  permissions: string[]
 }
 export interface LoginResponse {
   token: string

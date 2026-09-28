@@ -8,6 +8,12 @@ export interface SystemUser {
 export interface SystemUserPayload {
   username: string; displayName?: string; email?: string; phone?: string; status: number; password?: string; roleIds?: number[]
 }
+export interface PermissionItem { id:number; code:string; name:string; actionType:'VIEW'|'EDIT'|'MANAGE'|'DANGER'; description?:string }
+export interface PermissionModule { code:string; name:string; permissions:PermissionItem[] }
+export interface UserPermissionOverride { permissionCode:string; effect:'ALLOW'|'DENY'; expiresAt?:string; reason?:string }
+export interface UserPermissionProfile {
+  userId:number; username:string; modules:PermissionModule[]; rolePermissionCodes:string[]; effectivePermissionCodes:string[]; overrides:UserPermissionOverride[]
+}
 
 export const systemUserApi = {
   page: (params: { keyword?: string; status?: number; pageNum?: number; pageSize?: number }) =>
@@ -16,7 +22,9 @@ export const systemUserApi = {
   update: (id: number, data: SystemUserPayload) => http.put<SystemUser>(`/api/v1/users/${id}`, data),
   remove: (id: number) => http.delete(`/api/v1/users/${id}`),
   resetPassword: (id: number, newPassword: string) => http.put(`/api/v1/users/${id}/password`, { newPassword }),
-  assignRoles: (id: number, roleIds: number[]) => http.put<SystemUser>(`/api/v1/users/${id}/roles`, { roleIds })
+  assignRoles: (id: number, roleIds: number[]) => http.put<SystemUser>(`/api/v1/users/${id}/roles`, { roleIds }),
+  permissions: (id:number) => http.get<UserPermissionProfile>(`/api/v1/users/${id}/permissions`),
+  updatePermissions: (id:number, overrides:UserPermissionOverride[]) => http.put<UserPermissionProfile>(`/api/v1/users/${id}/permissions`, { overrides })
 }
 export const systemRoleApi = { list: () => http.get<SystemRole[]>('/api/v1/roles') }
 

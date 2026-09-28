@@ -35,7 +35,7 @@ public class StallExcelService {
   }catch(Exception ex){throw BizException.badRequest("Excel读取失败："+rootMessage(ex));}return new StallImportResult(ok,errors.size(),errors.size()>100?errors.subList(0,100):errors);
  }
  private static void set(Row r,int i,String v){r.createCell(i).setCellValue(v==null?"":v);}private static String text(Row r,int i,DataFormatter f){Cell c=r.getCell(i);return c==null?"":f.formatCellValue(c).trim();}
- private static String statusValue(String s){return switch(s){case "","空置","AVAILABLE"->"AVAILABLE";case "在用","OCCUPIED"->"OCCUPIED";case "维护","MAINTENANCE"->"MAINTENANCE";case "停用","DECOMMISSIONED"->"DECOMMISSIONED";default->s;};}
- private static String statusLabel(String s){return switch(s==null?"":s){case "AVAILABLE"->"空置";case "OCCUPIED"->"在用";case "MAINTENANCE"->"维护";case "DECOMMISSIONED"->"停用";default->s;};}
+ private static String statusValue(String s){return switch(s){case "","空置","AVAILABLE"->"AVAILABLE";case "装修中","RENOVATING"->"RENOVATING";case "撤场施工中","EXIT_CONSTRUCTION"->"EXIT_CONSTRUCTION";case "在用","OCCUPIED"->"OCCUPIED";case "维护","MAINTENANCE"->"MAINTENANCE";case "停用","DECOMMISSIONED"->"DECOMMISSIONED";default->s;};}
+ private static String statusLabel(String s){return switch(s==null?"":s){case "AVAILABLE"->"空置";case "RENOVATING"->"装修中";case "EXIT_CONSTRUCTION"->"撤场施工中";case "OCCUPIED"->"在用";case "MAINTENANCE"->"维护";case "DECOMMISSIONED"->"停用";default->s;};}
  private static String rootMessage(Throwable e){Throwable x=e;while(x.getCause()!=null)x=x.getCause();return x.getMessage()==null?x.getClass().getSimpleName():x.getMessage();}
 }

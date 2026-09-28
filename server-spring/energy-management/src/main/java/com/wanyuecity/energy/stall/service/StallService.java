@@ -24,7 +24,7 @@ import java.util.List;
 public class StallService {
 
     private static final List<String> ALLOWED_STATUS = List.of(
-            "AVAILABLE", "OCCUPIED", "MAINTENANCE", "DECOMMISSIONED");
+            "AVAILABLE", "RENOVATING", "EXIT_CONSTRUCTION", "OCCUPIED", "MAINTENANCE", "DECOMMISSIONED");
 
     private final StallMapper stallMapper;
     private final MerchantMapper merchantMapper;

@@ -7,68 +7,64 @@
         <span v-if="!collapsed">万悦城后勤管理系统</span>
       </div>
       <el-menu class="side-menu" :default-active="route.path" router :collapse="!isMobile && collapsed" background-color="#001529" text-color="#c9d1d9" active-text-color="#409EFF" @select="onMenuSelect">
-        <el-menu-item v-if="canGeneral" index="/dashboard">
+        <el-menu-item v-if="can('dashboard.view')" index="/dashboard">
           <el-icon><Odometer /></el-icon>
           <template #title>工作台</template>
         </el-menu-item>
-        <el-sub-menu v-if="canWorkflow" index="/workflow">
-          <template #title><el-icon><Tickets /></el-icon><span>流程中心</span></template>
-          <el-menu-item index="/workflow">全部流程</el-menu-item>
-          <el-menu-item v-if="canApply" index="/workflow/new-merchant">水电费变更</el-menu-item>
-          <el-menu-item v-if="canApply" index="/workflow/merchant-query">商户账户查询</el-menu-item>
+        <el-sub-menu v-if="hasAny('workflow.view','workflow.create','construction.view','construction.create','construction.inspection.config.view','merchant.query')" index="business-workflow">
+          <template #title><el-icon><Tickets /></el-icon><span>业务流程</span></template>
+          <el-menu-item v-if="can('workflow.view')" index="/workflow">全部流程</el-menu-item>
+          <el-menu-item v-if="can('workflow.create')" index="/workflow/new-merchant">水电费变更</el-menu-item>
+          <el-menu-item v-if="can('construction.view')" index="/construction">商户施工流程</el-menu-item>
+          <el-menu-item v-if="can('construction.create')" index="/construction/new">发起施工申请</el-menu-item>
+          <el-menu-item v-if="can('construction.inspection.config.view')" index="/construction/inspection-config">施工巡检配置</el-menu-item>
+          <el-menu-item v-if="can('merchant.query')" index="/workflow/merchant-query">商户账户查询</el-menu-item>
         </el-sub-menu>
-        <el-sub-menu v-if="canPowerTopology" index="/facility-topology">
-          <template #title><el-icon><Share /></el-icon><span>机电拓扑管理</span></template>
-          <el-menu-item index="/power/topology">配电拓扑管理</el-menu-item>
-          <el-menu-item index="/facility/water-supply">供水拓扑管理</el-menu-item>
-          <el-menu-item index="/facility/drainage">排水拓扑管理</el-menu-item>
-          <el-menu-item index="/facility/oil-exhaust">排油烟拓扑管理</el-menu-item>
-          <el-menu-item index="/facility/fresh-air">补风机拓扑管理</el-menu-item>
+        <el-sub-menu v-if="hasAny('merchant.menu','stall.menu','metering.menu')" index="business-master-data">
+          <template #title><el-icon><OfficeBuilding /></el-icon><span>经营基础资料</span></template>
+          <el-menu-item v-if="can('merchant.menu')" index="/merchant">商户账户管理</el-menu-item>
+          <el-menu-item v-if="can('stall.menu')" index="/stall">铺位管理</el-menu-item>
+          <el-menu-item v-if="can('metering.menu')" index="/stall-device">计量设备绑定</el-menu-item>
         </el-sub-menu>
-        <el-sub-menu v-if="canUsageMenu" index="/energy">
-          <template #title><el-icon><DataAnalysis /></el-icon><span>用量管理</span></template>
-          <el-menu-item v-if="canGeneral" index="/energy/devices">设备分析维度</el-menu-item>
-          <el-menu-item v-if="canGeneral" index="/energy/sync">历史用量同步</el-menu-item>
-          <el-menu-item v-if="canGeneral" index="/energy/bills">水电账单录入</el-menu-item>
-          <el-menu-item index="/energy/dashboard">数据大屏</el-menu-item>
-          <el-menu-item v-if="canGeneral" index="/energy/analysis">用量分析</el-menu-item>
+        <el-sub-menu v-if="hasAny('energy.dashboard.view','energy.analysis.view','energy.dimension.view','energy.sync.view','energy.bill.view')" index="energy-management">
+          <template #title><el-icon><DataAnalysis /></el-icon><span>能源管理</span></template>
+          <el-menu-item v-if="can('energy.dashboard.view')" index="/energy/dashboard">数据大屏</el-menu-item>
+          <el-menu-item v-if="can('energy.analysis.view')" index="/energy/analysis">用量分析</el-menu-item>
+          <el-menu-item v-if="can('energy.dimension.view')" index="/energy/devices">设备分析维度</el-menu-item>
+          <el-menu-item v-if="can('energy.sync.view')" index="/energy/sync">历史用量同步</el-menu-item>
+          <el-menu-item v-if="can('energy.bill.view')" index="/energy/bills">水电账单录入</el-menu-item>
         </el-sub-menu>
-        <el-sub-menu v-if="canPlatform" index="/platform">
-          <template #title>
-            <el-icon><Connection /></el-icon>
-            <span>源平台</span>
-          </template>
-          <el-menu-item index="/platform/config">源平台配置</el-menu-item>
-          <el-menu-item index="/platform/sync">同步日志</el-menu-item>
-          <el-menu-item index="/platform/sync/log">同步日志详情</el-menu-item>
+        <el-sub-menu v-if="hasAny('facility.power.view','facility.water.view','facility.drainage.view','facility.exhaust.view','facility.fresh_air.view')" index="facility-equipment">
+          <template #title><el-icon><Share /></el-icon><span>设施设备</span></template>
+          <el-menu-item v-if="can('facility.power.view')" index="/power/topology">配电拓扑管理</el-menu-item>
+          <el-menu-item v-if="can('facility.water.view')" index="/facility/water-supply">供水拓扑管理</el-menu-item>
+          <el-menu-item v-if="can('facility.drainage.view')" index="/facility/drainage">排水拓扑管理</el-menu-item>
+          <el-menu-item v-if="can('facility.exhaust.view')" index="/facility/oil-exhaust">排油烟拓扑管理</el-menu-item>
+          <el-menu-item v-if="can('facility.fresh_air.view')" index="/facility/fresh-air">补风机拓扑管理</el-menu-item>
         </el-sub-menu>
-        <el-menu-item v-if="canGeneral" index="/exception">
-          <el-icon><Warning /></el-icon>
-          <template #title>异常中心</template>
-        </el-menu-item>
-        <el-menu-item v-if="canMerchant" index="/merchant">
-          <el-icon><OfficeBuilding /></el-icon>
-          <template #title>商户账户管理</template>
-        </el-menu-item>
-        <el-menu-item v-if="canGeneral" index="/stall">
-          <el-icon><Grid /></el-icon>
-          <template #title>铺位管理</template>
-        </el-menu-item>
-        <el-menu-item v-if="isAdmin" index="/stall-device">
-          <el-icon><Link /></el-icon>
-          <template #title>设备绑定</template>
-        </el-menu-item>
-        <el-menu-item v-if="isSuperAdmin" index="/system/user">
-          <el-icon><User /></el-icon>
-          <template #title>用户管理</template>
-        </el-menu-item>
-        <el-menu-item v-if="isAdmin" index="/system/dictionary"><el-icon><List /></el-icon><template #title>基础字典</template></el-menu-item>
-        <el-menu-item v-if="isAdmin" index="/system/webhook">
-          <el-icon><Bell /></el-icon>
-          <template #title>Webhook 通知</template>
-        </el-menu-item>
-        <el-menu-item v-if="canAudit" index="/system/audit"><el-icon><DocumentChecked /></el-icon><template #title>操作审计</template></el-menu-item>
-        <el-menu-item v-if="isSuperAdmin" index="/system/migration"><el-icon><Switch /></el-icon><template #title>数据迁移</template></el-menu-item>
+        <el-sub-menu v-if="hasAny('exception.view','inspection.dashboard.view','inspection.task.view','inspection.issue.manage','inspection.plan.manage','inspection.equipment.view','inspection.category.manage')" index="operations-management">
+          <template #title><el-icon><Warning /></el-icon><span>运维管理</span></template>
+          <el-menu-item v-if="can('inspection.dashboard.view')" index="/inspection/dashboard">巡检数据大屏</el-menu-item>
+          <el-menu-item v-if="can('inspection.task.view')" index="/inspection/tasks">巡检任务</el-menu-item>
+          <el-menu-item v-if="can('inspection.equipment.view')" index="/inspection/equipment">设施设备台账</el-menu-item>
+          <el-menu-item v-if="can('inspection.category.manage')" index="/inspection/categories">设施设备分类</el-menu-item>
+          <el-menu-item v-if="can('inspection.issue.manage')" index="/inspection/issues">问题与整改</el-menu-item>
+          <el-menu-item v-if="can('inspection.plan.manage')" index="/inspection/config">巡检配置</el-menu-item>
+          <el-menu-item v-if="can('exception.view')" index="/exception">异常中心</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="hasAny('integration.config.view','integration.sync.view')" index="data-integration">
+          <template #title><el-icon><Connection /></el-icon><span>数据与集成</span></template>
+          <el-menu-item v-if="can('integration.config.view')" index="/platform/config">源平台配置</el-menu-item>
+          <el-menu-item v-if="can('integration.sync.view')" index="/platform/sync">数据同步与日志</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="hasAny('system.user.view','system.dictionary.view','system.webhook.view','system.audit.view','system.migration.manage')" index="system-management">
+          <template #title><el-icon><Setting /></el-icon><span>系统管理</span></template>
+          <el-menu-item v-if="can('system.user.view')" index="/system/user">用户与权限</el-menu-item>
+          <el-menu-item v-if="can('system.dictionary.view')" index="/system/dictionary">基础字典</el-menu-item>
+          <el-menu-item v-if="can('system.webhook.view')" index="/system/webhook">Webhook 通知</el-menu-item>
+          <el-menu-item v-if="can('system.audit.view')" index="/system/audit">操作审计</el-menu-item>
+          <el-menu-item v-if="can('system.migration.manage')" index="/system/migration">数据迁移</el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     <el-container class="content-container">
@@ -108,11 +104,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Lightning, Odometer, Connection, OfficeBuilding, Grid, Link, User, UserFilled, Expand, Fold, Warning, Tickets, Bell, DocumentChecked, List, DataAnalysis, Share, Switch
+  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
@@ -122,17 +118,8 @@ const userStore = useUserStore()
 const collapsed = ref(false)
 const isMobile = ref(window.innerWidth <= 768)
 const mobileMenuOpen = ref(false)
-const roles=computed(()=>userStore.user?.roles||[])
-const isSuperAdmin=computed(()=>roles.value.includes('SUPER_ADMIN'))
-const isAdmin=computed(()=>roles.value.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(r)))
-const canApply=computed(()=>isAdmin.value||roles.value.includes('APPLICANT'))
-const canWorkflow=computed(()=>isAdmin.value||roles.value.some(r=>['APPLICANT','DEVICE_VERIFIER','VIEWER'].includes(r)))
-const canMerchant=computed(()=>isAdmin.value||roles.value.some(r=>['DEVICE_VERIFIER','VIEWER'].includes(r)))
-const canGeneral=computed(()=>isAdmin.value||roles.value.includes('VIEWER'))
-const canPowerTopology=computed(()=>canGeneral.value||roles.value.includes('DEVICE_VERIFIER'))
-const canUsageMenu=computed(()=>canGeneral.value||roles.value.includes('DEVICE_VERIFIER'))
-const canPlatform=computed(()=>isAdmin.value||roles.value.includes('VIEWER'))
-const canAudit=computed(()=>isAdmin.value||roles.value.includes('VIEWER'))
+const can=(code:string)=>userStore.hasPermission(code)
+const hasAny=(...codes:string[])=>codes.some(can)
 
 onMounted(async () => {
   window.addEventListener('resize', onResize)

@@ -10,6 +10,8 @@ class WorkflowStateMachineTest {
     @Test void allowsNewMerchantMainPath() {
         assertDoesNotThrow(() -> machine.requireTransition("DRAFT", "FIELD_CHECK_PENDING"));
         assertDoesNotThrow(() -> machine.requireTransition("FIELD_CHECK_PENDING", "FIELD_CHECKING"));
+        assertDoesNotThrow(() -> machine.requireTransition("FIELD_VERIFIED", "WAITING_OA_SUBMISSION"));
+        assertDoesNotThrow(() -> machine.requireTransition("WAITING_OA_SUBMISSION", "WAITING_PLATFORM_CHANGE"));
         assertDoesNotThrow(() -> machine.requireTransition("PLATFORM_VERIFYING", "VERIFIED"));
         assertDoesNotThrow(() -> machine.requireTransition("VERIFIED", "COMPLETED"));
     }

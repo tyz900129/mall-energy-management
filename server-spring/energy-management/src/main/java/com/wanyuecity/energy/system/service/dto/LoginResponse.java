@@ -28,6 +28,8 @@ public class LoginResponse {
         private String username;
         private String displayName;
         private String email;
+        private String phone;
         private List<String> roles;
+        private List<String> permissions;
     }
 }

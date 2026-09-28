@@ -26,3 +26,10 @@ uploads/*
 /server-spring/known_hosts
 /server-spring/*.tar
 /server-spring/*.tar.gz
+
+# 本地工具缓存、构建日志和一次性数据处理成果
+/.codex-tmp/
+/.pnpm-store/
+/desktop-energy-fix/
+/outputs/
+/server-spring/energy-admin/*.log

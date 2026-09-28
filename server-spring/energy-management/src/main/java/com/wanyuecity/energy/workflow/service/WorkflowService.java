@@ -376,6 +376,7 @@ public class WorkflowService {
     @Transactional
     public WorkflowView reset(Long id) {
         Workflow row = require(id);
+        requireBillingWorkflow(row);
         clearRuntimeRecords(id);
         jdbc.update("UPDATE workflow_expected_change SET actual_account_number=NULL,verify_status='PENDING',verified_at=NULL,exception_reason=NULL WHERE workflow_id=?", id);
         jdbc.update("UPDATE workflow SET status='DRAFT',submitted_at=NULL,field_verified_at=NULL,waiting_platform_at=NULL,verified_at=NULL,completed_at=NULL,oa_process_no=NULL,completion_remark=NULL WHERE id=?", id);
@@ -385,7 +386,7 @@ public class WorkflowService {
     /** 超级管理员永久删除：清除流程及全部从属业务记录和核验附件。 */
     @Transactional
     public void permanentDelete(Long id) {
-        require(id);
+        requireBillingWorkflow(require(id));
         clearRuntimeRecords(id);
         jdbc.update("DELETE FROM workflow_expected_change WHERE workflow_id=?", id);
         jdbc.update("DELETE FROM workflow_device WHERE workflow_id=?", id);
@@ -430,7 +431,7 @@ public class WorkflowService {
     }
 
     public Page<WorkflowView> list(String status, String workflowType, String keyword, String applicantScope, int pageNum, int pageSize) {
-        QueryWrapper<Workflow> q = new QueryWrapper<>();
+        QueryWrapper<Workflow> q = new QueryWrapper<Workflow>().notIn("workflow_type", ConstructionWorkflowService.TYPES);
         if (hasText(applicantScope)) q.eq("applicant_name", applicantScope);
         if (hasText(status)) q.eq("status", status.trim()); if (hasText(workflowType)) q.eq("workflow_type", workflowType.trim());
         if (hasText(keyword)) { String k=keyword.trim(); q.and(w -> w.like("workflow_no",k).or().like("merchant_code",k).or().like("merchant_name",k)); }
@@ -439,21 +440,22 @@ public class WorkflowService {
     }
 
     public WorkflowView get(Long id) { return toView(require(id)); }
-    public WorkflowView getAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireOwner(w,username,ownOnly);return toView(w);}
-    @Transactional public WorkflowView submitAccessible(Long id,String username,boolean ownOnly){requireOwner(require(id),username,ownOnly);return submit(id);}
-    @Transactional public WorkflowView cancelAccessible(Long id,String username,boolean ownOnly){requireOwner(require(id),username,ownOnly);return cancel(id);}
-    public List<WorkflowDevice> devicesAccessible(Long id,String username,boolean ownOnly){requireOwner(require(id),username,ownOnly);return devices(id);}
-    public List<WorkflowExpectedChange> changesAccessible(Long id,String username,boolean ownOnly){requireOwner(require(id),username,ownOnly);return expectedChanges(id);}
+    public WorkflowView getAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return toView(w);}
+    @Transactional public WorkflowView submitAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return submit(id);}
+    @Transactional public WorkflowView cancelAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return cancel(id);}
+    public List<WorkflowDevice> devicesAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return devices(id);}
+    public List<WorkflowExpectedChange> changesAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return expectedChanges(id);}
     private void requireOwner(Workflow w,String username,boolean ownOnly){if(ownOnly&&!Objects.equals(w.getApplicantName(),username))throw BizException.forbidden("applicants may only access their own workflows");}
     public List<WorkflowDevice> devices(Long id) { require(id); return workflowDeviceMapper.selectList(new QueryWrapper<WorkflowDevice>().eq("workflow_id",id).orderByAsc("id")); }
     public List<WorkflowExpectedChange> expectedChanges(Long id) { require(id); return expectedChangeMapper.selectList(new QueryWrapper<WorkflowExpectedChange>().eq("workflow_id",id).orderByAsc("id")); }
-    public Map<String,Object> matchEvidence(Long id){require(id);List<Map<String,Object>> runs=jdbc.queryForList("SELECT id,sync_batch_id,match_status,matched_count,total_count,summary,created_at FROM workflow_match_run WHERE workflow_id=? ORDER BY id DESC",id);for(Map<String,Object> r:runs)r.put("details",jdbc.queryForList("SELECT platform_device_id,expected_account_number,actual_account_numbers,match_status,reason FROM workflow_match_detail WHERE match_run_id=? ORDER BY id",r.get("id")));return Map.of("runs",runs,"resolutions",jdbc.queryForList("SELECT action,from_status,to_status,conclusion,operator_name,created_at FROM workflow_match_resolution WHERE workflow_id=? ORDER BY id DESC",id));}
-    @Transactional public WorkflowView resolveMatch(Long id,MatchResolutionRequest req,String operator){Workflow w=require(id);if(!Set.of("PARTIAL_MATCH","EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("workflow is not awaiting exception resolution");String action=req.getAction().trim().toUpperCase(),from=w.getStatus(),to;if("RETRY".equals(action))to="WAITING_PLATFORM_CHANGE";else if("CLOSE_EXCEPTION".equals(action)){if(!hasText(req.getConclusion()))throw BizException.badRequest("conclusion is required");to="RESOLVED_EXCEPTION";w.setCompletedAt(LocalDateTime.now());}else throw BizException.badRequest("invalid resolution action");w.setStatus(to);workflowMapper.updateById(w);jdbc.update("INSERT INTO workflow_match_resolution(workflow_id,action,from_status,to_status,conclusion,operator_name) VALUES(?,?,?,?,?,?)",id,action,from,to,hasText(req.getConclusion())?req.getConclusion().trim():null,operator==null?"system":operator);return get(id);}
-    @Transactional public WorkflowView updateOaProcessNo(Long id,String value){Workflow w=requirePlatformInfoEditable(id);w.setOaProcessNo(trimToNull(value,100));workflowMapper.updateById(w);return get(id);}
+    public Map<String,Object> matchEvidence(Long id){Workflow w=require(id);requireBillingWorkflow(w);List<Map<String,Object>> runs=jdbc.queryForList("SELECT id,sync_batch_id,match_status,matched_count,total_count,summary,created_at FROM workflow_match_run WHERE workflow_id=? ORDER BY id DESC",id);for(Map<String,Object> r:runs)r.put("details",jdbc.queryForList("SELECT platform_device_id,expected_account_number,actual_account_numbers,match_status,reason FROM workflow_match_detail WHERE match_run_id=? ORDER BY id",r.get("id")));return Map.of("runs",runs,"resolutions",jdbc.queryForList("SELECT action,from_status,to_status,conclusion,operator_name,created_at FROM workflow_match_resolution WHERE workflow_id=? ORDER BY id DESC",id));}
+    @Transactional public WorkflowView resolveMatch(Long id,MatchResolutionRequest req,String operator){Workflow w=require(id);requireBillingWorkflow(w);if(!Set.of("PARTIAL_MATCH","EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("workflow is not awaiting exception resolution");String action=req.getAction().trim().toUpperCase(),from=w.getStatus(),to;if("RETRY".equals(action))to="WAITING_PLATFORM_CHANGE";else if("CLOSE_EXCEPTION".equals(action)){if(!hasText(req.getConclusion()))throw BizException.badRequest("conclusion is required");to="RESOLVED_EXCEPTION";w.setCompletedAt(LocalDateTime.now());}else throw BizException.badRequest("invalid resolution action");w.setStatus(to);workflowMapper.updateById(w);jdbc.update("INSERT INTO workflow_match_resolution(workflow_id,action,from_status,to_status,conclusion,operator_name) VALUES(?,?,?,?,?,?)",id,action,from,to,hasText(req.getConclusion())?req.getConclusion().trim():null,operator==null?"system":operator);return get(id);}
+    @Transactional public WorkflowView updateOaProcessNo(Long id,String value){Workflow w=requirePlatformInfoEditable(id);String oa=trimToNull(value,100);w.setOaProcessNo(oa);if(hasText(oa)&&"WAITING_OA_SUBMISSION".equals(w.getStatus())){stateMachine.requireTransition("WAITING_OA_SUBMISSION","WAITING_PLATFORM_CHANGE");w.setStatus("WAITING_PLATFORM_CHANGE");w.setWaitingPlatformAt(LocalDateTime.now());}else if(!hasText(oa)&&"WAITING_PLATFORM_CHANGE".equals(w.getStatus())){w.setStatus("WAITING_OA_SUBMISSION");w.setWaitingPlatformAt(null);}workflowMapper.updateById(w);return get(id);}
     @Transactional public WorkflowView updateCompletionRemark(Long id,String value){Workflow w=requirePlatformInfoEditable(id);w.setCompletionRemark(trimToNull(value,1000));workflowMapper.updateById(w);return get(id);}
-    private Workflow requirePlatformInfoEditable(Long id){Workflow w=require(id);if(!Set.of("WAITING_PLATFORM_CHANGE","PLATFORM_VERIFYING","PARTIAL_MATCH","EXCEPTION","VERIFIED","COMPLETED","RESOLVED_EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("仅平台处理阶段或已完成流程可以维护 OA 信息");return w;}
+    private Workflow requirePlatformInfoEditable(Long id){Workflow w=require(id);requireBillingWorkflow(w);if(!Set.of("WAITING_OA_SUBMISSION","WAITING_PLATFORM_CHANGE","PLATFORM_VERIFYING","PARTIAL_MATCH","EXCEPTION","VERIFIED","COMPLETED","RESOLVED_EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("仅待 OA 提交、平台处理阶段或已完成流程可以维护 OA 信息");return w;}
     private String trimToNull(String value,int max){if(value==null||value.isBlank())return null;String v=value.trim();if(v.length()>max)throw BizException.badRequest("填写内容不能超过"+max+"个字符");return v;}
     private Workflow require(Long id) { Workflow row=workflowMapper.selectById(id); if(row==null) throw BizException.notFound("workflow not found: id="+id); return row; }
+    private void requireBillingWorkflow(Workflow row){if(row.getWorkflowType()!=null&&ConstructionWorkflowService.TYPES.contains(row.getWorkflowType()))throw BizException.badRequest("请从商户施工流程入口操作该流程");}
     private WorkflowView toView(Workflow row) { WorkflowView v=new WorkflowView();
         v.setId(row.getId());v.setWorkflowNo(row.getWorkflowNo());v.setWorkflowType(row.getWorkflowType());v.setMerchantCode(row.getMerchantCode());v.setMerchantName(row.getMerchantName());v.setContactName(row.getContactName());v.setContactPhone(row.getContactPhone());v.setStallId(row.getStallId());
         Stall s=stallMapper.selectById(row.getStallId()); if(s!=null){v.setStallCode(s.getStallCode());v.setStallName(s.getStallName());v.setFloorCode(s.getFloorCode());v.setFloorName(s.getFloorName());v.setStallBusinessType(s.getBusinessType());v.setStallBusinessCategory(s.getBusinessCategory());}
