@@ -1,0 +1,43 @@
+import http from './http'
+
+const base = '/api/v1/access-control'
+
+export const accessControlApi = {
+  dashboard: () => http.get(`${base}/dashboard`),
+  points: () => http.get(`${base}/points`),
+  savePoint: (data: any) => data.id ? http.put(`${base}/points/${data.id}`, data) : http.post(`${base}/points`, data),
+  devices: () => http.get(`${base}/devices`),
+  probeDevice: (data: any) => http.post(`${base}/devices/probe`, data),
+  discoverDevice: (id: number) => http.post(`${base}/devices/${id}/discover`),
+  setDeviceWriteMode: (id: number, enabled: boolean) => http.post(`${base}/devices/${id}/write-mode`, { enabled }),
+  startPersonScan: () => http.post(`${base}/person-scans`),
+  latestPersonScan: () => http.get(`${base}/person-scans/latest`),
+  importLatestPersonScan: () => http.post(`${base}/person-scans/latest/import`),
+  startCardScan: () => http.post(`${base}/card-scans`),
+  latestCardScan: () => http.get(`${base}/card-scans/latest`),
+  saveDevice: (data: any) => data.id ? http.put(`${base}/devices/${data.id}`, data) : http.post(`${base}/devices`, data),
+  persons: (params: any = {}) => http.get(`${base}/persons`, { params }),
+  person: (id: number) => http.get(`${base}/persons/${id}`),
+  personFace: (id: number) => http.get(`${base}/persons/${id}/face`),
+  savePerson: (data: any) => data.id ? http.put(`${base}/persons/${data.id}`, data) : http.post(`${base}/persons`, data),
+  self: () => http.get(`${base}/self`),
+  updateSelf: (data: any) => http.put(`${base}/self`, data),
+  claimSelf: (data: any) => http.post(`${base}/self/claim`, data),
+  visitors: () => http.get(`${base}/visitors`),
+  visitor: (id: number) => http.get(`${base}/visitors/${id}`),
+  myVisitors: () => http.get(`${base}/visitors/mine`),
+  createVisitor: (data: any) => http.post(`${base}/visitors`, data),
+  uploadVisitorPhoto: (id:number, photoType:string, file:File) => { const data=new FormData();data.append('photoType',photoType);data.append('file',file);return http.post(`${base}/visitors/${id}/attachments`,data,{headers:{'Content-Type':'multipart/form-data'}}) },
+  visitorPhoto: (id:number, attachmentId:number) => http.get(`${base}/visitors/${id}/attachments/${attachmentId}`, { responseType:'blob' }),
+  decideVisitor: (id: number, data: any) => http.post(`${base}/visitors/${id}/decision`, data),
+  revokeVisitor: (id: number, reason: string) => http.post(`${base}/visitors/${id}/revoke`, { reason }),
+  renewals: () => http.get(`${base}/renewals`),
+  myRenewals: () => http.get(`${base}/renewals/mine`),
+  requestRenewal: () => http.post(`${base}/renewals/mine`),
+  decideRenewal: (id:number, data:any) => http.post(`${base}/renewals/${id}/decision`, data),
+  events: () => http.get(`${base}/events`),
+  myEvents: () => http.get(`${base}/events/mine`),
+  reviews: () => http.get(`${base}/reviews`),
+  generateReviews: (inactivityDays: number) => http.post(`${base}/reviews/generate`, null, { params: { inactivityDays } }),
+  decideReview: (id: number, data: any) => http.post(`${base}/reviews/${id}/decision`, data)
+}

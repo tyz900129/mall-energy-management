@@ -17,6 +17,28 @@ public class RequestPermissionResolver {
         if (!path.startsWith("/api/v1/")) return null;
 
         if (path.startsWith("/api/v1/dashboard")) return view("dashboard.view");
+        if (path.startsWith("/api/v1/access-control")) {
+            if (path.contains("/person-scans") || path.contains("/card-scans")) return manage("access.sync.import");
+            if (path.endsWith("/write-mode")) return admin("access.sync.write");
+            if (path.endsWith("/dashboard")) return view("access.dashboard.view");
+            if (path.endsWith("/self/claim")) return new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (path.endsWith("/self")) return read
+                    ? new Rule("access.self.view", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"))
+                    : new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (path.contains("/events/mine")) return new Rule("access.event.view.self", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (path.contains("/events")) return view("access.event.view.all");
+            if (path.contains("/visitors/mine")) return new Rule("visitor.view.own", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (path.contains("/renewals/mine")) return read ? new Rule("access.self.view", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER")) : new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (path.contains("/renewals")) return manage("visitor.approve");
+            if (path.contains("/visitors/") && path.contains("/attachments")) return read ? new Rule("visitor.view.own", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER")) : new Rule("visitor.create", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT"));
+            if (path.matches(".*/visitors/[^/]+/decision$")) return manage("visitor.approve");
+            if (path.matches(".*/visitors/[^/]+/revoke$")) return admin("access.person.revoke");
+            if (path.endsWith("/visitors") && !read) return new Rule("visitor.create", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT"));
+            if (path.contains("/visitors")) return view("visitor.view.all");
+            if (path.contains("/reviews")) return read ? manage("access.person.review") : manage("access.person.review");
+            if (path.contains("/persons")) return read ? view("access.person.view") : manage("access.person.manage");
+            if (path.contains("/devices") || path.contains("/points")) return read ? view("access.device.view") : manage("access.device.manage");
+        }
         if (path.startsWith("/api/v1/construction-inspection-templates"))
             return read ? new Rule("construction.inspection.config.view", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER"))
                     : manage("construction.inspection.config.manage");

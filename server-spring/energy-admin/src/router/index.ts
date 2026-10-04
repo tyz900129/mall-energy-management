@@ -5,6 +5,7 @@ const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
   { path: '/verify/:token', name: 'MobileVerification', component: () => import('@/views/MobileVerification.vue'), meta: { public: true, title: '现场设备核验' } },
   { path: '/construction-public/:token', name: 'ConstructionPublic', component: () => import('@/views/ConstructionPublic.vue'), meta: { public: true, title: '施工许可证与现场巡检' } },
+  { path: '/access/visitor-apply', name: 'VisitorApply', component: () => import('@/views/VisitorApply.vue'), meta: { public: true, title: '访客门禁申请' } },
   {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
@@ -41,6 +42,13 @@ const routes = [
       { path: 'inspection/equipment', name: 'InspectionEquipment', component: () => import('@/views/InspectionEquipment.vue'), meta: { title: '设施设备台账', permission:'inspection.equipment.view' } },
       { path: 'inspection/categories', name: 'InspectionCategories', component: () => import('@/views/InspectionCategories.vue'), meta: { title: '设施设备分类', permission:'inspection.category.manage' } },
       { path: 'inspection/equipment/:token', name: 'InspectionEquipmentScan', component: () => import('@/views/InspectionEquipmentScan.vue'), meta: { title: '扫码巡检', permission:'inspection.equipment.view' } },
+      { path: 'access/dashboard', name: 'AccessDashboard', component: () => import('@/views/AccessControl.vue'), props: { section: 'dashboard' }, meta: { title: '门禁数据概览', permission:'access.dashboard.view' } },
+      { path: 'access/self', name: 'AccessSelf', component: () => import('@/views/AccessControl.vue'), props: { section: 'self' }, meta: { title: '我的门禁', permission:'access.self.view' } },
+      { path: 'access/devices', name: 'AccessDevices', component: () => import('@/views/AccessControl.vue'), props: { section: 'devices' }, meta: { title: '门禁设备', permission:'access.device.view' } },
+      { path: 'access/persons', name: 'AccessPersons', component: () => import('@/views/AccessControl.vue'), props: { section: 'persons' }, meta: { title: '长期人员', permission:'access.person.view' } },
+      { path: 'access/visitors', name: 'AccessVisitors', component: () => import('@/views/AccessControl.vue'), props: { section: 'visitors' }, meta: { title: '访客预约', permission:'visitor.view.own' } },
+      { path: 'access/events', name: 'AccessEvents', component: () => import('@/views/AccessControl.vue'), props: { section: 'events' }, meta: { title: '通行记录', permission:'access.event.view.self' } },
+      { path: 'access/reviews', name: 'AccessReviews', component: () => import('@/views/AccessControl.vue'), props: { section: 'reviews' }, meta: { title: '人员复核', permission:'access.person.review' } },
       { path: 'merchant', name: 'Merchant', component: () => import('@/views/Merchant.vue'), meta: { title: '商户账户管理', permission:'merchant.menu' } },
       { path: 'stall', name: 'Stall', component: () => import('@/views/Stall.vue'), meta: { title: '铺位管理', permission:'stall.menu' } },
       { path: 'stall/:id/engineering', name: 'StallEngineering', component: () => import('@/views/StallEngineering.vue'), meta: { title: '铺位工程资料', permission:'stall.engineering.view' } },
@@ -72,7 +80,7 @@ router.beforeEach(async (to, _from, next) => {
   try { await userStore.fetchMe() } catch { userStore.logout(); return next({ name: 'Login' }) }
   const permission=to.meta.permission as string|undefined
   if(permission&&!userStore.hasPermission(permission)){
-    const fallback=userStore.hasPermission('dashboard.view')?'/dashboard':userStore.hasPermission('workflow.view')?'/workflow':userStore.hasPermission('construction.view')?'/construction':userStore.hasPermission('merchant.query')?'/workflow/merchant-query':'/login'
+    const fallback=userStore.hasPermission('dashboard.view')?'/dashboard':userStore.hasPermission('access.self.view')?'/access/self':userStore.hasPermission('workflow.view')?'/workflow':userStore.hasPermission('construction.view')?'/construction':userStore.hasPermission('merchant.query')?'/workflow/merchant-query':'/login'
     return next(fallback)
   }
   next()

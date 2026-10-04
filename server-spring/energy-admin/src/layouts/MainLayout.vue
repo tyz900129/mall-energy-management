@@ -52,6 +52,16 @@
           <el-menu-item v-if="can('inspection.plan.manage')" index="/inspection/config">巡检配置</el-menu-item>
           <el-menu-item v-if="can('exception.view')" index="/exception">异常中心</el-menu-item>
         </el-sub-menu>
+        <el-sub-menu v-if="hasAny('access.dashboard.view','access.self.view','access.device.view','access.person.view','visitor.view.own','visitor.view.all','visitor.create','visitor.approve','access.event.view.self','access.event.view.all','access.person.review')" index="access-management">
+          <template #title><el-icon><Key /></el-icon><span>门禁与访客</span></template>
+          <el-menu-item v-if="can('access.dashboard.view')" index="/access/dashboard">数据概览</el-menu-item>
+          <el-menu-item v-if="can('access.self.view')" index="/access/self">我的门禁</el-menu-item>
+          <el-menu-item v-if="can('access.device.view')" index="/access/devices">门禁点与设备</el-menu-item>
+          <el-menu-item v-if="can('access.person.view')" index="/access/persons">长期人员</el-menu-item>
+          <el-menu-item v-if="hasAny('visitor.view.own','visitor.view.all','visitor.create','visitor.approve')" index="/access/visitors">访客预约</el-menu-item>
+          <el-menu-item v-if="hasAny('access.event.view.self','access.event.view.all')" index="/access/events">通行记录</el-menu-item>
+          <el-menu-item v-if="can('access.person.review')" index="/access/reviews">人员复核</el-menu-item>
+        </el-sub-menu>
         <el-sub-menu v-if="hasAny('integration.config.view','integration.sync.view')" index="data-integration">
           <template #title><el-icon><Connection /></el-icon><span>数据与集成</span></template>
           <el-menu-item v-if="can('integration.config.view')" index="/platform/config">源平台配置</el-menu-item>
@@ -108,7 +118,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting
+  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting, Key
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 

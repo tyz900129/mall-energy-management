@@ -1,0 +1,20 @@
+[Unit]
+Description=Wanyue City Logistics Management Backend
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=admin
+Group=Users
+WorkingDirectory=/home/admin/energy-deploy
+Environment=LOG_DIR=/home/admin/energy-deploy/logs
+Environment=ENERGY_UPLOAD_BASE=/home/admin/energy-management-uploads
+ExecStart=/home/admin/energy-deploy/systemd-start-energy.sh
+SuccessExitStatus=143
+Restart=always
+RestartSec=10
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

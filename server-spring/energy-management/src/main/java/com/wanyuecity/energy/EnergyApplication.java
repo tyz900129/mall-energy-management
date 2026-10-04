@@ -7,6 +7,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * Application entry. Extends SpringBootServletInitializer so the war can be
@@ -16,6 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @MapperScan("com.wanyuecity.energy.**.mapper")
 @EnableCaching
 @EnableScheduling
+@EnableAsync
 public class EnergyApplication extends SpringBootServletInitializer {
 
     @Override
