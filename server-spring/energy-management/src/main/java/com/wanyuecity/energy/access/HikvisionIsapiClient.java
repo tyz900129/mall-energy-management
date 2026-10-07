@@ -119,6 +119,28 @@ public class HikvisionIsapiClient {
         try{String body=json.writeValueAsString(Map.of("UserInfoSearchCond",Map.of("searchID",UUID.randomUUID().toString(),"searchResultPosition",0,"maxResults",10,"EmployeeNoList",List.of(Map.of("employeeNo",employeeNo)))));JsonNode users=json.readTree(execute(ip,port,username,password,"POST","/ISAPI/AccessControl/UserInfo/Search?format=json",body,"application/json")).path("UserInfoSearch").path("UserInfo");if(users.isArray())for(JsonNode user:users)if(employeeNo.equals(user.path("employeeNo").asText()))return !requireFace||user.path("numOfFace").asInt(0)>0;return false;}catch(Exception ex){throw BizException.badRequest("设备人员校验失败");}
     }
 
+    public FaceQualityResult checkFaceQuality(String ip,int port,String username,String password,byte[]faceImage){
+        String employeeNo="QC"+System.currentTimeMillis()+UUID.randomUUID().toString().replace("-","").substring(0,4);
+        String step="创建临时人员";
+        try{
+            LocalDateTime from=LocalDateTime.now(),to=from.plusHours(1);
+            Map<String,Object>valid=Map.of("enable",true,"beginTime",DEVICE_TIME.format(from),"endTime",DEVICE_TIME.format(to),"timeType","local");
+            Map<String,Object>user=new LinkedHashMap<>();user.put("employeeNo",employeeNo);user.put("name","质量检测");user.put("userType","normal");user.put("Valid",valid);user.put("doorRight","1");user.put("RightPlan",List.of(Map.of("doorNo",1,"planTemplateNo","1")));
+            execute(ip,port,username,password,"POST","/ISAPI/AccessControl/UserInfo/Record?format=json",json.writeValueAsString(Map.of("UserInfo",user)),"application/json");
+            step="上传人脸检测质量";
+            String meta=json.writeValueAsString(Map.of("faceLibType","blackFD","FDID","1","FPID",employeeNo));
+            RequestBody multipart=new MultipartBody.Builder().setType(MultipartBody.FORM)
+                    .addFormDataPart("FaceDataRecord",null,RequestBody.create(meta,MediaType.get("application/json; charset=utf-8")))
+                    .addFormDataPart("FaceImage","face.jpg",RequestBody.create(faceImage,MediaType.get("image/jpeg"))).build();
+            executeBody(ip,port,username,password,"POST","/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",multipart,"application/json");
+            step="验证人脸写入";
+            if(!personExists(ip,port,username,password,employeeNo,true))return new FaceQualityResult(false,"人脸写入后验证失败，设备未检测到有效人脸数据",step);
+            return new FaceQualityResult(true,"人脸质量检测通过",null);
+        }catch(BizException ex){return new FaceQualityResult(false,ex.getMessage(),step);}
+        catch(Exception ex){String detail=ex.getMessage()==null?ex.getClass().getSimpleName():ex.getClass().getSimpleName()+"："+ex.getMessage();return new FaceQualityResult(false,step+"失败（"+detail.substring(0,Math.min(200,detail.length()))+"）",step);}
+        finally{try{deletePerson(ip,port,username,password,employeeNo);}catch(Exception ignored){}}
+    }
+
     private ProbeResult get(String ip,int port,String username,String password,String uri){try{return new ProbeResult(true,execute(ip,port,username,password,"GET",uri,null,"application/xml"));}catch(Exception ex){return new ProbeResult(false,new byte[0]);}}
     private byte[] execute(String ip,int port,String username,String password,String method,String uri,String body,String accept) throws Exception {RequestBody rb=body==null?null:RequestBody.create(body,MediaType.get("application/json; charset=utf-8"));return executeBody(ip,port,username,password,method,uri,rb,accept);}
     private byte[] executeBody(String ip,int port,String username,String password,String method,String uri,RequestBody body,String accept) throws Exception {String url="http://"+ip+":"+port+uri;Request.Builder builder=new Request.Builder().url(url).header("Accept",accept);if("POST".equals(method))builder.post(body);else if("PUT".equals(method))builder.put(body);else if("DELETE".equals(method))builder.delete(body);else builder.get();Request initial=builder.build();try(Response first=http.newCall(initial).execute()){if(first.isSuccessful())return first.body()==null?new byte[0]:first.body().bytes();if(first.code()!=401){String detail=first.body()==null?"":first.body().string();throw deviceError(first.code(),detail);}String auth=authorization(first.header("WWW-Authenticate",""),username,password,method,uri);try(Response response=http.newCall(initial.newBuilder().header("Authorization",auth).build()).execute()){if(response.code()==401||response.code()==403)throw BizException.badRequest("设备用户名或密码不正确");if(!response.isSuccessful()){String detail=response.body()==null?"":response.body().string();throw deviceError(response.code(),detail);}return response.body()==null?new byte[0]:response.body().bytes();}}}
@@ -167,5 +189,6 @@ public class HikvisionIsapiClient {
     public record DeviceInfo(String deviceName,String model,String serialNumber,String firmwareVersion,String firmwareReleasedDate,String deviceId,String macAddress,String ipAddress) {}
     public record PersonPage(int total,List<Map<String,Object>> rows) {}
     public record CardPage(int total,List<Map<String,Object>> rows) {}
+    public record FaceQualityResult(boolean passed,String message,String failedStep) {}
     private record ProbeResult(boolean ok,byte[] body) {}
 }

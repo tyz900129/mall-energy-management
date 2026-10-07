@@ -8,8 +8,17 @@ export const useUserStore = defineStore('user', () => {
 
   async function fingerprint() {
     const raw=[navigator.userAgent,navigator.language,screen.width,screen.height,screen.colorDepth,Intl.DateTimeFormat().resolvedOptions().timeZone].join('|')
-    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))
-    return Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,'0')).join('')
+    if (window.isSecureContext && crypto?.subtle) {
+      try {
+        const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))
+        return Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,'0')).join('')
+      } catch {}
+    }
+    let id=localStorage.getItem('device_fingerprint_fallback')
+    if(!id){id=[Date.now().toString(36),Math.random().toString(36).slice(2,12)].join('-');localStorage.setItem('device_fingerprint_fallback',id)}
+    let hash=2166136261
+    for(let i=0;i<raw.length;i++){hash^=raw.charCodeAt(i);hash=Math.imul(hash,16777619)}
+    return `fallback-${(hash>>>0).toString(16)}-${id}`
   }
 
   function saveSession(resp:any){token.value=resp.token;user.value=resp.user;localStorage.setItem('token',resp.token);localStorage.setItem('user',JSON.stringify(resp.user))}
