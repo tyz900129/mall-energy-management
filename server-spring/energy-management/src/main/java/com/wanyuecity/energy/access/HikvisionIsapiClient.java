@@ -82,6 +82,17 @@ public class HikvisionIsapiClient {
         catch(BizException ex){throw ex;}catch(Exception ex){throw BizException.badRequest("读取设备人脸照片失败");}
     }
 
+    public EventPage readAccessEventPage(String ip,int port,String username,String password,String searchId,int position,int size,LocalDateTime from,LocalDateTime to){
+        try{
+            Map<String,Object> condition=new LinkedHashMap<>();condition.put("searchID",searchId);condition.put("searchResultPosition",position);condition.put("maxResults",size);condition.put("major",0);condition.put("minor",0);condition.put("startTime",from.atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));condition.put("endTime",to.atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+            JsonNode search=json.readTree(execute(ip,port,username,password,"POST","/ISAPI/AccessControl/AcsEvent?format=json",json.writeValueAsString(Map.of("AcsEventCond",condition)),"application/json")).path("AcsEvent");
+            List<Map<String,Object>> rows=new ArrayList<>();JsonNode items=search.path("InfoList");if(items.isArray())for(JsonNode item:items)rows.add(json.convertValue(item,Map.class));
+            return new EventPage(search.path("totalMatches").asInt(rows.size()),rows);
+        }catch(BizException ex){throw ex;}catch(Exception ex){throw BizException.badRequest("读取设备通行记录失败");}
+    }
+
+    public byte[] readEventPicture(String ip,int port,String username,String password,String pictureUrl){return readFaceImage(ip,port,username,password,pictureUrl);}
+
     public void createPerson(String ip,int port,String username,String password,String employeeNo,String name,LocalDateTime from,LocalDateTime to,byte[]faceImage){
         if(employeeNo==null||!employeeNo.matches("[A-Za-z0-9_-]{1,32}"))throw BizException.badRequest("设备人员编号格式不正确");
         if(name==null||name.isBlank()||name.length()>32)throw BizException.badRequest("设备人员姓名格式不正确");
@@ -189,6 +200,7 @@ public class HikvisionIsapiClient {
     public record DeviceInfo(String deviceName,String model,String serialNumber,String firmwareVersion,String firmwareReleasedDate,String deviceId,String macAddress,String ipAddress) {}
     public record PersonPage(int total,List<Map<String,Object>> rows) {}
     public record CardPage(int total,List<Map<String,Object>> rows) {}
+    public record EventPage(int total,List<Map<String,Object>> rows) {}
     public record FaceQualityResult(boolean passed,String message,String failedStep) {}
     private record ProbeResult(boolean ok,byte[] body) {}
 }

@@ -26,6 +26,7 @@ public class RequestPermissionResolver {
                     ? new Rule("access.self.view", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"))
                     : new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (path.contains("/events/mine")) return new Rule("access.event.view.self", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (path.endsWith("/events/sync") || path.endsWith("/events/sync-status")) return manage("access.event.sync");
             if (path.contains("/events")) return view("access.event.view.all");
             if (path.contains("/visitors/mine")) return new Rule("visitor.view.own", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (path.contains("/renewals/mine")) return read ? new Rule("access.self.view", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER")) : new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
@@ -33,6 +34,7 @@ public class RequestPermissionResolver {
             if (path.contains("/visitors/") && path.contains("/attachments")) return read ? new Rule("visitor.view.own", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER")) : new Rule("visitor.create", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT"));
             if (path.matches(".*/visitors/[^/]+/decision$")) return manage("visitor.approve");
             if (path.matches(".*/visitors/[^/]+/revoke$")) return admin("access.person.revoke");
+            if (path.matches(".*/visitors/[^/]+/permanent$")) return admin("access.test-data.delete");
             if (path.endsWith("/visitors") && !read) return new Rule("visitor.create", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT"));
             if (path.contains("/visitors")) return view("visitor.view.all");
             if (path.contains("/reviews")) return read ? manage("access.person.review") : manage("access.person.review");

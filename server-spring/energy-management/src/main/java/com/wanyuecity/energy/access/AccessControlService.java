@@ -25,6 +25,7 @@ public class AccessControlService {
     private final VisitorAttachmentService attachments;
     private final ObjectMapper json;
     private final SystemFaceQualityService systemFaceQuality;
+    private final AccessEventSyncService eventSyncService;
 
     public Map<String,Object> dashboard(){
         Map<String,Object> out=new LinkedHashMap<>();
@@ -35,6 +36,7 @@ public class AccessControlService {
         out.put("expiring30Days",count("SELECT COUNT(*) FROM access_person WHERE person_status='ACTIVE' AND valid_to BETWEEN NOW() AND DATE_ADD(NOW(),INTERVAL 30 DAY)"));
         out.put("pendingReview",count("SELECT COUNT(*) FROM access_person_review WHERE status='PENDING'"));
         out.put("todayEvents",count("SELECT COUNT(*) FROM access_event WHERE event_time>=CURRENT_DATE"));
+        out.putAll(eventSyncService.analysisMetrics());
         out.put("recentEvents",jdbc.queryForList("SELECT e.id,e.event_time eventTime,e.direction,e.result,p.person_name personName,d.device_name deviceName,ap.point_name pointName FROM access_event e JOIN access_device d ON d.id=e.device_id JOIN access_point ap ON ap.id=d.access_point_id LEFT JOIN access_person p ON p.id=e.person_id ORDER BY e.event_time DESC LIMIT 20"));
         return out;
     }
@@ -92,11 +94,13 @@ public class AccessControlService {
     public Map<String,Object> decideVisitor(Long id,Map<String,Object>b,String username){String decision=upper(b,"decision","");if(!Set.of("APPROVED","REJECTED").contains(decision))bad("审批结果必须为通过或拒绝");return "APPROVED".equals(decision)?provisionService.approveVisitor(id,username,text(b,"approvalNote")):provisionService.rejectVisitor(id,username,text(b,"approvalNote"));}
     public Map<String,Object> revokeVisitor(Long id,Map<String,Object>b,String username){required(b,"reason","请填写撤销原因");return provisionService.revokeVisitor(id,username,text(b,"reason"));}
 
+    @Transactional public void permanentlyDeleteVisitor(Long id){Map<String,Object>v=one("SELECT visitor_person_id personId,status FROM visitor_appointment WHERE id=?",id);Long personId=longValue(v.get("personId"));if(personId!=null){List<Long>apps=jdbc.query("SELECT id FROM access_application WHERE appointment_id=? OR person_id=?",(rs,n)->rs.getLong(1),id,personId);if(!apps.isEmpty()){String marks=String.join(",",Collections.nCopies(apps.size(),"?"));jdbc.update("DELETE FROM access_device_sync_task WHERE application_id IN ("+marks+")",apps.toArray());jdbc.update("DELETE FROM access_person_retention_snapshot WHERE application_id IN ("+marks+")",apps.toArray());jdbc.update("DELETE FROM access_application WHERE id IN ("+marks+")",apps.toArray());}jdbc.update("DELETE FROM access_person_review WHERE person_id=?",personId);jdbc.update("DELETE FROM access_person_device WHERE person_id=?",personId);jdbc.update("UPDATE access_event SET person_id=NULL WHERE person_id=?",personId);jdbc.update("DELETE FROM access_person_document WHERE person_id=?",personId);jdbc.update("DELETE FROM access_person_retention_snapshot WHERE person_id=?",personId);jdbc.update("UPDATE visitor_appointment SET visitor_person_id=NULL WHERE id=?",id);jdbc.update("DELETE FROM access_person WHERE id=? AND person_type='VISITOR'",personId);}attachments.deleteAll(id);jdbc.update("DELETE FROM visitor_appointment WHERE id=?",id);}
+
     public Map<String,Object> checkFaceQuality(byte[]faceImage){
         return systemFaceQuality.check(faceImage);
     }
 
-    public List<Map<String,Object>> events(String username,boolean own){String where=own?" WHERE p.system_user_id=(SELECT id FROM sys_user WHERE username=? LIMIT 1)":"";Object[]a=own?new Object[]{username}:new Object[0];return jdbc.queryForList("SELECT e.id,e.event_time eventTime,e.direction,e.verify_mode verifyMode,e.result,e.event_type eventType,d.device_name deviceName,ap.point_name pointName,p.person_name personName,p.person_no personNo FROM access_event e JOIN access_device d ON d.id=e.device_id JOIN access_point ap ON ap.id=d.access_point_id LEFT JOIN access_person p ON p.id=e.person_id"+where+" ORDER BY e.event_time DESC LIMIT 1000",a);}
+    public List<Map<String,Object>> events(String username,boolean own){String where=own?" WHERE p.system_user_id=(SELECT id FROM sys_user WHERE username=? LIMIT 1)":"";Object[]a=own?new Object[]{username}:new Object[0];return jdbc.queryForList("SELECT e.id,e.event_time eventTime,e.direction,e.verify_mode verifyMode,e.result,e.event_type eventType,(e.snapshot_path IS NOT NULL) hasSnapshot,d.device_name deviceName,ap.point_name pointName,p.person_name personName,p.person_no personNo FROM access_event e JOIN access_device d ON d.id=e.device_id JOIN access_point ap ON ap.id=d.access_point_id LEFT JOIN access_person p ON p.id=e.person_id"+where+" ORDER BY e.event_time DESC LIMIT 1000",a);}
     public List<Map<String,Object>> reviews(){return jdbc.queryForList("SELECT r.id,r.review_type reviewType,r.status,r.reason,r.decision,r.decision_note decisionNote,r.created_at createdAt,p.id personId,p.person_no personNo,p.person_name personName,p.phone,p.organization_name organizationName,p.last_passed_at lastPassedAt,p.valid_to validTo FROM access_person_review r JOIN access_person p ON p.id=r.person_id WHERE r.status='PENDING' ORDER BY r.created_at");}
     @Transactional public int generateInactivityReviews(int days){return jdbc.update("INSERT INTO access_person_review(person_id,review_type,reason) SELECT p.id,'INACTIVE',CONCAT('连续',?,'天未通行，请人工复核') FROM access_person p WHERE p.person_type='LONG_TERM' AND p.person_status='ACTIVE' AND (p.last_passed_at IS NULL OR p.last_passed_at<DATE_SUB(NOW(),INTERVAL ? DAY)) AND NOT EXISTS(SELECT 1 FROM access_person_review r WHERE r.person_id=p.id AND r.review_type='INACTIVE' AND r.status='PENDING')",days,days);}
     @Transactional public void decideReview(Long id,Map<String,Object>b,String username){String d=upper(b,"decision","");if(!Set.of("KEEP","OBSERVE","RENEW","DISABLE","DELETE_RECOMMENDED").contains(d))bad("不支持的复核决定");jdbc.update("UPDATE access_person_review SET status='COMPLETED',decision=?,decision_note=?,reviewed_by=?,reviewed_at=NOW() WHERE id=? AND status='PENDING'",d,text(b,"decisionNote"),username,id);}

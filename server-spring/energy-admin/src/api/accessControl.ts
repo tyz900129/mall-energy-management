@@ -29,6 +29,7 @@ export const accessControlApi = {
   createVisitor: (data: any) => http.post(`${base}/visitors`, data),
   uploadVisitorPhoto: (id:number, photoType:string, file:File) => { const data=new FormData();data.append('photoType',photoType);data.append('file',file);return http.post(`${base}/visitors/${id}/attachments`,data,{headers:{'Content-Type':'multipart/form-data'}}) },
   visitorPhoto: (id:number, attachmentId:number) => http.get(`${base}/visitors/${id}/attachments/${attachmentId}`, { responseType:'blob' }),
+  deleteVisitor: (id:number) => http.delete(`${base}/visitors/${id}/permanent`),
   decideVisitor: (id: number, data: any) => http.post(`${base}/visitors/${id}/decision`, data),
   revokeVisitor: (id: number, reason: string) => http.post(`${base}/visitors/${id}/revoke`, { reason }),
   renewals: () => http.get(`${base}/renewals`),
@@ -37,6 +38,9 @@ export const accessControlApi = {
   decideRenewal: (id:number, data:any) => http.post(`${base}/renewals/${id}/decision`, data),
   events: () => http.get(`${base}/events`),
   myEvents: () => http.get(`${base}/events/mine`),
+  syncEvents: () => http.post(`${base}/events/sync`),
+  eventSyncStatus: () => http.get(`${base}/events/sync-status`),
+  eventSnapshot: (id:number) => http.get(`${base}/events/${id}/snapshot`, { responseType:'blob' }),
   reviews: () => http.get(`${base}/reviews`),
   generateReviews: (inactivityDays: number) => http.post(`${base}/reviews/generate`, null, { params: { inactivityDays } }),
   decideReview: (id: number, data: any) => http.post(`${base}/reviews/${id}/decision`, data)
