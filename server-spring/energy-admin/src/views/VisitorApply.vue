@@ -76,6 +76,11 @@
 
       <el-checkbox v-model="agreed">本人确认资料真实，并同意用于门禁预约及通行管理</el-checkbox>
 
+      <div v-if="submitting" class="submit-progress">
+        <div>{{ submitMessage }}</div>
+        <el-progress :percentage="submitProgress" :stroke-width="8"/>
+      </div>
+
       <el-button class="submit" type="primary" size="large" :loading="submitting" @click="submit">提交申请</el-button>
     </el-form>
   </section>
@@ -108,6 +113,8 @@ const files=ref<any>({})
 const stalls=ref<any[]>([])
 const stallLoading=ref(false)
 const submitting=ref(false)
+const submitProgress=ref(0)
+const submitMessage=ref('')
 const agreed=ref(false)
 const done=ref(false)
 const appointmentNo=ref('')
@@ -159,6 +166,24 @@ async function faceCheckFile(file:File):Promise<File>{
   }finally{bitmap.close()}
 }
 
+async function uploadFile(file:File,type:string):Promise<File>{
+  const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'})
+  try{
+    const maxEdge=type==='FACE'?1280:2000
+    const scale=Math.min(1,maxEdge/Math.max(bitmap.width,bitmap.height))
+    if(scale===1&&file.size<=1200*1024)return file
+    const canvas=document.createElement('canvas')
+    canvas.width=Math.max(1,Math.round(bitmap.width*scale))
+    canvas.height=Math.max(1,Math.round(bitmap.height*scale))
+    const context=canvas.getContext('2d')
+    if(!context)return file
+    context.drawImage(bitmap,0,0,canvas.width,canvas.height)
+    const quality=type==='FACE'?0.88:0.9
+    const blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,'image/jpeg',quality))
+    return blob?new File([blob],`${type.toLowerCase()}.jpg`,{type:'image/jpeg'}):file
+  }finally{bitmap.close()}
+}
+
 async function onFaceSelected(e:Event){
   const file=(e.target as HTMLInputElement).files?.[0]
   if(!file)return
@@ -193,14 +218,25 @@ async function submit(){
   }
   if(!agreed.value){ElMessage.warning('请先确认资料使用说明');return}
   submitting.value=true
+  submitProgress.value=2
+  submitMessage.value='正在创建申请记录...'
   try{
     if(!submissionToken.value){
       const r:any=await accessPublicApi.create(form.value)
       submissionToken.value=r.token
       appointmentNo.value=r.appointmentNo
     }
-    for(const t of ['ID_FRONT','ID_BACK','FACE'])
-      await accessPublicApi.upload(submissionToken.value,t,files.value[t])
+    const types=['ID_FRONT','ID_BACK','FACE']
+    for(let index=0;index<types.length;index++){
+      const t=types[index]
+      submitMessage.value=`正在处理并上传第 ${index+1}/3 张照片...`
+      const optimized=await uploadFile(files.value[t],t)
+      await accessPublicApi.upload(submissionToken.value,t,optimized,percent=>{
+        submitProgress.value=Math.round(((index+percent/100)/types.length)*95)+3
+      })
+    }
+    submitProgress.value=100
+    submitMessage.value='申请资料已提交'
     done.value=true
     submissionToken.value=''
   }finally{submitting.value=false}
@@ -258,6 +294,7 @@ header p{color:#6b7280;margin:0}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .submit{width:100%;margin-top:18px;height:48px}
+.submit-progress{margin-top:16px;color:#606266;font-size:14px}.submit-progress .el-progress{margin-top:8px}
 .trap{position:absolute;left:-9999px;opacity:0}
 @media(max-width:600px){
   .visitor-page{padding:0;background:#fff}
