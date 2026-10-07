@@ -29,6 +29,8 @@ import java.util.Map;
 @Service
 public class SystemFaceQualityService {
     private static final String MODEL = "models/face_detection_yunet_2023mar.onnx";
+    private static final int MAX_DETECTION_EDGE = 1000;
+    private static final double MIN_SHARPNESS = 18d;
     private final Object detectorLock = new Object();
     private FaceDetectorYN detector;
     private String initializationError;
@@ -67,25 +69,36 @@ public class SystemFaceQualityService {
             int width = image.cols(), height = image.rows();
             if (width < 400 || height < 400) return failed("照片分辨率过低，请使用不低于400×400的照片", "RESOLUTION");
 
+            Mat detectionImage = image;
+            double detectionScale = Math.min(1d, MAX_DETECTION_EDGE / (double) Math.max(width, height));
+            if (detectionScale < 1d) {
+                detectionImage = new Mat();
+                Imgproc.resize(image, detectionImage, new Size(
+                        Math.max(1, Math.round(width * detectionScale)),
+                        Math.max(1, Math.round(height * detectionScale))), 0, 0, Imgproc.INTER_AREA);
+            }
             Mat faces = new Mat();
             try {
                 synchronized (detectorLock) {
-                    detector.setInputSize(image.size());
-                    detector.detect(image, faces);
+                    detector.setInputSize(detectionImage.size());
+                    detector.detect(detectionImage, faces);
                 }
                 if (faces.rows() == 0) return failed("未检测到清晰正脸，请正对镜头并露出完整五官", "FACE_NOT_FOUND");
                 if (faces.rows() > 1) return failed("照片中检测到多张人脸，请只保留申请人本人", "MULTIPLE_FACES");
 
                 float[] values = new float[(int) (faces.total() * faces.channels())];
                 faces.get(0, 0, values);
-                Rect box = safeRect(values, width, height);
-                double ratio = (double) box.area() / (width * (double) height);
+                Rect detectedBox = safeRect(values, detectionImage.cols(), detectionImage.rows());
+                double ratio = (double) detectedBox.area() / (detectionImage.cols() * (double) detectionImage.rows());
                 if (ratio < 0.08) return failed("人脸占画面比例过小，请靠近镜头重新拍摄", "FACE_TOO_SMALL");
                 if (ratio > 0.82) return failed("人脸距离镜头过近，请保持适当距离", "FACE_TOO_LARGE");
 
-                Map<String, Object> poseFailure = checkPose(values, box);
+                Map<String, Object> poseFailure = checkPose(values, detectedBox);
                 if (poseFailure != null) return poseFailure;
 
+                Rect box = detectionScale < 1d
+                        ? scaleRect(detectedBox, 1d / detectionScale, width, height)
+                        : detectedBox;
                 Mat face = new Mat(image, box);
                 try {
                     Mat gray = new Mat();
@@ -100,7 +113,12 @@ public class SystemFaceQualityService {
                         try {
                             Core.meanStdDev(laplacian, mean, deviation);
                             double sharpness = Math.pow(deviation.get(0, 0)[0], 2);
-                            if (sharpness < 55) return failed("照片模糊，请保持手机稳定并重新拍摄", "BLURRY");
+                            if (sharpness < MIN_SHARPNESS) {
+                                Map<String, Object> result = failed("照片清晰度不足，请保持手机稳定并重新拍摄", "BLURRY");
+                                result.put("sharpness", Math.round(sharpness));
+                                result.put("requiredSharpness", Math.round(MIN_SHARPNESS));
+                                return result;
+                            }
                             Map<String, Object> result = new LinkedHashMap<>();
                             result.put("passed", true);
                             result.put("message", "人脸照片质量检测通过");
@@ -122,10 +140,19 @@ public class SystemFaceQualityService {
                 }
             } finally {
                 faces.release();
+                if (detectionImage != image) detectionImage.release();
             }
         } finally {
             image.release();
         }
+    }
+
+    private Rect scaleRect(Rect source, double scale, int width, int height) {
+        int x = Math.max(0, Math.min(width - 1, (int) Math.round(source.x * scale)));
+        int y = Math.max(0, Math.min(height - 1, (int) Math.round(source.y * scale)));
+        int w = Math.max(1, Math.min(width - x, (int) Math.round(source.width * scale)));
+        int h = Math.max(1, Math.min(height - y, (int) Math.round(source.height * scale)));
+        return new Rect(x, y, w, h);
     }
 
     private Map<String, Object> basicFallback(byte[] jpeg) {
