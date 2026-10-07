@@ -30,6 +30,7 @@
         <bcprov.version>1.78.1</bcprov.version>
         <poi.version>5.3.0</poi.version>
         <zxing.version>3.5.3</zxing.version>
+        <opencv.version>4.9.0-0</opencv.version>
     </properties>
 
     <dependencies>
@@ -144,6 +145,14 @@
             <groupId>com.google.zxing</groupId>
             <artifactId>javase</artifactId>
             <version>${zxing.version}</version>
+        </dependency>
+        <!-- Local face detection and image-quality checks. This deliberately runs
+             inside the platform so a visitor application never depends on an
+             access-control terminal being online. -->
+        <dependency>
+            <groupId>org.openpnp</groupId>
+            <artifactId>opencv</artifactId>
+            <version>${opencv.version}</version>
         </dependency>
 
         <!-- OpenAPI (Swagger UI) -->

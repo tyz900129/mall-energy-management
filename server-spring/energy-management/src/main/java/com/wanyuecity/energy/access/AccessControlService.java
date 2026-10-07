@@ -24,6 +24,7 @@ public class AccessControlService {
     private final AccessProvisionService provisionService;
     private final VisitorAttachmentService attachments;
     private final ObjectMapper json;
+    private final SystemFaceQualityService systemFaceQuality;
 
     public Map<String,Object> dashboard(){
         Map<String,Object> out=new LinkedHashMap<>();
@@ -92,12 +93,7 @@ public class AccessControlService {
     public Map<String,Object> revokeVisitor(Long id,Map<String,Object>b,String username){required(b,"reason","请填写撤销原因");return provisionService.revokeVisitor(id,username,text(b,"reason"));}
 
     public Map<String,Object> checkFaceQuality(byte[]faceImage){
-        List<Map<String,Object>>devices=jdbc.queryForList("SELECT d.id,d.device_name deviceName,d.ip_address ipAddress,d.http_port httpPort,d.login_username loginUsername,d.password_ciphertext passwordCiphertext,d.password_iv passwordIv FROM access_device d WHERE d.enabled=1 AND d.isapi_enabled=1 AND d.online_status='ONLINE' AND d.read_only_mode=0 ORDER BY CASE d.direction WHEN 'ENTRY' THEN 0 ELSE 1 END,d.id LIMIT 1");
-        if(devices.isEmpty())throw BizException.badRequest("当前没有可用于检测的在线门禁设备，请稍后再试");
-        Map<String,Object>device=devices.get(0);String cipher=Objects.toString(device.get("passwordCiphertext"),""),iv=Objects.toString(device.get("passwordIv"),"");
-        if(cipher.isBlank())throw BizException.badRequest("设备登录凭据不完整，无法进行人脸检测");
-        var result=isapi.checkFaceQuality(Objects.toString(device.get("ipAddress"),""),intValue(device.get("httpPort"),80),Objects.toString(device.get("loginUsername"),""),crypto.decrypt(cipher,iv),faceImage);
-        Map<String,Object>out=new LinkedHashMap<>();out.put("passed",result.passed());out.put("message",result.message());out.put("failedStep",result.failedStep());out.put("deviceName",device.get("deviceName"));return out;
+        return systemFaceQuality.check(faceImage);
     }
 
     public List<Map<String,Object>> events(String username,boolean own){String where=own?" WHERE p.system_user_id=(SELECT id FROM sys_user WHERE username=? LIMIT 1)":"";Object[]a=own?new Object[]{username}:new Object[0];return jdbc.queryForList("SELECT e.id,e.event_time eventTime,e.direction,e.verify_mode verifyMode,e.result,e.event_type eventType,d.device_name deviceName,ap.point_name pointName,p.person_name personName,p.person_no personNo FROM access_event e JOIN access_device d ON d.id=e.device_id JOIN access_point ap ON ap.id=d.access_point_id LEFT JOIN access_person p ON p.id=e.person_id"+where+" ORDER BY e.event_time DESC LIMIT 1000",a);}
