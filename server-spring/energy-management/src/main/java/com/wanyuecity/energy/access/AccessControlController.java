@@ -23,7 +23,6 @@ public class AccessControlController {
     @PostMapping("/devices/{id}/write-mode") public ApiResponse<Map<String,Object>>writeMode(@PathVariable Long id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.setDeviceWriteMode(id,Boolean.TRUE.equals(b.get("enabled"))));}
     @PostMapping("/person-scans") public ApiResponse<Map<String,Object>>startPersonScan(Authentication a){return ApiResponse.ok(service.startPersonScan(a.getName()));}
     @GetMapping("/person-scans/latest") public ApiResponse<Map<String,Object>>latestPersonScan(){return ApiResponse.ok(service.latestPersonScan());}
-    @PostMapping("/person-scans/latest/import") public ApiResponse<Map<String,Object>>importLatestPersonScan(){Map<String,Object>result=service.importLatestPersonScan();service.normalizeImportedPersons();return ApiResponse.ok(result);}
     @PostMapping("/card-scans") public ApiResponse<Map<String,Object>>startCardScan(Authentication a){return ApiResponse.ok(service.startCardScan(a.getName()));}
     @GetMapping("/card-scans/latest") public ApiResponse<Map<String,Object>>latestCardScan(){return ApiResponse.ok(service.latestCardScan());}
     @PostMapping("/devices") public ApiResponse<Map<String,Object>>createDevice(@RequestBody Map<String,Object>b){return ApiResponse.ok(service.saveDevice(null,b));}
@@ -33,6 +32,7 @@ public class AccessControlController {
     @GetMapping("/persons/{id}/face") public ApiResponse<Map<String,Object>>personFace(@PathVariable Long id,Authentication a){boolean sensitive=a.getAuthorities().stream().anyMatch(x->"ROLE_SUPER_ADMIN".equals(x.getAuthority()));if(!sensitive)throw com.wanyuecity.energy.core.BizException.forbidden("仅超级管理员可以查看人脸照片");return ApiResponse.ok(service.personFace(id));}
     @PostMapping("/persons") public ApiResponse<Map<String,Object>>createPerson(@RequestBody Map<String,Object>b){return ApiResponse.ok(service.savePerson(null,b));}
     @PutMapping("/persons/{id}") public ApiResponse<Map<String,Object>>updatePerson(@PathVariable Long id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.savePerson(id,b));}
+    @DeleteMapping("/persons/{id}/permanent") public ApiResponse<Void>deletePerson(@PathVariable Long id,Authentication a){requireSuperAdmin(a);service.permanentlyDeletePerson(id);return ApiResponse.ok();}
     @GetMapping("/self") public ApiResponse<Map<String,Object>>self(Authentication a){return ApiResponse.ok(service.self(a.getName()));}
     @PutMapping("/self") public ApiResponse<Map<String,Object>>updateSelf(@RequestBody Map<String,Object>b,Authentication a){return ApiResponse.ok(service.updateSelf(a.getName(),b));}
     @PostMapping("/self/claim") public ApiResponse<Map<String,Object>>claimSelf(@RequestBody Map<String,Object>b,Authentication a,jakarta.servlet.http.HttpServletRequest r){return ApiResponse.ok(service.claimSelf(a.getName(),b,r.getRemoteAddr()));}

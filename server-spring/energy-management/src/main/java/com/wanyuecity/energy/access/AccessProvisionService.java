@@ -23,6 +23,27 @@ public class AccessProvisionService {
     private final ObjectMapper json;
 
     @Transactional
+    public void permanentlyDeletePerson(Long personId){
+        one("SELECT id FROM access_person WHERE id=?",personId);
+        List<Map<String,Object>> mappings=jdbc.queryForList("SELECT x.device_id deviceId,COALESCE(NULLIF(x.device_employee_no,''),NULLIF(x.device_person_no,''),p.person_no) employeeNo,d.device_name deviceName,d.ip_address ipAddress,d.http_port httpPort,d.login_username loginUsername,d.password_ciphertext passwordCiphertext,d.password_iv passwordIv FROM access_person_device x JOIN access_person p ON p.id=x.person_id JOIN access_device d ON d.id=x.device_id WHERE x.person_id=?",personId);
+        List<String> errors=new ArrayList<>();
+        for(Map<String,Object> device:mappings){
+            try{isapi.deletePerson(text(device.get("ipAddress")),number(device.get("httpPort"),80),text(device.get("loginUsername")),password(device),text(device.get("employeeNo")));}
+            catch(Exception ex){errors.add(text(device.get("deviceName"))+"："+safe(ex.getMessage()));}
+        }
+        if(!errors.isEmpty())throw BizException.badRequest("设备人员删除失败，本系统资料未删除："+String.join("；",errors));
+        jdbc.update("UPDATE access_event SET person_id=NULL WHERE person_id=?",personId);
+        jdbc.update("UPDATE visitor_appointment SET visitor_person_id=NULL WHERE visitor_person_id=?",personId);
+        jdbc.update("DELETE FROM access_person_review WHERE person_id=?",personId);
+        jdbc.update("DELETE FROM access_person_document WHERE person_id=?",personId);
+        jdbc.update("DELETE FROM access_device_sync_task WHERE person_id=?",personId);
+        jdbc.update("UPDATE access_person_retention_snapshot SET person_id=NULL WHERE person_id=?",personId);
+        jdbc.update("DELETE FROM access_application WHERE person_id=?",personId);
+        jdbc.update("DELETE FROM access_person_device WHERE person_id=?",personId);
+        jdbc.update("DELETE FROM access_person WHERE id=?",personId);
+    }
+
+    @Transactional
     public Map<String,Object> approveVisitor(Long appointmentId,String operator,String note){
         Map<String,Object> v=one("SELECT * FROM visitor_appointment WHERE id=? FOR UPDATE",appointmentId);
         String status=text(v.get("status"));
