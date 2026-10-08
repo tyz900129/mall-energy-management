@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 public class HikvisionIsapiClient {
     private static final Pattern IPV4 = Pattern.compile("^(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}$");
     private static final Pattern CHALLENGE_VALUE = Pattern.compile("([a-zA-Z]+)=(?:\\\"([^\\\"]*)\\\"|([^,\\s]+))");
-    private static final DateTimeFormatter DEVICE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final DateTimeFormatter DEVICE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
     private final OkHttpClient http = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(5)).readTimeout(Duration.ofSeconds(8))
             .writeTimeout(Duration.ofSeconds(8)).build();
@@ -84,7 +84,8 @@ public class HikvisionIsapiClient {
 
     public EventPage readAccessEventPage(String ip,int port,String username,String password,String searchId,int position,int size,LocalDateTime from,LocalDateTime to){
         try{
-            Map<String,Object> condition=new LinkedHashMap<>();condition.put("searchID",searchId);condition.put("searchResultPosition",position);condition.put("maxResults",size);condition.put("major",0);condition.put("minor",0);condition.put("startTime",DEVICE_TIME.format(from));condition.put("endTime",DEVICE_TIME.format(to));
+            var zone=java.time.ZoneId.systemDefault();
+            Map<String,Object> condition=new LinkedHashMap<>();condition.put("searchID",searchId);condition.put("searchResultPosition",position);condition.put("maxResults",size);condition.put("major",0);condition.put("minor",0);condition.put("startTime",DEVICE_TIME.format(from.atZone(zone)));condition.put("endTime",DEVICE_TIME.format(to.atZone(zone)));
             JsonNode search=json.readTree(execute(ip,port,username,password,"POST","/ISAPI/AccessControl/AcsEvent?format=json",json.writeValueAsString(Map.of("AcsEventCond",condition)),"application/json")).path("AcsEvent");
             List<Map<String,Object>> rows=new ArrayList<>();JsonNode items=search.path("InfoList");if(items.isArray())for(JsonNode item:items)rows.add(json.convertValue(item,Map.class));
             return new EventPage(search.path("totalMatches").asInt(rows.size()),rows);
