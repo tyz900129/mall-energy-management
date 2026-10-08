@@ -16,6 +16,12 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import javax.imageio.ImageIO;
 
 @Service
 @RequiredArgsConstructor
@@ -66,6 +72,7 @@ public class AccessEventSyncService {
 
     public Map<String,Object> status(){Map<String,Object> out=new LinkedHashMap<>(lastSummary);out.put("running",running.get());out.put("devices",jdbc.queryForList("SELECT id,device_name deviceName,direction,last_event_sync_at lastEventSyncAt,last_event_sync_status lastEventSyncStatus,last_event_sync_message lastEventSyncMessage FROM access_device WHERE enabled=1 ORDER BY id"));return out;}
     public Snapshot snapshot(long eventId){Map<String,Object> row=one("SELECT snapshot_path path,COALESCE(snapshot_mime_type,'image/jpeg') mime FROM access_event WHERE id=?",eventId);String relative=Objects.toString(row.get("path"),"");if(relative.isBlank())throw BizException.notFound("该通行记录没有照片");Path root=Path.of(baseDir).toAbsolutePath().normalize(),path=root.resolve(relative).normalize();if(!path.startsWith(root)||!Files.isRegularFile(path))throw BizException.notFound("通行记录照片已过保存期或文件不存在");return new Snapshot(path,Objects.toString(row.get("mime"),"image/jpeg"));}
+    public byte[] thumbnail(long eventId){try{Snapshot source=snapshot(eventId);BufferedImage image=ImageIO.read(source.path().toFile());if(image==null)throw BizException.notFound("照片格式无法识别");int maxWidth=160,maxHeight=120;double ratio=Math.min((double)maxWidth/image.getWidth(),(double)maxHeight/image.getHeight());ratio=Math.min(1d,ratio);int width=Math.max(1,(int)Math.round(image.getWidth()*ratio)),height=Math.max(1,(int)Math.round(image.getHeight()*ratio));BufferedImage thumb=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);Graphics2D g=thumb.createGraphics();try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);g.setColor(Color.WHITE);g.fillRect(0,0,width,height);g.drawImage(image,0,0,width,height,null);}finally{g.dispose();}ByteArrayOutputStream out=new ByteArrayOutputStream();ImageIO.write(thumb,"jpg",out);return out.toByteArray();}catch(BizException ex){throw ex;}catch(Exception ex){throw BizException.notFound("缩略图生成失败");}}
 
     @Scheduled(cron="0 20 2 * * *")
     public void cleanupExpiredSnapshots(){List<Map<String,Object>> rows=jdbc.queryForList("SELECT id,snapshot_path path FROM access_event WHERE event_time<DATE_SUB(NOW(),INTERVAL 1 MONTH) AND snapshot_path IS NOT NULL");Path root=Path.of(baseDir).toAbsolutePath().normalize();for(Map<String,Object>row:rows){try{Path path=root.resolve(Objects.toString(row.get("path"),"")).normalize();if(path.startsWith(root))Files.deleteIfExists(path);}catch(Exception ignored){}jdbc.update("UPDATE access_event SET snapshot_path=NULL,snapshot_mime_type=NULL WHERE id=?",row.get("id"));}}
