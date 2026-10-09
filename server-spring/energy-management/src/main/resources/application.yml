@@ -73,6 +73,8 @@ energy:
     request-timeout-ms: 15000
     sync-cron: ${ENERGY_PLATFORM_SYNC_CRON:0 0 2 * * ?}
     relation-concurrency: ${ENERGY_PLATFORM_RELATION_CONCURRENCY:8}
+  usage:
+    monthly-sync-cron: ${ENERGY_USAGE_MONTHLY_SYNC_CRON:0 0 3 1 * *}
   bootstrap:
     default-admin-password: ${ENERGY_DEFAULT_ADMIN_PASSWORD}
   log:

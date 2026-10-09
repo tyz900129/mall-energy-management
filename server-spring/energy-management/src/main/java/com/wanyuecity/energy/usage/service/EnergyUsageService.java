@@ -260,6 +260,14 @@ public class EnergyUsageService {
         return jdbc.queryForList("SELECT * FROM energy_usage_sync_batch ORDER BY started_at DESC LIMIT 50");
     }
 
+    public boolean hasSuccessfulFullSync(LocalDate startDate, LocalDate endDate) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM energy_usage_sync_batch
+                WHERE start_date<=? AND end_date>=? AND group_id IS NULL AND status='SUCCESS'
+                """, Integer.class, startDate, endDate);
+        return count != null && count > 0;
+    }
+
     public Map<String, Object> analysis(LocalDate start, LocalDate end, String period, Long groupId, String deviceId, Long dimensionId, Long dimensionValueId) {
         validateAnalysisRange(start, end);
         String normalizedPeriod = period == null ? "MONTH" : period.trim().toUpperCase(Locale.ROOT);
