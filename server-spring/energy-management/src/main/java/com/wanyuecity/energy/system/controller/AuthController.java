@@ -89,7 +89,8 @@ public class AuthController {
     private LoginResponse completeLogin(SysUser user, HttpServletRequest http) {
         if (user == null || Integer.valueOf(0).equals(user.getStatus())) throw BizException.forbidden("账号已停用");
         List<String> roles = userService.findRoleCodes(user.getId());
-        if (roles.isEmpty()) throw BizException.forbidden("账号尚未分配权限，请联系管理员");
+        List<String> permissions = List.copyOf(permissionService.effectivePermissionCodes(user.getId()));
+        if (roles.isEmpty() && permissions.isEmpty()) throw BizException.forbidden("账号尚未分配权限，请联系管理员");
         String token = tokenProvider.createToken(user.getId(), user.getUsername(), roles);
         userService.recordLogin(user.getId());
         log.info("login ok: user={}, roles={}, ip={}", user.getUsername(), roles, http.getRemoteAddr());
@@ -97,7 +98,7 @@ public class AuthController {
 
         LoginResponse.UserInfo info = new LoginResponse.UserInfo(
                 user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), user.getPhone(), roles,
-                List.copyOf(permissionService.effectivePermissionCodes(user.getId())));
+                permissions);
         return new LoginResponse(token, tokenProvider.getExpireMinutes(), info);
     }
     private void auditLogin(String username,Long userId,boolean success,String reason,HttpServletRequest http){try{String result="{\"success\":"+success+(reason==null?"":",\"reason\":\""+reason+"\"")+"}";auditLogService.record(username,userId,"LOGIN","AUTH",userId==null?null:userId.toString(),null,result,http.getRemoteAddr(),http.getHeader("User-Agent"));}catch(Exception e){log.error("login audit persistence failed: {}",e.getClass().getSimpleName());}}
