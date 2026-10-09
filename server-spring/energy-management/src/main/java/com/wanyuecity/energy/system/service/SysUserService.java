@@ -46,7 +46,9 @@ public class SysUserService {
         u.setUsername(username); u.setPasswordHash(passwordEncoder.encode(password));
         u.setDisplayName(displayName); u.setPhone(phone); u.setStatus(1);
         userMapper.insert(u);
-        // 自助注册账号故意不赋予角色，须由管理员审核分配。
+        SysRole viewer = roleMapper.selectOne(new QueryWrapper<SysRole>().eq("code", "VIEWER").last("LIMIT 1"));
+        if (viewer == null) throw new IllegalStateException("系统缺少只读用户角色");
+        replaceUserRole(u.getId(), viewer.getId());
     }
 
     public List<String> findRoleCodes(Long userId) {

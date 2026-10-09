@@ -20,7 +20,7 @@
       <div class="register-link"><el-button v-if="hasDeviceLogin" link type="warning" @click="cancelAutoLogin">取消自动登录，使用其他账号</el-button><el-button link type="primary" @click="registerVisible=true">没有账号？自主注册</el-button></div>
     </el-card>
     <el-dialog v-model="registerVisible" title="自主注册" width="460px" append-to-body>
-      <el-alert title="注册后默认无任何权限，请联系管理员分配角色" type="warning" :closable="false" style="margin-bottom:16px" />
+      <el-alert title="注册后默认开通只读用户角色，可进入“我的门禁”认领本人档案" type="info" :closable="false" style="margin-bottom:16px" />
       <el-form ref="registerRef" :model="registerForm" :rules="registerRules" label-width="86px">
         <el-form-item label="用户名" prop="username"><el-input v-model="registerForm.username" placeholder="3-64位字母、数字或 _ . -" /></el-form-item>
         <el-form-item label="姓名"><el-input v-model="registerForm.displayName" /></el-form-item>
@@ -74,7 +74,7 @@ async function onSubmit() {
     }
   })
 }
-async function register(){if(!await registerRef.value?.validate().catch(()=>false))return;registering.value=true;try{await authApi.register(registerForm);ElMessage.success('注册成功，请联系管理员分配权限');form.username=registerForm.username;registerVisible.value=false}finally{registering.value=false}}
+async function register(){if(!await registerRef.value?.validate().catch(()=>false))return;registering.value=true;try{await authApi.register(registerForm);ElMessage.success('注册成功，已开通我的门禁权限');form.username=registerForm.username;registerVisible.value=false}finally{registering.value=false}}
 function cancelAutoLogin(){localStorage.removeItem('device_login_token');localStorage.removeItem('token');localStorage.removeItem('user');hasDeviceLogin.value=false;ElMessage.success('已取消本设备自动登录')}
 onMounted(async()=>{if(route.query.switch==='1'){cancelAutoLogin();return}if(localStorage.getItem('device_login_token')){loading.value=true;try{if(await userStore.autoLogin()){ElMessage.success('已通过本设备自动登录');router.replace((route.query.redirect as string)||'/')}}finally{loading.value=false}}})
 </script>

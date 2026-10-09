@@ -56,7 +56,7 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponse<String> register(@Valid @RequestBody RegisterRequest req) {
         userService.selfRegister(req.getUsername(), req.getPassword(), req.getDisplayName(), req.getPhone());
-        return ApiResponse.ok("注册成功，请联系管理员分配权限");
+        return ApiResponse.ok("注册成功，已开通我的门禁权限");
     }
 
     @PostMapping("/device-login")
