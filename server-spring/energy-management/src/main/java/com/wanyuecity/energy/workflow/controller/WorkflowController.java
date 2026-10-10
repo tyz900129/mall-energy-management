@@ -84,10 +84,16 @@ public class WorkflowController {
     @PostMapping("/{id}/match-resolution") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<WorkflowView> resolve(@PathVariable Long id,@Valid @RequestBody MatchResolutionRequest req,Authentication auth){return ApiResponse.ok(service.resolveMatch(id,req,auth==null?null:auth.getName()));}
     @PutMapping("/{id}/oa-process-no") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<WorkflowView> updateOaProcessNo(@PathVariable Long id,@RequestBody WorkflowPlatformInfoRequest req){return ApiResponse.ok(service.updateOaProcessNo(id,req.getValue()));}
     @PutMapping("/{id}/completion-remark") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<WorkflowView> updateCompletionRemark(@PathVariable Long id,@RequestBody WorkflowPlatformInfoRequest req){return ApiResponse.ok(service.updateCompletionRemark(id,req.getValue()));}
-    private boolean ownOnly(Authentication auth){
-        boolean bridgedCreate=auth.getAuthorities().stream().anyMatch(a->"PERMISSION_BRIDGE:workflow.create".equals(a.getAuthority()));
-        if(bridgedCreate)return true;
-        return auth.getAuthorities().stream().anyMatch(a->"ROLE_APPLICANT".equals(a.getAuthority()))
-                &&auth.getAuthorities().stream().noneMatch(a->Set.of("ROLE_SUPER_ADMIN","ROLE_SYSTEM_ADMIN","ROLE_VIEWER").contains(a.getAuthority()));
+    static boolean ownOnly(Authentication auth){
+        Set<String> authorities = auth.getAuthorities().stream().map(a -> a.getAuthority()).collect(java.util.stream.Collectors.toSet());
+        boolean elevated = authorities.stream().anyMatch(Set.of(
+                "ROLE_SUPER_ADMIN", "ROLE_SYSTEM_ADMIN", "ROLE_DEVICE_VERIFIER",
+                "ROLE_PLATFORM_OPERATOR", "ROLE_AUDITOR")::contains);
+        if (elevated) return false;
+        // VIEWER is commonly retained when a self-registered user is later assigned
+        // APPLICANT. It must never turn applicant-scoped workflow access into global access.
+        return authorities.contains("ROLE_APPLICANT")
+                || authorities.contains("workflow.create")
+                || authorities.contains("PERMISSION_BRIDGE:workflow.create");
     }
 }
