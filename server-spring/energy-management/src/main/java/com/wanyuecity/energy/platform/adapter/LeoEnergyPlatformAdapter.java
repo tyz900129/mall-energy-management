@@ -8,6 +8,7 @@ import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformEnergyMetric;
+import com.wanyuecity.energy.platform.dto.PlatformAccountBill;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -154,6 +156,32 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
         return paginate(baseUrl, sessionToken,
                 "/api/account/page?mobilePhone=&spaceId=" + enc(spaceId) + "&type=arrears&name=",
                 "data", "list", this::mapAccount, 50);
+    }
+
+    @Override
+    public List<PlatformAccountBill> fetchAccountHistoryBills(String baseUrl, String sessionToken, String platformAccountId) {
+        JsonNode response = getJson(baseUrl, "/api/account/" + enc(platformAccountId)
+                + "/history-bills?id=" + enc(platformAccountId), sessionToken);
+        if (!isSuccess(response) || !response.path("data").isArray()) {
+            throw new PlatformAdapterException("BAD_RESPONSE", "History bills response is invalid");
+        }
+        List<PlatformAccountBill> bills = new ArrayList<>();
+        for (JsonNode node : response.path("data")) {
+            String start = firstText(node, "startTime");
+            LocalDateTime startTime = parseDateTime(start);
+            if (startTime == null) continue;
+            bills.add(PlatformAccountBill.builder()
+                    .sourceBillId(firstText(node, "id"))
+                    .platformAccountId(platformAccountId)
+                    .accountNumber(firstText(node, "accountNumber"))
+                    .billDate(startTime.toLocalDate())
+                    .startTime(startTime)
+                    .endTime(parseDateTime(firstText(node, "endTime")))
+                    .amount(decimalOrNull(node.path("amount")))
+                    .sourceUpdatedAt(parseDateTime(firstText(node, "updateTime", "createTime")))
+                    .build());
+        }
+        return bills;
     }
 
     private PlatformAccount fetchAccountDetail(String baseUrl, String token, PlatformAccount summary) {
@@ -700,6 +728,15 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
     private BigDecimal decimalOrNull(JsonNode n) {
         if (n.isMissingNode() || n.isNull()) return null;
         return new BigDecimal(n.asText("0"));
+    }
+
+    private LocalDateTime parseDateTime(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return LocalDateTime.parse(value.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")); }
+        catch (Exception ignored) {
+            try { return LocalDateTime.parse(value.trim()); }
+            catch (Exception ignoredAgain) { return null; }
+        }
     }
 
     private String joinUrl(String baseUrl, String path) {

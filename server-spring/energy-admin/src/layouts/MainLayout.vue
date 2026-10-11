@@ -26,7 +26,7 @@
           <el-menu-item v-if="can('stall.menu')" index="/stall">铺位管理</el-menu-item>
           <el-menu-item v-if="can('metering.menu')" index="/stall-device">计量设备绑定</el-menu-item>
         </el-sub-menu>
-        <el-sub-menu v-if="hasAny('energy.dashboard.view','energy.analysis.view','energy.dimension.view','energy.sync.view','energy.bill.view','energy.arrears.view')" index="energy-management">
+        <el-sub-menu v-if="hasAny('energy.dashboard.view','energy.analysis.view','energy.dimension.view','energy.sync.view','energy.bill.view','energy.arrears.view','energy.anomaly.view')" index="energy-management">
           <template #title><el-icon><DataAnalysis /></el-icon><span>能源管理</span></template>
           <el-menu-item v-if="can('energy.dashboard.view')" index="/energy/dashboard">数据大屏</el-menu-item>
           <el-menu-item v-if="can('energy.analysis.view')" index="/energy/analysis">用量分析</el-menu-item>
@@ -34,6 +34,7 @@
           <el-menu-item v-if="can('energy.sync.view')" index="/energy/sync">历史用量同步</el-menu-item>
           <el-menu-item v-if="can('energy.bill.view')" index="/energy/bills">水电账单录入</el-menu-item>
           <el-menu-item v-if="can('energy.arrears.view')" index="/energy/arrears">欠费通知</el-menu-item>
+          <el-menu-item v-if="can('energy.anomaly.view')" index="/energy/account-anomalies">账户异动监控</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="hasAny('facility.power.view','facility.water.view','facility.drainage.view','facility.exhaust.view','facility.fresh_air.view')" index="facility-equipment">
           <template #title><el-icon><Share /></el-icon><span>设施设备</span></template>

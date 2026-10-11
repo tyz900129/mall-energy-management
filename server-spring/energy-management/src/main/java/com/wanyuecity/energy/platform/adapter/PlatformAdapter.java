@@ -6,6 +6,7 @@ import com.wanyuecity.energy.platform.dto.PlatformDevice;
 import com.wanyuecity.energy.platform.dto.PlatformDailyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformMonthlyUsage;
 import com.wanyuecity.energy.platform.dto.PlatformEnergyMetric;
+import com.wanyuecity.energy.platform.dto.PlatformAccountBill;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -38,6 +39,9 @@ public interface PlatformAdapter {
 
     /** Fetch accounts returned by the source platform's arrears filter. */
     List<PlatformAccount> fetchArrearsAccounts(String baseUrl, String sessionToken, String spaceId);
+
+    /** Fetch daily history bills for one billing account. */
+    List<PlatformAccountBill> fetchAccountHistoryBills(String baseUrl, String sessionToken, String platformAccountId);
 
     /** Fetch all devices under the given space. Paginates internally. */
     List<PlatformDevice> fetchDevices(String baseUrl, String sessionToken, String spaceId);

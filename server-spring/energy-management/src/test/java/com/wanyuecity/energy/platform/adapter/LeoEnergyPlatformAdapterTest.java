@@ -96,6 +96,19 @@ class LeoEnergyPlatformAdapterTest {
     }
 
     @Test
+    void fetchesDailyAccountHistoryBills() throws Exception {
+        server.enqueue(json("{\"code\":\"200000\",\"data\":[{\"id\":15608270,\"accountNumber\":211948813500420100,\"startTime\":\"2026-10-10 00:00:00\",\"endTime\":\"2026-10-11 00:00:00\",\"amount\":127.52,\"updateTime\":\"2026-10-11 00:02:46\"}]}"));
+
+        var bills = adapter.fetchAccountHistoryBills(server.url("/").toString(), "TOKEN", "7861");
+
+        assertEquals(1, bills.size());
+        assertEquals("2026-10-10", bills.get(0).getBillDate().toString());
+        assertEquals("127.52", bills.get(0).getAmount().toPlainString());
+        RecordedRequest request = server.takeRequest();
+        assertEquals("/api/account/7861/history-bills?id=7861", request.getPath());
+    }
+
+    @Test
     void relationUsesDeviceIdInsteadOfRelationRowId() throws Exception {
         server.enqueue(json("{\"code\":\"200000\",\"data\":{\"total\":1,\"list\":[{\"id\":\"ACCOUNT-ID\",\"accountNumber\":\"ACCOUNT-1\"}]}}"));
         server.enqueue(json("{\"code\":\"200000\",\"data\":[{\"id\":\"RELATION-ID\",\"deviceId\":\"DEVICE-1\"}]}"));
