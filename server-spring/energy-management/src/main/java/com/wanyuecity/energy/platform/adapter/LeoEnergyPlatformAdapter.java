@@ -149,6 +149,13 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 "data", "list", this::mapAccount);
     }
 
+    @Override
+    public List<PlatformAccount> fetchArrearsAccounts(String baseUrl, String sessionToken, String spaceId) {
+        return paginate(baseUrl, sessionToken,
+                "/api/account/page?mobilePhone=&spaceId=" + enc(spaceId) + "&type=arrears&name=",
+                "data", "list", this::mapAccount, 50);
+    }
+
     private PlatformAccount fetchAccountDetail(String baseUrl, String token, PlatformAccount summary) {
         try {
             String id = summary.getPlatformAccountId();
@@ -484,11 +491,17 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
     private <T> List<T> paginate(String baseUrl, String cookie, String pathPrefix,
                                  String dataKey, String listKey,
                                  java.util.function.Function<JsonNode, T> mapper) {
+        return paginate(baseUrl, cookie, pathPrefix, dataKey, listKey, mapper, DEFAULT_PAGE_SIZE);
+    }
+
+    private <T> List<T> paginate(String baseUrl, String cookie, String pathPrefix,
+                                 String dataKey, String listKey,
+                                 java.util.function.Function<JsonNode, T> mapper, int pageSize) {
         List<T> out = new ArrayList<>();
         int page = 1;
         while (true) {
             String sep = pathPrefix.contains("?") ? "&" : "?";
-            String path = pathPrefix + sep + "pageNumber=" + page + "&pageSize=" + DEFAULT_PAGE_SIZE;
+            String path = pathPrefix + sep + "pageNumber=" + page + "&pageSize=" + pageSize;
             JsonNode resp = getJson(baseUrl, path, cookie);
             if (!isSuccess(resp)) {
                 throw new PlatformAdapterException("PLATFORM_ERROR",
@@ -503,7 +516,7 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 out.add(mapper.apply(item));
             }
             int total = data.path("total").asInt(0);
-            if (out.size() >= total || list.size() < DEFAULT_PAGE_SIZE) {
+            if (out.size() >= total || list.size() < pageSize) {
                 break;
             }
             page++;

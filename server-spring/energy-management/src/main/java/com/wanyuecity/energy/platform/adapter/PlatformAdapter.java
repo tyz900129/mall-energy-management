@@ -36,6 +36,9 @@ public interface PlatformAdapter {
     /** Fetch all accounts under the given space. Paginates internally. */
     List<PlatformAccount> fetchAccounts(String baseUrl, String sessionToken, String spaceId);
 
+    /** Fetch accounts returned by the source platform's arrears filter. */
+    List<PlatformAccount> fetchArrearsAccounts(String baseUrl, String sessionToken, String spaceId);
+
     /** Fetch all devices under the given space. Paginates internally. */
     List<PlatformDevice> fetchDevices(String baseUrl, String sessionToken, String spaceId);
 

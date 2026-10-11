@@ -68,7 +68,7 @@ public class FeishuWebhookProvider implements NotificationProvider {
         return m.find() ? m.group(1).trim() : "万悦城后勤管理系统通知";
     }
     private String headerTemplate(String eventType) {
-        if (eventType != null && (eventType.contains("OVERDUE") || eventType.contains("EXCEPTION"))) return "red";
+        if (eventType != null && (eventType.contains("OVERDUE") || eventType.contains("EXCEPTION") || eventType.contains("ARREARS"))) return "red";
         if (eventType != null && eventType.contains("COMPLETED")) return "green";
         return "blue";
     }

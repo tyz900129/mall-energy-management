@@ -114,6 +114,7 @@ public class RequestPermissionResolver {
     }
 
     private Rule energy(String path, String method, boolean read) {
+        if (path.contains("/arrears")) return read ? view("energy.arrears.view") : manage("energy.arrears.manage");
         if (path.contains("/bills")) return read ? new Rule("energy.bill.view","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER")) : manage("energy.bill.manage");
         if (path.contains("/usage/sync")) return read ? view("energy.sync.view") : manage("energy.sync.execute");
         if (path.endsWith("/analysis")) return new Rule("energy.analysis.view","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER"));

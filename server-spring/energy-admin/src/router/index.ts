@@ -27,6 +27,7 @@ const routes = [
       { path: 'energy/devices', name: 'DeviceGroup', component: () => import('@/views/DeviceGroup.vue'), meta: { title: '设备分析维度', permission:'energy.dimension.view' } },
       { path: 'energy/sync', name: 'UsageSync', component: () => import('@/views/UsageSync.vue'), meta: { title: '历史用量同步', permission:'energy.sync.view' } },
       { path: 'energy/bills', name: 'UtilityBill', component: () => import('@/views/UtilityBill.vue'), meta: { title: '水电账单录入', permission:'energy.bill.view' } },
+      { path: 'energy/arrears', name: 'ArrearsNotification', component: () => import('@/views/ArrearsNotification.vue'), meta: { title: '欠费通知', permission:'energy.arrears.view' } },
       { path: 'energy/dashboard', name: 'UsageDashboard', component: () => import('@/views/UsageDashboard.vue'), meta: { title: '用量数据大屏', permission:'energy.dashboard.view' } },
       { path: 'energy/analysis', name: 'UsageAnalysis', component: () => import('@/views/UsageAnalysis.vue'), meta: { title: '用量分析', permission:'energy.analysis.view' } },
       { path: 'power/topology', name: 'PowerTopology', component: () => import('@/views/PowerTopology.vue'), meta: { title: '配电拓扑管理', permission:'facility.power.view' } },
