@@ -34,6 +34,7 @@ public class PlatformAccount {
 
     private BigDecimal balance;
     private BigDecimal arrears;
+    private String arrearsStartedAt;
 
     /** "0" = disabled, "1" = enabled, etc. Strings to keep the source semantics. */
     private String platformStatus;

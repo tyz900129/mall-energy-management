@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -21,7 +20,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class ArrearsNotificationService {
     public static final String EVENT = "ENERGY_ARREARS_NOTICE";
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final JdbcTemplate jdbc;
     private final PlatformConfigService configService;
     private final PlatformAdapter adapter;
@@ -42,7 +40,7 @@ public class ArrearsNotificationService {
             LocalDateTime now = LocalDateTime.now();
             jdbc.update("UPDATE energy_arrears_account SET active=0");
             for (PlatformAccount account : accounts) upsert(account, now);
-            List<Map<String,Object>> notified = jdbc.queryForList("SELECT account_number,account_name,user_name,mobile_phone,balance,arrears FROM energy_arrears_account WHERE active=1 AND excluded=0 ORDER BY arrears DESC,account_number");
+            List<Map<String,Object>> notified = jdbc.queryForList("SELECT account_number,account_name,user_name,mobile_phone,balance,arrears,arrears_started_at FROM energy_arrears_account WHERE active=1 AND excluded=0 ORDER BY arrears DESC,account_number");
             Integer excluded = jdbc.queryForObject("SELECT COUNT(*) FROM energy_arrears_account WHERE active=1 AND excluded=1", Integer.class);
             BigDecimal total = notified.stream().map(row -> decimal(row.get("arrears"))).reduce(BigDecimal.ZERO, BigDecimal::add);
             if (!notified.isEmpty()) notificationService.notifyConfiguredEvent(EVENT, message(notified, excluded == null ? 0 : excluded, total, now));
@@ -65,7 +63,7 @@ public class ArrearsNotificationService {
         if(excluded!=null){where.append(" AND excluded=?");args.add(excluded?1:0);}
         Long total=jdbc.queryForObject("SELECT COUNT(*) FROM energy_arrears_account"+where,Long.class,args.toArray());
         List<Object> pageArgs=new ArrayList<>(args);pageArgs.add(size);pageArgs.add(offset);
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT account_number accountNumber,platform_account_id platformAccountId,account_name accountName,user_name userName,mobile_phone mobilePhone,balance,arrears,excluded,exclusion_remark exclusionRemark,last_seen_at lastSeenAt,updated_at updatedAt FROM energy_arrears_account"+where+" ORDER BY arrears DESC,account_number LIMIT ? OFFSET ?",pageArgs.toArray());
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT account_number accountNumber,platform_account_id platformAccountId,account_name accountName,user_name userName,mobile_phone mobilePhone,balance,arrears,arrears_started_at arrearsStartedAt,excluded,exclusion_remark exclusionRemark,last_seen_at lastSeenAt,updated_at updatedAt FROM energy_arrears_account"+where+" ORDER BY arrears DESC,account_number LIMIT ? OFFSET ?",pageArgs.toArray());
         Map<String,Object> out=new LinkedHashMap<>();out.put("records",rows);out.put("total",total==null?0:total);out.put("pageNum",Math.max(pageNum,1));out.put("pageSize",size);out.put("running",running.get());return out;
     }
 
@@ -77,12 +75,12 @@ public class ArrearsNotificationService {
     }
 
     private void upsert(PlatformAccount a, LocalDateTime now){
-        jdbc.update("INSERT INTO energy_arrears_account(account_number,platform_account_id,account_name,user_name,mobile_phone,balance,arrears,active,last_seen_at) VALUES(?,?,?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE platform_account_id=VALUES(platform_account_id),account_name=VALUES(account_name),user_name=VALUES(user_name),mobile_phone=VALUES(mobile_phone),balance=VALUES(balance),arrears=VALUES(arrears),active=1,last_seen_at=VALUES(last_seen_at)",
-                a.getAccountNumber(),a.getPlatformAccountId(),a.getAccountName(),a.getUserName(),a.getMobilePhone(),a.getBalance(),a.getArrears(),now);
+        jdbc.update("INSERT INTO energy_arrears_account(account_number,platform_account_id,account_name,user_name,mobile_phone,balance,arrears,arrears_started_at,active,last_seen_at) VALUES(?,?,?,?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE platform_account_id=VALUES(platform_account_id),account_name=VALUES(account_name),user_name=VALUES(user_name),mobile_phone=VALUES(mobile_phone),balance=VALUES(balance),arrears=VALUES(arrears),arrears_started_at=VALUES(arrears_started_at),active=1,last_seen_at=VALUES(last_seen_at)",
+                a.getAccountNumber(),a.getPlatformAccountId(),a.getAccountName(),a.getUserName(),a.getMobilePhone(),a.getBalance(),a.getArrears(),a.getArrearsStartedAt(),now);
     }
 
     private Map<String,Object> run(Long id){List<Map<String,Object>> rows=jdbc.queryForList("SELECT id,trigger_type triggerType,status,fetched_count fetchedCount,excluded_count excludedCount,notified_count notifiedCount,total_arrears totalArrears,error_message errorMessage,started_at startedAt,completed_at completedAt FROM energy_arrears_sync_run WHERE id=?",id);return rows.isEmpty()?Map.of():rows.get(0);}
-    private String message(List<Map<String,Object>> rows,int excluded,BigDecimal total,LocalDateTime now){StringBuilder b=new StringBuilder("### ⚠️ 能源欠费账户通知\n\n");b.append("**获取时间**：").append(now.format(TIME)).append("\n**欠费账户**：").append(rows.size()).append(" 个\n**欠费合计**：").append(total.stripTrailingZeros().toPlainString()).append(" 元\n");if(excluded>0)b.append("**已设置不推送**：").append(excluded).append(" 个\n");b.append("\n");int max=Math.min(rows.size(),30);for(int i=0;i<max;i++){Map<String,Object> r=rows.get(i);String name=text(r.get("user_name"));if(name.isBlank())name=text(r.get("account_name"));b.append(i+1).append(". **").append(name.isBlank()?r.get("account_number"):name).append("**\n   账户：").append(r.get("account_number")).append("　欠费：").append(decimal(r.get("arrears")).stripTrailingZeros().toPlainString()).append(" 元\n");}if(rows.size()>max)b.append("\n> 另有 ").append(rows.size()-max).append(" 个欠费账户，请进入系统查看。\n");return b.append("\n[👉 查看欠费通知](https://auto.apperload.com/energy/arrears)").toString();}
+    private String message(List<Map<String,Object>> rows,int excluded,BigDecimal total,LocalDateTime now){String weekday=switch(now.getDayOfWeek()){case MONDAY->"周一";case TUESDAY->"周二";case WEDNESDAY->"周三";case THURSDAY->"周四";case FRIDAY->"周五";case SATURDAY->"周六";case SUNDAY->"周日";};StringBuilder b=new StringBuilder("### 💧⚡ 水电费账户欠费提醒\n\n");b.append("**通知日期**：").append(now.getYear()).append("年").append(now.getMonthValue()).append("月").append(now.getDayOfMonth()).append("日 ").append(weekday).append("\n");b.append("**今日需处理账户**：").append(rows.size()).append(" 个\n**欠费合计**：**¥").append(total.setScale(2,java.math.RoundingMode.HALF_UP).toPlainString()).append("**\n");if(excluded>0)b.append("> 另有 ").append(excluded).append(" 个账户已设置不推送\n");b.append("\n---\n");int max=Math.min(rows.size(),30);for(int i=0;i<max;i++){Map<String,Object> r=rows.get(i);String account=text(r.get("account_number"));String name=text(r.get("user_name"));if(name.isBlank())name=text(r.get("account_name"));String title=name.isBlank()?account:name;if(!account.isBlank()&&!title.contains(account))title=account+"-"+title;b.append("\n**").append(i+1).append(". ").append(title).append("**\n");b.append("- 最终欠费：**¥").append(decimal(r.get("arrears")).setScale(2,java.math.RoundingMode.HALF_UP).toPlainString()).append("**\n");String started=text(r.get("arrears_started_at"));if(!started.isBlank())b.append("- 欠费起始：").append(started).append("\n");}if(rows.size()>max)b.append("\n> 其余 ").append(rows.size()-max).append(" 个欠费账户未在本次消息中展开。\n");return b.toString().trim();}
     private BigDecimal decimal(Object value){if(value==null)return BigDecimal.ZERO;return value instanceof BigDecimal b?b:new BigDecimal(value.toString());}
     private String text(Object value){return value==null?"":value.toString().trim();}
     private String shortText(String value,int max){if(value==null)return null;return value.length()<=max?value:value.substring(0,max);}

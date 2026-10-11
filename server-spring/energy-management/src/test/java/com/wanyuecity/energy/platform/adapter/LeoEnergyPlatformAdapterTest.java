@@ -81,12 +81,13 @@ class LeoEnergyPlatformAdapterTest {
 
     @Test
     void fetchesArrearsAccountsWithSourceFilter() throws Exception {
-        server.enqueue(json("{\"code\":\"200000\",\"data\":{\"total\":1,\"list\":[{\"id\":\"A-1\",\"accountNumber\":\"3066-000001\",\"name\":\"测试商户\",\"arrears\":\"125.50\"}]}}"));
+        server.enqueue(json("{\"code\":\"200000\",\"data\":{\"total\":1,\"list\":[{\"id\":\"A-1\",\"accountNumber\":\"3066-000001\",\"name\":\"测试商户\",\"arrears\":\"125.50\",\"arrearsTime\":\"2026-10-11 00:00:46\"}]}}"));
 
         var accounts = adapter.fetchArrearsAccounts(server.url("/").toString(), "TOKEN", "4801");
 
         assertEquals(1, accounts.size());
         assertEquals("125.50", accounts.get(0).getArrears().toPlainString());
+        assertEquals("2026-10-11 00:00:46", accounts.get(0).getArrearsStartedAt());
         RecordedRequest request = server.takeRequest();
         assertEquals("arrears", request.getRequestUrl().queryParameter("type"));
         assertEquals("4801", request.getRequestUrl().queryParameter("spaceId"));

@@ -608,6 +608,7 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 .mobilePhone(n.path("mobilePhone").asText(""))
                 .balance(decimalOrNull(n.path("balance")))
                 .arrears(decimalOrNull(n.path("arrears")))
+                .arrearsStartedAt(firstText(n, "arrearsStartedAt", "arrearsStartTime", "arrearsTime", "arrearsDate", "debtStartTime", "oweTime"))
                 .platformStatus(n.path("billConfiguration").path("status").asText(""))
                 .sourceSpaceId(n.path("spaceId").asText(""))
                 .build();
@@ -644,6 +645,7 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 .mobilePhone(prefer(d.getMobilePhone(), summary.getMobilePhone()))
                 .balance(d.getBalance() != null ? d.getBalance() : summary.getBalance())
                 .arrears(d.getArrears() != null ? d.getArrears() : summary.getArrears())
+                .arrearsStartedAt(prefer(d.getArrearsStartedAt(), summary.getArrearsStartedAt()))
                 .platformStatus(prefer(d.getPlatformStatus(), summary.getPlatformStatus()))
                 .sourceSpaceId(prefer(d.getSourceSpaceId(), summary.getSourceSpaceId()))
                 .build();
