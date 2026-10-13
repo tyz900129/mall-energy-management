@@ -81,6 +81,7 @@ public class SecurityConfig {
                                 ,"/api/v1/inspections/public-qr/**"
                                 ,"/api/v1/inspection-equipment/public-qr/**"
                                 ,"/api/v1/access-public/**"
+                                ,"/api/v1/operation-public/**"
                                 ,"/api/v1/system/migration/exports/*/download"
                         ).permitAll()
                         .requestMatchers("/error").permitAll()

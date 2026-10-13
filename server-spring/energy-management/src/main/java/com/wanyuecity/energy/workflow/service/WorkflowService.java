@@ -154,7 +154,7 @@ public class WorkflowService {
         }
         row.setStallId(req.getStallId());
         row.setRequestedBillingStartTime(req.getEffectiveTime()); row.setApplicantId(user == null ? null : user.getId());
-        row.setApplicantName(username); row.setStatus("DRAFT"); row.setRemark(req.getRemark());
+        row.setApplicantName(displayName(user, username)); row.setStatus("DRAFT"); row.setRemark(req.getRemark());
         row.setExpectedAccountAction("NEW_MERCHANT".equals(check.getWorkflowType()) ? "CREATE_AND_BIND" :
                 "EXISTING_MERCHANT_ADD_STALL".equals(check.getWorkflowType()) ? "BIND" : "UNBIND");
         row.setUsesWater(req.getUsesWater());
@@ -322,7 +322,7 @@ public class WorkflowService {
         row.setWorkflowNo(nextWorkflowNo()); row.setWorkflowType("NEW_MERCHANT"); row.setMerchantCode(req.getMerchantCode());
         row.setMerchantName(req.getMerchantName()); row.setContactName(req.getContactName()); row.setContactPhone(req.getContactPhone());
         row.setStallId(req.getStallId()); row.setRequestedBillingStartTime(req.getRequestedBillingStartTime());
-        row.setApplicantId(user == null ? null : user.getId()); row.setApplicantName(username); row.setStatus("DRAFT");
+        row.setApplicantId(user == null ? null : user.getId()); row.setApplicantName(displayName(user, username)); row.setStatus("DRAFT");
         row.setRemark(req.getRemark()); row.setExtraData("{\"targetAccountResolution\":\"MERCHANT_CODE_AFTER_PLATFORM_CREATION\"}");
         try { workflowMapper.insert(row); }
         catch (DuplicateKeyException ex) {
@@ -346,7 +346,7 @@ public class WorkflowService {
         if (!hasText(requestKey)) return null;
         Workflow existing = workflowMapper.selectOne(new QueryWrapper<Workflow>()
                 .eq("request_key", requestKey).last("LIMIT 1"));
-        if (existing != null && !Objects.equals(existing.getApplicantName(), username))
+        if (existing != null && !ownedBy(existing, username))
             throw BizException.badRequest("流程请求编号已被使用");
         return existing;
     }
@@ -432,7 +432,11 @@ public class WorkflowService {
 
     public Page<WorkflowView> list(String status, String workflowType, String keyword, String applicantScope, int pageNum, int pageSize) {
         QueryWrapper<Workflow> q = new QueryWrapper<Workflow>().notIn("workflow_type", ConstructionWorkflowService.TYPES);
-        if (hasText(applicantScope)) q.eq("applicant_name", applicantScope);
+        if (hasText(applicantScope)) {
+            SysUser applicant=findUser(applicantScope);
+            if(applicant!=null)q.and(w->w.eq("applicant_id",applicant.getId()).or().eq("applicant_name",applicantScope));
+            else q.eq("applicant_name",applicantScope);
+        }
         if (hasText(status)) q.eq("status", status.trim()); if (hasText(workflowType)) q.eq("workflow_type", workflowType.trim());
         if (hasText(keyword)) { String k=keyword.trim(); q.and(w -> w.like("workflow_no",k).or().like("merchant_code",k).or().like("merchant_name",k)); }
         q.orderByDesc("created_at"); Page<Workflow> p=workflowMapper.selectPage(Page.of(pageNum, Math.min(Math.max(pageSize,1),100)),q);
@@ -445,7 +449,7 @@ public class WorkflowService {
     @Transactional public WorkflowView cancelAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return cancel(id);}
     public List<WorkflowDevice> devicesAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return devices(id);}
     public List<WorkflowExpectedChange> changesAccessible(Long id,String username,boolean ownOnly){Workflow w=require(id);requireBillingWorkflow(w);requireOwner(w,username,ownOnly);return expectedChanges(id);}
-    private void requireOwner(Workflow w,String username,boolean ownOnly){if(ownOnly&&!Objects.equals(w.getApplicantName(),username))throw BizException.forbidden("applicants may only access their own workflows");}
+    private void requireOwner(Workflow w,String username,boolean ownOnly){if(ownOnly&&!ownedBy(w,username))throw BizException.forbidden("applicants may only access their own workflows");}
     public List<WorkflowDevice> devices(Long id) { require(id); return workflowDeviceMapper.selectList(new QueryWrapper<WorkflowDevice>().eq("workflow_id",id).orderByAsc("id")); }
     public List<WorkflowExpectedChange> expectedChanges(Long id) { require(id); return expectedChangeMapper.selectList(new QueryWrapper<WorkflowExpectedChange>().eq("workflow_id",id).orderByAsc("id")); }
     public Map<String,Object> matchEvidence(Long id){Workflow w=require(id);requireBillingWorkflow(w);List<Map<String,Object>> runs=jdbc.queryForList("SELECT id,sync_batch_id,match_status,matched_count,total_count,summary,created_at FROM workflow_match_run WHERE workflow_id=? ORDER BY id DESC",id);for(Map<String,Object> r:runs)r.put("details",jdbc.queryForList("SELECT platform_device_id,expected_account_number,actual_account_numbers,match_status,reason FROM workflow_match_detail WHERE match_run_id=? ORDER BY id",r.get("id")));return Map.of("runs",runs,"resolutions",jdbc.queryForList("SELECT action,from_status,to_status,conclusion,operator_name,created_at FROM workflow_match_resolution WHERE workflow_id=? ORDER BY id DESC",id));}
@@ -471,8 +475,11 @@ public class WorkflowService {
         if (!hasText(resolvedName)&&billingAccount!=null) resolvedName=MerchantNameParser.extract(billingAccount.getAccountName(),row.getMerchantCode());
         v.setMerchantName(hasText(resolvedName)?resolvedName:row.getMerchantName());
         v.setBillingAccountName(billingAccount==null?null:(hasText(billingAccount.getUserName())?billingAccount.getUserName():billingAccount.getAccountName()));
-        v.setOriginalContactPhone(row.getOriginalContactPhone());v.setUpdateSmsPhone(row.getUpdateSmsPhone());v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(row.getApplicantName());v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
-    private SysUser findUser(String username){if(!hasText(username))return null;return userMapper.selectOne(new QueryWrapper<SysUser>().eq("username",username).last("LIMIT 1"));}
+        SysUser applicant=row.getApplicantId()==null?null:userMapper.selectById(row.getApplicantId());
+        v.setOriginalContactPhone(row.getOriginalContactPhone());v.setUpdateSmsPhone(row.getUpdateSmsPhone());v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(displayName(applicant,row.getApplicantName()));v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
+    private SysUser findUser(String username){if(!hasText(username)||userMapper==null)return null;return userMapper.selectOne(new QueryWrapper<SysUser>().eq("username",username).last("LIMIT 1"));}
+    private boolean ownedBy(Workflow workflow,String username){if(!hasText(username))return false;SysUser user=findUser(username);if(user!=null&&workflow.getApplicantId()!=null)return Objects.equals(workflow.getApplicantId(),user.getId());return Objects.equals(workflow.getApplicantName(),username);}
+    private String displayName(SysUser user,String fallback){return user!=null&&hasText(user.getDisplayName())?user.getDisplayName().trim():fallback;}
     private String nextWorkflowNo(){return "WF"+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))+UUID.randomUUID().toString().substring(0,4).toUpperCase();}
     private boolean hasText(String s){return s!=null&&!s.isBlank();}
 }

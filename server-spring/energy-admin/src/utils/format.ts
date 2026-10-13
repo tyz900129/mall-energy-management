@@ -22,7 +22,7 @@ const labels: Record<string, string> = {
   DRAFT: '草稿', FIELD_CHECK_PENDING: '待现场核验', FIELD_CHECKING: '核验中', FIELD_VERIFIED: '现场核验通过', FIELD_EXCEPTION: '现场异常',
   WAITING_OA_SUBMISSION: '待OA提交', WAITING_PLATFORM_CHANGE: '等待平台处理', PLATFORM_VERIFYING: '平台核对中',
   RESOLVED_EXCEPTION: '异常已关闭', CANCELLED: '已取消', COMPLETED: '已完成',
-  SUPER_ADMIN: '超级管理员', SYSTEM_ADMIN: '系统管理员', APPLICANT: '申请人', DEVICE_VERIFIER: '现场核验员',
-  PLATFORM_OPERATOR: '只读用户', AUDITOR: '只读用户', VIEWER: '只读用户'
+  SUPER_ADMIN: '超级管理员', SYSTEM_ADMIN: '系统管理员', APPLICANT: '商管人员', DEVICE_VERIFIER: '物业工作人员',
+  PLATFORM_OPERATOR: '普通用户', AUDITOR: '普通用户', VIEWER: '普通用户'
 }
 export function enumLabel(value?: string | null): string { return value ? (labels[value] || value) : '-' }

@@ -72,10 +72,10 @@ public class AccountAnomalyMonitorService {
         List<BigDecimal> history=jdbc.query("SELECT amount FROM energy_account_daily_bill WHERE account_number=? AND bill_date<? ORDER BY bill_date DESC LIMIT 30",(rs,n)->rs.getBigDecimal(1),number,target);
         int samples=history.size();
         if(samples<7){saveResult(number,name,target,actual,null,samples,null,null,null,null,"OBSERVING");return;}
-        Map<String,Object> rule=effectiveRule(number);
-        if(!bool(rule.get("enabled"))||ignored(rule,target)){saveResult(number,name,target,actual,null,samples,null,null,null,null,"IGNORED");return;}
         BigDecimal avg=history.stream().reduce(BigDecimal.ZERO,BigDecimal::add).divide(BigDecimal.valueOf(samples),4,RoundingMode.HALF_UP);
         BigDecimal diff=actual.subtract(avg),pct=avg.compareTo(BigDecimal.ZERO)==0?null:diff.multiply(BigDecimal.valueOf(100)).divide(avg,2,RoundingMode.HALF_UP);
+        Map<String,Object> rule=effectiveRule(number);
+        if(!bool(rule.get("enabled"))||ignored(rule,target)){saveResult(number,name,target,actual,avg,samples,diff,pct,null,null,"IGNORED");return;}
         BigDecimal min=decimal(rule.get("minimumDifference"),BigDecimal.valueOf(20));
         BigDecimal rise=decimal(rule.get("riseThresholdPct"),BigDecimal.valueOf(50));
         BigDecimal fall=decimal(rule.get("fallThresholdPct"),BigDecimal.valueOf(50));
@@ -96,6 +96,28 @@ public class AccountAnomalyMonitorService {
 
     public Map<String,Object> results(LocalDate date,String keyword,String status,String direction,int pageNum,int pageSize){LocalDate target=date==null?LocalDate.now().minusDays(1):date;int size=Math.min(Math.max(pageSize,1),100),offset=(Math.max(pageNum,1)-1)*size;StringBuilder where=new StringBuilder(" WHERE bill_date=?");List<Object> args=new ArrayList<>();args.add(target);if(keyword!=null&&!keyword.isBlank()){where.append(" AND (account_name LIKE ? OR account_number LIKE ?)");String k="%"+keyword.trim()+"%";args.add(k);args.add(k);}if(status!=null&&!status.isBlank()){where.append(" AND analysis_status=?");args.add(status);}if(direction!=null&&!direction.isBlank()){where.append(" AND direction=?");args.add(direction);}Long total=jdbc.queryForObject("SELECT COUNT(*) FROM energy_account_anomaly_result"+where,Long.class,args.toArray());List<Object> paged=new ArrayList<>(args);paged.add(size);paged.add(offset);List<Map<String,Object>> rows=jdbc.queryForList("SELECT id,account_number accountNumber,account_name accountName,bill_date billDate,actual_amount actualAmount,baseline_average baselineAverage,sample_days sampleDays,difference_amount differenceAmount,difference_pct differencePct,direction,severity,analysis_status analysisStatus,handle_status handleStatus,handle_remark handleRemark,notified FROM energy_account_anomaly_result"+where+" ORDER BY CASE analysis_status WHEN 'ANOMALY' THEN 0 ELSE 1 END,ABS(COALESCE(difference_pct,0)) DESC LIMIT ? OFFSET ?",paged.toArray());return Map.of("records",rows,"total",total==null?0:total,"pageNum",Math.max(pageNum,1),"pageSize",size);}
 
+    public List<Map<String,Object>> accounts(String keyword){String k=keyword==null?"":keyword.trim();String like="%"+k+"%";return jdbc.queryForList("SELECT p.account_number accountNumber,COALESCE(NULLIF(p.user_name,''),NULLIF(p.account_name,''),p.account_number) accountName FROM platform_account_current p WHERE (?='' OR p.account_number LIKE ? OR p.account_name LIKE ? OR p.user_name LIKE ?) UNION SELECT r.account_number accountNumber,MAX(COALESCE(NULLIF(r.account_name,''),r.account_number)) accountName FROM energy_account_anomaly_result r WHERE (?='' OR r.account_number LIKE ? OR r.account_name LIKE ?) GROUP BY r.account_number ORDER BY accountName LIMIT 80",k,like,like,like,k,like,like);}
+
+    public Map<String,Object> trend(String accountNumber,LocalDate startDate,LocalDate endDate){
+        if(accountNumber==null||accountNumber.isBlank())throw BizException.badRequest("请选择商户账户");
+        LocalDate end=endDate==null?LocalDate.now().minusDays(1):endDate;
+        LocalDate start=startDate==null?end.minusDays(89):startDate;
+        if(start.isAfter(end))throw BizException.badRequest("开始日期不能晚于结束日期");
+        if(start.plusDays(366).isBefore(end))throw BizException.badRequest("单次最多查询367天");
+        List<Map<String,Object>> points=jdbc.queryForList("SELECT bill_date billDate,actual_amount actualAmount,baseline_average baselineAverage,difference_amount differenceAmount,difference_pct differencePct,sample_days sampleDays,direction,severity,analysis_status analysisStatus FROM energy_account_anomaly_result WHERE account_number=? AND bill_date BETWEEN ? AND ? ORDER BY bill_date",accountNumber.trim(),start,end);
+        List<BigDecimal> rates=points.stream().map(p->p.get("differencePct")).filter(Objects::nonNull).map(v->decimal(v,BigDecimal.ZERO)).toList();
+        List<BigDecimal> rises=rates.stream().filter(v->v.signum()>0).sorted().toList();
+        List<BigDecimal> falls=rates.stream().filter(v->v.signum()<0).map(BigDecimal::abs).sorted().toList();
+        Map<String,Object> rule=effectiveRule(accountNumber.trim());
+        Map<String,Object> summary=new LinkedHashMap<>();
+        summary.put("recordDays",points.size());summary.put("validDays",rates.size());
+        summary.put("averageRate",rates.isEmpty()?null:rates.stream().reduce(BigDecimal.ZERO,BigDecimal::add).divide(BigDecimal.valueOf(rates.size()),2,RoundingMode.HALF_UP));
+        summary.put("maxRisePct",rises.isEmpty()?null:rises.get(rises.size()-1));summary.put("maxFallPct",falls.isEmpty()?null:falls.get(falls.size()-1));
+        summary.put("suggestedRisePct",percentile(rises,0.90));summary.put("suggestedFallPct",percentile(falls,0.90));
+        String name=accounts(accountNumber.trim()).stream().filter(a->accountNumber.trim().equals(text(a.get("accountNumber")))).map(a->text(a.get("accountName"))).findFirst().orElse(accountNumber.trim());
+        return Map.of("accountNumber",accountNumber.trim(),"accountName",name,"startDate",start,"endDate",end,"points",points,"summary",summary,"rule",rule);
+    }
+
     public List<Map<String,Object>> rules(String keyword){String filter=keyword==null||keyword.isBlank()?"":" AND (p.account_number LIKE ? OR p.account_name LIKE ? OR p.user_name LIKE ?)";List<Object> args=new ArrayList<>();if(!filter.isEmpty()){String k="%"+keyword.trim()+"%";args.add(k);args.add(k);args.add(k);}return jdbc.queryForList("SELECT p.account_number accountNumber,COALESCE(NULLIF(p.user_name,''),NULLIF(p.account_name,''),p.account_number) accountName,COALESCE(r.enabled,1) enabled,r.rise_threshold_pct riseThresholdPct,r.fall_threshold_pct fallThresholdPct,r.minimum_difference minimumDifference,COALESCE(r.webhook_enabled,1) webhookEnabled,r.ignore_start_date ignoreStartDate,r.ignore_end_date ignoreEndDate,r.remark FROM platform_account_current p LEFT JOIN energy_account_anomaly_rule r ON r.account_number=p.account_number WHERE (p.platform_status IS NULL OR UPPER(p.platform_status) NOT IN ('0','DISABLED','INACTIVE'))"+filter+" ORDER BY accountName LIMIT 500",args.toArray());}
 
     public Map<String,Object> defaultRule(){return effectiveRule("__DEFAULT__");}
@@ -113,6 +135,7 @@ public class AccountAnomalyMonitorService {
     private boolean boolDefault(Object v,boolean d){return v==null?d:bool(v);}
     private BigDecimal decimal(Object v,BigDecimal d){try{return v==null?d:new BigDecimal(v.toString());}catch(Exception e){return d;}}
     private BigDecimal nullableDecimal(Object v){return v==null||text(v).isBlank()?null:new BigDecimal(v.toString());}
+    private BigDecimal percentile(List<BigDecimal> sorted,double percentile){if(sorted.isEmpty())return null;int index=(int)Math.ceil(sorted.size()*percentile)-1;return sorted.get(Math.max(0,Math.min(index,sorted.size()-1))).setScale(2,RoundingMode.HALF_UP);}
     private LocalDate nullableDate(Object v){return v==null||text(v).isBlank()?null:LocalDate.parse(v.toString());}
     private LocalDate toDate(Object v){if(v==null)return null;if(v instanceof java.sql.Date d)return d.toLocalDate();return LocalDate.parse(v.toString());}
     private String shortText(String v,int max){if(v==null)return null;return v.length()<=max?v:v.substring(0,max);}

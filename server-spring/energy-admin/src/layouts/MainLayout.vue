@@ -26,7 +26,7 @@
           <el-menu-item v-if="can('stall.menu')" index="/stall">铺位管理</el-menu-item>
           <el-menu-item v-if="can('metering.menu')" index="/stall-device">计量设备绑定</el-menu-item>
         </el-sub-menu>
-        <el-sub-menu v-if="hasAny('energy.dashboard.view','energy.analysis.view','energy.dimension.view','energy.sync.view','energy.bill.view','energy.arrears.view','energy.anomaly.view')" index="energy-management">
+        <el-sub-menu v-if="hasAny('energy.dashboard.view','energy.analysis.view','energy.dimension.view','energy.sync.view','energy.bill.view','energy.arrears.view','energy.anomaly.view','energy.balance-warning.view')" index="energy-management">
           <template #title><el-icon><DataAnalysis /></el-icon><span>能源管理</span></template>
           <el-menu-item v-if="can('energy.dashboard.view')" index="/energy/dashboard">数据大屏</el-menu-item>
           <el-menu-item v-if="can('energy.analysis.view')" index="/energy/analysis">用量分析</el-menu-item>
@@ -35,6 +35,7 @@
           <el-menu-item v-if="can('energy.bill.view')" index="/energy/bills">水电账单录入</el-menu-item>
           <el-menu-item v-if="can('energy.arrears.view')" index="/energy/arrears">欠费通知</el-menu-item>
           <el-menu-item v-if="can('energy.anomaly.view')" index="/energy/account-anomalies">账户异动监控</el-menu-item>
+          <el-menu-item v-if="can('energy.balance-warning.view')" index="/energy/balance-warnings">余额预警通知</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="hasAny('facility.power.view','facility.water.view','facility.drainage.view','facility.exhaust.view','facility.fresh_air.view')" index="facility-equipment">
           <template #title><el-icon><Share /></el-icon><span>设施设备</span></template>
@@ -63,6 +64,16 @@
           <el-menu-item v-if="hasAny('visitor.view.own','visitor.view.all','visitor.create','visitor.approve')" index="/access/visitors">访客预约</el-menu-item>
           <el-menu-item v-if="hasAny('access.event.view.self','access.event.view.all')" index="/access/events">通行记录</el-menu-item>
           <el-menu-item v-if="can('access.person.review')" index="/access/reviews">人员复核</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="hasAny('operation.merchant.view','operation.dashboard.view','operation.clearance.submit','operation.clearance.review','operation.property.view','operation.accountability.view')" index="operation-business-management">
+          <template #title><el-icon><Management /></el-icon><span>运营管理</span></template>
+          <el-menu-item v-if="can('operation.dashboard.view')" index="/operation/dashboard">运营日清总览</el-menu-item>
+          <el-menu-item v-if="can('operation.merchant.view')" index="/operation/merchant-responsibilities">责任商管管理</el-menu-item>
+          <el-menu-item v-if="can('operation.clearance.view')" index="/operation/clearances">商户日清记录</el-menu-item>
+          <el-menu-item v-if="can('operation.clearance.template.view')" index="/operation/clearance-templates">日清表单模板</el-menu-item>
+          <el-menu-item v-if="can('operation.property.view')" index="/operation/property-inspections">物业清场检查</el-menu-item>
+          <el-menu-item v-if="can('operation.property.template.view')" index="/operation/property-inspection-templates">物业检查模板</el-menu-item>
+          <el-menu-item v-if="can('operation.accountability.view')" index="/operation/accountability">追责管理</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="hasAny('integration.config.view','integration.sync.view')" index="data-integration">
           <template #title><el-icon><Connection /></el-icon><span>数据与集成</span></template>
@@ -94,7 +105,7 @@
             <el-icon><UserFilled /></el-icon>
             {{ userStore.user?.displayName || userStore.user?.username || '未登录' }}
             <el-tag v-if="userStore.user?.roles?.length" class="user-role" size="small" type="warning" effect="dark" style="margin-left: 8px">
-              {{ userStore.user.roles[0] }}
+              {{ enumLabel(userStore.user.roles[0]) }}
             </el-tag>
           </span>
           <template #dropdown>
@@ -120,9 +131,10 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting, Key
+  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting, Key, Management
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { enumLabel } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()

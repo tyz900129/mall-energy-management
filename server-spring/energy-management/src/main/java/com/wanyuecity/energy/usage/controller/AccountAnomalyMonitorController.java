@@ -19,6 +19,8 @@ public class AccountAnomalyMonitorController {
     private final AccountAnomalyMonitorService service;
     @GetMapping("/overview") public ApiResponse<Map<String,Object>> overview(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return ApiResponse.ok(service.overview(date));}
     @GetMapping public ApiResponse<Map<String,Object>> results(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date,@RequestParam(required=false)String keyword,@RequestParam(required=false)String status,@RequestParam(required=false)String direction,@RequestParam(defaultValue="1")int pageNum,@RequestParam(defaultValue="20")int pageSize){return ApiResponse.ok(service.results(date,keyword,status,direction,pageNum,pageSize));}
+    @GetMapping("/accounts") public ApiResponse<List<Map<String,Object>>> accounts(@RequestParam(required=false)String keyword){return ApiResponse.ok(service.accounts(keyword));}
+    @GetMapping("/trend") public ApiResponse<Map<String,Object>> trend(@RequestParam String accountNumber,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate startDate,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate endDate){return ApiResponse.ok(service.trend(accountNumber,startDate,endDate));}
     @PostMapping("/sync") public ApiResponse<Map<String,Object>> sync(){return ApiResponse.ok(service.syncAndAnalyze("MANUAL"));}
     @GetMapping("/rules") public ApiResponse<List<Map<String,Object>>> rules(@RequestParam(required=false)String keyword){return ApiResponse.ok(service.rules(keyword));}
     @GetMapping("/rules/default") public ApiResponse<Map<String,Object>> defaultRule(){return ApiResponse.ok(service.defaultRule());}

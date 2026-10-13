@@ -15,8 +15,31 @@ public class RequestPermissionResolver {
         String method = request.getMethod();
         boolean read = HttpMethod.GET.matches(method);
         if (!path.startsWith("/api/v1/")) return null;
+        if (path.startsWith("/api/v1/operation-public/")) return null;
 
         if (path.startsWith("/api/v1/dashboard")) return view("dashboard.view");
+        if (path.startsWith("/api/v1/operations/merchant-responsibilities"))
+            return read ? new Rule("operation.merchant.view","APPLICANT",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT"))
+                    : new Rule("operation.merchant.manage","APPLICANT",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT"));
+        if (path.startsWith("/api/v1/operations/dashboard"))
+            return new Rule("operation.dashboard.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"));
+        if (path.startsWith("/api/v1/operations/accountability-orders"))
+            return read ? new Rule("operation.accountability.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"))
+                    : new Rule("operation.accountability.manage","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER"));
+        if (path.startsWith("/api/v1/operations/property-inspections")) {
+            if (path.contains("/templates")) return read ? new Rule("operation.property.template.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER")) : manage("operation.property.template.manage");
+            if (!read) return new Rule("operation.clearance.review","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER"));
+            return new Rule("operation.property.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"));
+        }
+        if (path.startsWith("/api/v1/operations/clearances")) {
+            if (path.endsWith("/period")) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            if (!read) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            return new Rule("operation.clearance.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"));
+        }
+        if (path.startsWith("/api/v1/operations/clearance-templates")) {
+            if (path.contains("/stall/")) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
+            return read ? new Rule("operation.clearance.template.view","APPLICANT",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT")) : manage("operation.clearance.template.manage");
+        }
         if (path.startsWith("/api/v1/access-control")) {
             if (path.contains("/person-scans") || path.contains("/card-scans")) return manage("access.sync.import");
             if (path.endsWith("/write-mode")) return admin("access.sync.write");
@@ -115,6 +138,7 @@ public class RequestPermissionResolver {
 
     private Rule energy(String path, String method, boolean read) {
         if (path.contains("/account-anomalies")) return read ? view("energy.anomaly.view") : manage("energy.anomaly.manage");
+        if (path.contains("/balance-warnings")) return read ? view("energy.balance-warning.view") : manage("energy.balance-warning.manage");
         if (path.contains("/arrears")) return read ? view("energy.arrears.view") : manage("energy.arrears.manage");
         if (path.contains("/bills")) return read ? new Rule("energy.bill.view","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER")) : manage("energy.bill.manage");
         if (path.contains("/usage/sync")) return read ? view("energy.sync.view") : manage("energy.sync.execute");
