@@ -65,6 +65,7 @@ declare module 'vue' {
     ElTree: typeof import('element-plus/es')['ElTree']
     ElTreeSelect: typeof import('element-plus/es')['ElTreeSelect']
     ElUpload: typeof import('element-plus/es')['ElUpload']
+    OperationDynamicForm: typeof import('./src/components/OperationDynamicForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     UsageTrendChart: typeof import('./src/components/UsageTrendChart.vue')['default']

@@ -23,7 +23,7 @@ public class OperationDashboardService {
         if (!global) args.add(userId);
         String base = " FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id " +
                 "LEFT JOIN operation_merchant_responsibility r ON r.stall_id=s.id AND r.status='ACTIVE' " +
-                "LEFT JOIN sys_user u ON u.id=r.responsible_user_id " +
+                "LEFT JOIN sys_user u ON u.id=r.responsible_user_id LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type " +
                 "LEFT JOIN operation_clearance_record c ON c.stall_id=s.id AND c.period_date=? " +
                 "WHERE s.status='OCCUPIED' AND COALESCE(s.business_type,'')<>'CK'" + scope;
         Map<String,Object> summary = jdbc.queryForMap("SELECT COUNT(*) expectedCount," +
@@ -32,7 +32,7 @@ public class OperationDashboardService {
                 "SUM(CASE WHEN c.status='ABNORMAL' THEN 1 ELSE 0 END) abnormalCount," +
                 "SUM(CASE WHEN r.id IS NULL THEN 1 ELSE 0 END) unassignedCount" + base, args.toArray());
         List<Map<String,Object>> details = jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName," +
-                "COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName,s.business_type businessType," +
+                "COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName,COALESCE(d.item_label,s.business_type) businessType,s.business_type businessTypeCode," +
                 "u.display_name managerName,u.phone managerPhone,c.id recordId,c.status,c.submitter_name submitterName," +
                 "c.submitted_at submittedAt,c.exception_description exceptionDescription " + base +
                 " ORDER BY CASE WHEN c.id IS NULL THEN 0 WHEN c.status='ABNORMAL' THEN 1 ELSE 2 END,s.floor_code,s.stall_code", args.toArray());

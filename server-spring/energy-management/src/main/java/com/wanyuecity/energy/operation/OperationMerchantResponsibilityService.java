@@ -31,9 +31,9 @@ public class OperationMerchantResponsibilityService {
         String k="%"+Objects.toString(keyword,"").trim()+"%";
         String filter=(managerUserId==null?"":" AND r.responsible_user_id="+managerUserId);
         String where=" WHERE s.status<>'DISABLED' AND (s.stall_code LIKE ? OR s.stall_name LIKE ? OR m.merchant_code LIKE ? OR m.merchant_name LIKE ?)"+filter;
-        String from=" FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id LEFT JOIN operation_merchant_responsibility r ON r.stall_id=s.id AND r.status='ACTIVE' LEFT JOIN sys_user u ON u.id=r.responsible_user_id";
+        String from=" FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id LEFT JOIN operation_merchant_responsibility r ON r.stall_id=s.id AND r.status='ACTIVE' LEFT JOIN sys_user u ON u.id=r.responsible_user_id LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type";
         Long total=jdbc.queryForObject("SELECT COUNT(*)"+from+where,Long.class,k,k,k,k);
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.stall_name stallName,s.floor_name floorName,s.business_type businessType,s.status stallStatus,s.operation_qr_token qrToken,m.merchant_code merchantCode,m.merchant_name merchantName,r.id responsibilityId,r.responsible_user_id managerUserId,u.username managerUsername,u.display_name managerName,COALESCE(NULLIF(r.contact_phone,''),u.phone) managerPhone,r.effective_from effectiveFrom,r.remark"+from+where+" ORDER BY s.floor_code,s.stall_code LIMIT ? OFFSET ?",k,k,k,k,ps,offset);
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.stall_name stallName,s.floor_name floorName,s.business_type businessType,COALESCE(d.item_label,s.business_type) businessTypeLabel,s.status stallStatus,s.operation_qr_token qrToken,m.merchant_code merchantCode,m.merchant_name merchantName,r.id responsibilityId,r.responsible_user_id managerUserId,u.username managerUsername,u.display_name managerName,COALESCE(NULLIF(r.contact_phone,''),u.phone) managerPhone,r.effective_from effectiveFrom,r.remark"+from+where+" ORDER BY s.floor_code,s.stall_code LIMIT ? OFFSET ?",k,k,k,k,ps,offset);
         Map<String,Object> result=new LinkedHashMap<>(); result.put("records",rows);result.put("total",total==null?0:total);result.put("current",pn);result.put("size",ps);return result;
     }
 
@@ -47,7 +47,7 @@ public class OperationMerchantResponsibilityService {
     }
 
     public Map<String,Object> publicStall(String token){
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName,s.business_type businessType,s.status stallStatus,COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id WHERE s.operation_qr_token=? AND s.status<>'DISABLED'",token);
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName,s.business_type businessType,COALESCE(d.item_label,s.business_type) businessTypeLabel,s.status stallStatus,COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type WHERE s.operation_qr_token=? AND s.status<>'DISABLED'",token);
         if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"二维码无效或铺位已停用");return rows.get(0);
     }
 
