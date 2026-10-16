@@ -38,7 +38,7 @@ public class OperationClearanceTemplateService {
     }
 
     public Map<String, Object> resolveByToken(String token) {
-        List<Map<String, Object>> stalls = jdbc.queryForList("SELECT business_type businessType FROM stall WHERE operation_qr_token=? AND status<>'DISABLED'", token);
+        List<Map<String, Object>> stalls = jdbc.queryForList("SELECT business_type businessType FROM stall WHERE operation_qr_token=? AND status<>'DECOMMISSIONED'", token);
         if (stalls.isEmpty()) throw bad("铺位不存在");
         String type = Objects.toString(stalls.get(0).get("businessType"), "");
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT id,name,business_type businessType,version_no versionNo,fields_json fieldsJson " +

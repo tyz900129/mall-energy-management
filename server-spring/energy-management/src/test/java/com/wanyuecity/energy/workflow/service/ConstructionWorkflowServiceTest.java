@@ -11,7 +11,10 @@ import com.wanyuecity.energy.workflow.mapper.ConstructionWorkflowDetailMapper;
 import com.wanyuecity.energy.workflow.mapper.WorkflowMapper;
 import com.wanyuecity.energy.workflow.mapper.ConstructionInspectionMapper;
 import com.wanyuecity.energy.workflow.mapper.ConstructionAcceptanceMapper;
+import com.wanyuecity.energy.workflow.service.dto.ConstructionWorkflowRequest;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,6 +64,28 @@ class ConstructionWorkflowServiceTest {
         assertEquals("新施工流程必须通过验收结果完成并归档", error.getMessage());
     }
 
+    @Test
+    void entryConstructionRequiresAvailableStall() {
+        when(workflowMapper.selectOne(any())).thenReturn(null);
+        when(stallMapper.selectOne(any())).thenReturn(stall("OCCUPIED"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.create(request(ConstructionWorkflowService.ENTRY), "applicant"));
+
+        assertEquals("施工入场仅允许选择空置铺位，当前状态：在用", error.getMessage());
+    }
+
+    @Test
+    void exitConstructionRequiresOccupiedStall() {
+        when(workflowMapper.selectOne(any())).thenReturn(null);
+        when(stallMapper.selectOne(any())).thenReturn(stall("AVAILABLE"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.create(request(ConstructionWorkflowService.EXIT), "applicant"));
+
+        assertEquals("撤场施工仅允许选择在用铺位，当前状态：空置", error.getMessage());
+    }
+
     private Workflow workflow(String type) {
         Workflow workflow = new Workflow();
         workflow.setId(1L); workflow.setWorkflowNo("SG1"); workflow.setWorkflowType(type);
@@ -72,6 +97,16 @@ class ConstructionWorkflowServiceTest {
         ConstructionWorkflowDetail detail = new ConstructionWorkflowDetail();
         detail.setId(2L); detail.setWorkflowId(1L);
         return detail;
+    }
+
+    private ConstructionWorkflowRequest request(String type) {
+        ConstructionWorkflowRequest request = new ConstructionWorkflowRequest();
+        request.setRequestKey("request-1");
+        request.setWorkflowType(type);
+        request.setStallId(9L);
+        request.setConstructionStartTime(LocalDateTime.now().plusDays(1));
+        request.setConstructionEndTime(LocalDateTime.now().plusDays(2));
+        return request;
     }
 
     private Stall stall(String status) {

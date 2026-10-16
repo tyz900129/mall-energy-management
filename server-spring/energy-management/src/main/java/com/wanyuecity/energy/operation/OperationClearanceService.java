@@ -112,7 +112,7 @@ public class OperationClearanceService {
         Map<String, Object> stall = one("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName," +
                 "COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName " +
                 "FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id " +
-                "WHERE s.operation_qr_token=? AND s.status<>'DISABLED'", token);
+                "WHERE s.operation_qr_token=? AND s.status<>'DECOMMISSIONED'", token);
         Long userId = jdbc.queryForObject("SELECT id FROM sys_user WHERE username=?", Long.class, username);
         if (!unrestricted) {
             Integer owned = jdbc.queryForObject("SELECT COUNT(*) FROM operation_merchant_responsibility " +

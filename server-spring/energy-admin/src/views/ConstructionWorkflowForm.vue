@@ -22,7 +22,7 @@
           </el-col>
           <el-col :xs="24" :sm="12">
             <el-form-item label="施工位置" prop="stallId">
-              <el-select v-model="form.stallId" filterable style="width:100%" placeholder="请选择楼层和铺位号" @change="onStallChange">
+              <el-select v-model="form.stallId" filterable style="width:100%" placeholder="请选择楼层和铺位号" no-data-text="没有符合当前流程状态的铺位" @change="onStallChange">
                 <el-option v-for="stall in stalls" :key="stall.id" :label="stallLabel(stall)" :value="stall.id" />
               </el-select>
             </el-form-item>
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
@@ -80,7 +80,7 @@ import { useUserStore } from '@/stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 const formRef = ref<FormInstance>()
-const stalls = ref<Stall[]>([])
+const allStalls = ref<Stall[]>([])
 const saving = ref(false)
 const requestKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
 const typeOptions = [
@@ -97,6 +97,9 @@ const form = reactive({
   constructionCompanyName: '', constructionPrincipalName: '', constructionPrincipalPhone: '',
   propertyEngineerName: '', propertyEngineerPhone: '', commercialManagerName: '', commercialManagerPhone: '', remark: ''
 })
+const stalls = computed(() => allStalls.value.filter(item => form.workflowType === 'MERCHANT_CONSTRUCTION_ENTRY'
+  ? item.status === 'AVAILABLE'
+  : item.status === 'OCCUPIED'))
 const required = (message: string) => [{ required: true, message, trigger: 'blur' }]
 const rules: FormRules = {
   workflowType: required('请选择流程类型'), stallId: required('请选择施工铺位'),
@@ -107,9 +110,16 @@ const rules: FormRules = {
   commercialManagerName: required('请输入商管负责人'), commercialManagerPhone: required('请输入商管负责人电话')
 }
 const statusHint = computed(() => ({
-  MERCHANT_CONSTRUCTION_ENTRY: '提交后铺位进入“装修中”；验收合格后自动变为“在用”。',
-  MERCHANT_CONSTRUCTION_EXIT: '提交后铺位进入“撤场施工中”；验收合格后自动变为“空置”。'
+  MERCHANT_CONSTRUCTION_ENTRY: '仅可选择“空置”铺位；提交后进入“装修中”，验收合格后自动变为“在用”。',
+  MERCHANT_CONSTRUCTION_EXIT: '仅可选择“在用”铺位；提交后进入“撤场施工中”，验收合格后自动变为“空置”。'
 }[form.workflowType]))
+
+watch(() => form.workflowType, () => {
+  if (form.stallId && !stalls.value.some(item => item.id === form.stallId)) {
+    form.stallId = null
+    form.merchantName = ''
+  }
+})
 
 function stallLabel(stall: Stall) { return `${stall.floorName || stall.floorCode || '未设置楼层'} · ${stall.stallCode}` }
 function onStallChange(id: number) {
@@ -132,7 +142,7 @@ onMounted(async () => {
   const phone=userStore.user?.phone||''
   if(isVerifier.value){form.propertyEngineerName=name;form.propertyEngineerPhone=phone}else{form.commercialManagerName=name;form.commercialManagerPhone=phone}
   const result: any = await stallApi.page({ pageNum: 1, pageSize: 500 })
-  stalls.value = (result.records || []).filter((item: Stall) => item.status !== 'DECOMMISSIONED')
+  allStalls.value = result.records || []
 })
 </script>
 

@@ -28,7 +28,7 @@ public class OperationFormImageService {
         String type = text(formType).toUpperCase();
         if (!FORM_TYPES.contains(type)) throw bad("不支持的表单类型");
         if (!text(fieldCode).matches("[A-Za-z][A-Za-z0-9_]{0,40}")) throw bad("图片题编码不正确");
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM stall WHERE operation_qr_token=? AND status<>'DISABLED'", Integer.class, qrToken);
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM stall WHERE operation_qr_token=? AND status<>'DECOMMISSIONED'", Integer.class, qrToken);
         if (count == null || count == 0) throw bad("铺位二维码无效");
         if (file == null || file.isEmpty()) throw bad("请选择图片");
         if (file.getSize() > 8L * 1024 * 1024) throw bad("图片不能超过8MB，请压缩后上传");

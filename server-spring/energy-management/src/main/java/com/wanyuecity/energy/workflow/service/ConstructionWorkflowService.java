@@ -52,20 +52,20 @@ public class ConstructionWorkflowService {
     public ConstructionWorkflowView create(ConstructionWorkflowRequest req, String username) {
         String type = normalizeType(req.getWorkflowType());
         validatePeriod(req.getConstructionStartTime(), req.getConstructionEndTime());
+        String requestKey = text(req.getRequestKey()) ? req.getRequestKey().trim() : UUID.randomUUID().toString();
+        Workflow repeated = workflowMapper.selectOne(new QueryWrapper<Workflow>().eq("request_key", requestKey).last("LIMIT 1"));
+        if (repeated != null) {
+            if (!Objects.equals(type, repeated.getWorkflowType()) || !Objects.equals(repeated.getApplicantName(), username))
+                throw BizException.badRequest("流程请求编号已被使用");
+            return get(repeated.getId(), username, false);
+        }
+
         Stall stall = requireStallForUpdate(req.getStallId());
-        if ("DECOMMISSIONED".equals(stall.getStatus())) throw BizException.badRequest("停用铺位不能发起施工流程");
+        validateInitialStallStatus(type, stall);
         long active = workflowMapper.selectCount(new QueryWrapper<Workflow>()
                 .eq("stall_id", stall.getId()).in("workflow_type", NEW_TYPES)
                 .in("status", List.of("IN_PROGRESS", "PENDING_ACCEPTANCE", "ACCEPTING", "REJECTED")));
         if (active > 0) throw BizException.badRequest("该铺位已有进行中的施工流程，请先处理完成");
-
-        String requestKey = text(req.getRequestKey()) ? req.getRequestKey().trim() : UUID.randomUUID().toString();
-        Workflow repeated = workflowMapper.selectOne(new QueryWrapper<Workflow>().eq("request_key", requestKey).last("LIMIT 1"));
-        if (repeated != null) {
-            if (!TYPES.contains(repeated.getWorkflowType()) || !Objects.equals(repeated.getApplicantName(), username))
-                throw BizException.badRequest("流程请求编号已被使用");
-            return get(repeated.getId(), username, false);
-        }
 
         SysUser user = text(username) ? userMapper.selectOne(new QueryWrapper<SysUser>().eq("username", username).last("LIMIT 1")) : null;
         Workflow workflow = new Workflow();
@@ -86,7 +86,7 @@ public class ConstructionWorkflowService {
             workflowMapper.insert(workflow);
         } catch (DuplicateKeyException ex) {
             Workflow existing = workflowMapper.selectOne(new QueryWrapper<Workflow>().eq("request_key", requestKey).last("LIMIT 1"));
-            if (existing != null && TYPES.contains(existing.getWorkflowType()) && Objects.equals(existing.getApplicantName(), username))
+            if (existing != null && Objects.equals(type, existing.getWorkflowType()) && Objects.equals(existing.getApplicantName(), username))
                 return toView(existing);
             throw ex;
         }
@@ -304,6 +304,28 @@ public class ConstructionWorkflowService {
     private void validatePeriod(LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null) throw BizException.badRequest("请选择施工开始和结束时间");
         if (!end.isAfter(start)) throw BizException.badRequest("施工结束时间必须晚于开始时间");
+    }
+
+    private void validateInitialStallStatus(String type, Stall stall) {
+        String status = stall.getStatus();
+        if (ENTRY.equals(type) && !"AVAILABLE".equals(status)) {
+            throw BizException.badRequest("施工入场仅允许选择空置铺位，当前状态：" + stallStatusLabel(status));
+        }
+        if (EXIT.equals(type) && !"OCCUPIED".equals(status)) {
+            throw BizException.badRequest("撤场施工仅允许选择在用铺位，当前状态：" + stallStatusLabel(status));
+        }
+    }
+
+    private String stallStatusLabel(String status) {
+        return switch (status == null ? "" : status) {
+            case "AVAILABLE" -> "空置";
+            case "RENOVATING" -> "装修中";
+            case "EXIT_CONSTRUCTION" -> "撤场施工中";
+            case "OCCUPIED" -> "在用";
+            case "MAINTENANCE" -> "维修中";
+            case "DECOMMISSIONED" -> "已停用";
+            default -> text(status) ? status : "未知";
+        };
     }
 
     private String targetStallStatus(String type) {

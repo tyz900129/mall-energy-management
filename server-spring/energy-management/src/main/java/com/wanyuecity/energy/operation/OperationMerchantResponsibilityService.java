@@ -30,7 +30,7 @@ public class OperationMerchantResponsibilityService {
         int pn=Math.max(1,pageNum), ps=Math.min(100,Math.max(10,pageSize)), offset=(pn-1)*ps;
         String k="%"+Objects.toString(keyword,"").trim()+"%";
         String filter=(managerUserId==null?"":" AND r.responsible_user_id="+managerUserId);
-        String where=" WHERE s.status<>'DISABLED' AND (s.stall_code LIKE ? OR s.stall_name LIKE ? OR m.merchant_code LIKE ? OR m.merchant_name LIKE ?)"+filter;
+        String where=" WHERE s.status<>'DECOMMISSIONED' AND (s.stall_code LIKE ? OR s.stall_name LIKE ? OR m.merchant_code LIKE ? OR m.merchant_name LIKE ?)"+filter;
         String from=" FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id LEFT JOIN operation_merchant_responsibility r ON r.stall_id=s.id AND r.status='ACTIVE' LEFT JOIN sys_user u ON u.id=r.responsible_user_id LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type";
         Long total=jdbc.queryForObject("SELECT COUNT(*)"+from+where,Long.class,k,k,k,k);
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.stall_name stallName,s.floor_name floorName,s.business_type businessType,COALESCE(d.item_label,s.business_type) businessTypeLabel,s.status stallStatus,s.operation_qr_token qrToken,m.merchant_code merchantCode,m.merchant_name merchantName,r.id responsibilityId,r.responsible_user_id managerUserId,u.username managerUsername,u.display_name managerName,COALESCE(NULLIF(r.contact_phone,''),u.phone) managerPhone,r.effective_from effectiveFrom,r.remark"+from+where+" ORDER BY s.floor_code,s.stall_code LIMIT ? OFFSET ?",k,k,k,k,ps,offset);
@@ -47,7 +47,7 @@ public class OperationMerchantResponsibilityService {
     }
 
     public Map<String,Object> publicStall(String token){
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName,s.business_type businessType,COALESCE(d.item_label,s.business_type) businessTypeLabel,s.status stallStatus,COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type WHERE s.operation_qr_token=? AND s.status<>'DISABLED'",token);
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName,s.business_type businessType,COALESCE(d.item_label,s.business_type) businessTypeLabel,s.status stallStatus,COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type WHERE s.operation_qr_token=? AND s.status<>'DECOMMISSIONED'",token);
         if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"二维码无效或铺位已停用");return rows.get(0);
     }
 
@@ -58,7 +58,7 @@ public class OperationMerchantResponsibilityService {
     }
 
     public byte[] qr(Long stallId){
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT operation_qr_token token FROM stall WHERE id=? AND status<>'DISABLED'",stallId);if(rows.isEmpty())throw bad("铺位不存在或已停用");
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT operation_qr_token token FROM stall WHERE id=? AND status<>'DECOMMISSIONED'",stallId);if(rows.isEmpty())throw bad("铺位不存在或已停用");
         String token=Objects.toString(rows.get(0).get("token"),"");if(token.isBlank()){token=UUID.randomUUID().toString().replace("-","");jdbc.update("UPDATE stall SET operation_qr_token=? WHERE id=?",token,stallId);}
         try{String url=publicBaseUrl.replaceAll("/+$","")+"/operation/stall/"+token;BitMatrix matrix=new QRCodeWriter().encode(url,BarcodeFormat.QR_CODE,520,520);ByteArrayOutputStream out=new ByteArrayOutputStream();MatrixToImageWriter.writeToStream(matrix,"PNG",out);return out.toByteArray();}catch(Exception e){throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,"铺位二维码生成失败");}
     }
@@ -67,7 +67,7 @@ public class OperationMerchantResponsibilityService {
     public Map<String,Object> assign(Map<String,Object> body,String operator) {
         Long stallId=number(body.get("stallId")), userId=number(body.get("managerUserId"));
         if(stallId==null||userId==null) throw bad("请选择铺位和责任商管");
-        ensureExists("SELECT COUNT(*) FROM stall WHERE id=? AND status<>'DISABLED'",stallId,"铺位不存在或已停用");
+        ensureExists("SELECT COUNT(*) FROM stall WHERE id=? AND status<>'DECOMMISSIONED'",stallId,"铺位不存在或已停用");
         ensureExists("SELECT COUNT(*) FROM sys_user WHERE id=? AND status=1",userId,"责任商管不存在或已停用");
         List<Map<String,Object>> old=jdbc.queryForList("SELECT id,responsible_user_id FROM operation_merchant_responsibility WHERE stall_id=?",stallId);
         Long oldUser=old.isEmpty()?null:number(old.get(0).get("responsible_user_id"));

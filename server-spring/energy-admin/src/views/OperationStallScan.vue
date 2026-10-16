@@ -112,7 +112,7 @@ const propertyForm=ref<any>({}),propertyStatus=ref<'NORMAL'|'ABNORMAL'>('NORMAL'
 const selectedViolations=computed(()=>(propertyForm.value.violationItems||[]).filter((x:any)=>selectedViolationIds.value.includes(x.id)))
 const todayAnswerRows=computed(()=>{const record=todayDetail.value.record;if(!record)return[];const answers=parseJson(record.answersJson,{}),fields=parseJson(record.templateFieldsJson,[]);return fields.map((field:any)=>({label:field.label||field.code,value:answerText(answers[field.code],field.type)}))})
 const token=()=>String(route.params.token)
-const statusText=(v:string)=>({OCCUPIED:'在用',AVAILABLE:'空置',RENOVATING:'装修中'}as any)[v]||v||'-'
+const statusText=(v:string)=>({OCCUPIED:'在用',AVAILABLE:'空置',RENOVATING:'装修中',EXIT_CONSTRUCTION:'撤场施工中',MAINTENANCE:'维修中',DECOMMISSIONED:'已停用'}as any)[v]||v||'-'
 const defaults=(fs:any[])=>Object.fromEntries(fs.map(f=>[f.code,f.type==='BOOLEAN'?(f.expected??true):f.type==='NUMBER'?null:'']))
 function login(){router.push({path:'/login',query:{redirect:route.fullPath}})}
 function coming(n:string){ElMessage.info(`${n}将在后续阶段接入`)}
