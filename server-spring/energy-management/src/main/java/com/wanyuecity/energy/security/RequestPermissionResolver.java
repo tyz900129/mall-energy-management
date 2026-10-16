@@ -35,6 +35,7 @@ public class RequestPermissionResolver {
             return new Rule("operation.property.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"));
         }
         if (path.startsWith("/api/v1/operations/clearances")) {
+            if (path.endsWith("/settings")) return manage("operation.clearance.setting.manage");
             if (path.endsWith("/period")) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (!read) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             return new Rule("operation.clearance.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"));
