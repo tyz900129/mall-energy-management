@@ -26,6 +26,9 @@ public class RequestPermissionResolver {
         if (path.startsWith("/api/v1/operations/accountability-orders"))
             return read ? new Rule("operation.accountability.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"))
                     : new Rule("operation.accountability.manage","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER"));
+        if (path.startsWith("/api/v1/operations/violation-items"))
+            return read ? new Rule("operation.violation.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER"))
+                    : manage("operation.violation.manage");
         if (path.startsWith("/api/v1/operations/property-inspections")) {
             if (path.contains("/templates")) return read ? new Rule("operation.property.template.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER")) : manage("operation.property.template.manage");
             if (!read) return new Rule("operation.clearance.review","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER"));

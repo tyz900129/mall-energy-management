@@ -65,14 +65,14 @@
           <el-menu-item v-if="hasAny('access.event.view.self','access.event.view.all')" index="/access/events">通行记录</el-menu-item>
           <el-menu-item v-if="can('access.person.review')" index="/access/reviews">人员复核</el-menu-item>
         </el-sub-menu>
-        <el-sub-menu v-if="hasAny('operation.merchant.view','operation.dashboard.view','operation.clearance.submit','operation.clearance.review','operation.property.view','operation.accountability.view')" index="operation-business-management">
+        <el-sub-menu v-if="hasAny('operation.merchant.view','operation.dashboard.view','operation.clearance.submit','operation.clearance.review','operation.property.view','operation.violation.view','operation.accountability.view')" index="operation-business-management">
           <template #title><el-icon><Management /></el-icon><span>运营管理</span></template>
           <el-menu-item v-if="can('operation.dashboard.view')" index="/operation/dashboard">运营日清总览</el-menu-item>
           <el-menu-item v-if="can('operation.merchant.view')" index="/operation/merchant-responsibilities">责任商管管理</el-menu-item>
           <el-menu-item v-if="can('operation.clearance.view')" index="/operation/clearances">商户日清记录</el-menu-item>
           <el-menu-item v-if="can('operation.clearance.template.view')" index="/operation/clearance-templates">日清表单模板</el-menu-item>
           <el-menu-item v-if="can('operation.property.view')" index="/operation/property-inspections">物业清场检查</el-menu-item>
-          <el-menu-item v-if="can('operation.property.template.view')" index="/operation/property-inspection-templates">物业检查模板</el-menu-item>
+          <el-menu-item v-if="can('operation.violation.view')" index="/operation/violation-items">违规项目管理</el-menu-item>
           <el-menu-item v-if="can('operation.accountability.view')" index="/operation/accountability">追责管理</el-menu-item>
         </el-sub-menu>
         <el-sub-menu v-if="hasAny('integration.config.view','integration.sync.view')" index="data-integration">

@@ -18,7 +18,7 @@ import java.util.Map;
 public class AccountAnomalyMonitorController {
     private final AccountAnomalyMonitorService service;
     @GetMapping("/overview") public ApiResponse<Map<String,Object>> overview(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return ApiResponse.ok(service.overview(date));}
-    @GetMapping public ApiResponse<Map<String,Object>> results(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date,@RequestParam(required=false)String keyword,@RequestParam(required=false)String status,@RequestParam(required=false)String direction,@RequestParam(defaultValue="1")int pageNum,@RequestParam(defaultValue="20")int pageSize){return ApiResponse.ok(service.results(date,keyword,status,direction,pageNum,pageSize));}
+    @GetMapping public ApiResponse<Map<String,Object>> results(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date,@RequestParam(required=false)String keyword,@RequestParam(required=false)String status,@RequestParam(required=false)String direction,@RequestParam(defaultValue="false")boolean includeUnmonitored,@RequestParam(defaultValue="1")int pageNum,@RequestParam(defaultValue="20")int pageSize){return ApiResponse.ok(service.results(date,keyword,status,direction,includeUnmonitored,pageNum,pageSize));}
     @GetMapping("/accounts") public ApiResponse<List<Map<String,Object>>> accounts(@RequestParam(required=false)String keyword){return ApiResponse.ok(service.accounts(keyword));}
     @GetMapping("/trend") public ApiResponse<Map<String,Object>> trend(@RequestParam String accountNumber,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate startDate,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate endDate){return ApiResponse.ok(service.trend(accountNumber,startDate,endDate));}
     @PostMapping("/sync") public ApiResponse<Map<String,Object>> sync(){return ApiResponse.ok(service.syncAndAnalyze("MANUAL"));}
@@ -26,5 +26,7 @@ public class AccountAnomalyMonitorController {
     @GetMapping("/rules/default") public ApiResponse<Map<String,Object>> defaultRule(){return ApiResponse.ok(service.defaultRule());}
     @PutMapping("/rules/{accountNumber}") public ApiResponse<Void> saveRule(@PathVariable String accountNumber,@RequestBody Map<String,Object> body){service.saveRule(accountNumber,body);return ApiResponse.ok();}
     @PutMapping("/{id}/handle") public ApiResponse<Void> handle(@PathVariable Long id,@RequestBody Map<String,Object> body){service.handle(id,String.valueOf(body.get("status")),body.get("remark")==null?null:String.valueOf(body.get("remark")));return ApiResponse.ok();}
+    @GetMapping("/{id}/handle-history") public ApiResponse<List<Map<String,Object>>> handleHistory(@PathVariable Long id){return ApiResponse.ok(service.handleHistory(id));}
+    @PutMapping("/{id}/disable-monitoring") public ApiResponse<Void> disableMonitoring(@PathVariable Long id,@RequestBody Map<String,Object> body){service.disableMonitoring(id,body.get("remark")==null?null:String.valueOf(body.get("remark")));return ApiResponse.ok();}
     @GetMapping("/runs") public ApiResponse<List<Map<String,Object>>> runs(){return ApiResponse.ok(service.runs());}
 }

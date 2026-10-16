@@ -9,5 +9,7 @@ export const accountAnomalyApi={
  defaultRule:()=>http.get('/api/v1/energy/account-anomalies/rules/default'),
  saveRule:(accountNumber:string,data:any)=>http.put(`/api/v1/energy/account-anomalies/rules/${encodeURIComponent(accountNumber)}`,data),
  handle:(id:number,data:any)=>http.put(`/api/v1/energy/account-anomalies/${id}/handle`,data),
+ handleHistory:(id:number)=>http.get(`/api/v1/energy/account-anomalies/${id}/handle-history`),
+ disableMonitoring:(id:number,data:any)=>http.put(`/api/v1/energy/account-anomalies/${id}/disable-monitoring`,data),
  runs:()=>http.get('/api/v1/energy/account-anomalies/runs')
 }
