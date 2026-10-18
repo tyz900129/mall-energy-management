@@ -89,6 +89,10 @@ public class WorkflowService {
 
         Stall stall = stallMapper.selectById(req.getStallId());
         if (stall == null) throw BizException.badRequest("铺位不存在");
+        if ("NEW_MERCHANT".equals(type) && !isWarehouse(stall)) {
+            if (!hasText(req.getStallBusinessType())) out.getReasons().add("请选择铺位业态");
+            else if (!isEnabledBusinessType(req.getStallBusinessType())) out.getReasons().add("所选铺位业态无效，请从业态字典中选择");
+        }
         if ("DECOMMISSIONED".equals(stall.getStatus())) out.getReasons().add("铺位已停用");
         if ("MERCHANT_EXIT".equals(type) && out.getMerchantStalls().stream().noneMatch(s -> Objects.equals(s.getStallId(), stall.getId())))
             out.getReasons().add("该铺位不属于当前商户，不能发起撤柜解绑");
@@ -153,6 +157,11 @@ public class WorkflowService {
             row.setContactPhone(hasText(req.getContactPhone()) ? req.getContactPhone().trim() : null);
         }
         row.setStallId(req.getStallId());
+        Stall selectedStall = stallMapper.selectById(req.getStallId());
+        if ("NEW_MERCHANT".equals(check.getWorkflowType()) && selectedStall != null) {
+            row.setOriginalStallBusinessType(selectedStall.getBusinessType());
+            row.setRequestedStallBusinessType(isWarehouse(selectedStall) ? null : req.getStallBusinessType().trim());
+        }
         row.setRequestedBillingStartTime(req.getEffectiveTime()); row.setApplicantId(user == null ? null : user.getId());
         row.setApplicantName(displayName(user, username)); row.setStatus("DRAFT"); row.setRemark(req.getRemark());
         row.setExpectedAccountAction("NEW_MERCHANT".equals(check.getWorkflowType()) ? "CREATE_AND_BIND" :
@@ -377,6 +386,7 @@ public class WorkflowService {
     public WorkflowView reset(Long id) {
         Workflow row = require(id);
         requireBillingWorkflow(row);
+        restoreStallBusinessType(row);
         clearRuntimeRecords(id);
         jdbc.update("UPDATE workflow_expected_change SET actual_account_number=NULL,verify_status='PENDING',verified_at=NULL,exception_reason=NULL WHERE workflow_id=?", id);
         jdbc.update("UPDATE workflow SET status='DRAFT',submitted_at=NULL,field_verified_at=NULL,waiting_platform_at=NULL,verified_at=NULL,completed_at=NULL,oa_process_no=NULL,completion_remark=NULL WHERE id=?", id);
@@ -453,7 +463,7 @@ public class WorkflowService {
     public List<WorkflowDevice> devices(Long id) { require(id); return workflowDeviceMapper.selectList(new QueryWrapper<WorkflowDevice>().eq("workflow_id",id).orderByAsc("id")); }
     public List<WorkflowExpectedChange> expectedChanges(Long id) { require(id); return expectedChangeMapper.selectList(new QueryWrapper<WorkflowExpectedChange>().eq("workflow_id",id).orderByAsc("id")); }
     public Map<String,Object> matchEvidence(Long id){Workflow w=require(id);requireBillingWorkflow(w);List<Map<String,Object>> runs=jdbc.queryForList("SELECT id,sync_batch_id,match_status,matched_count,total_count,summary,created_at FROM workflow_match_run WHERE workflow_id=? ORDER BY id DESC",id);for(Map<String,Object> r:runs)r.put("details",jdbc.queryForList("SELECT platform_device_id,expected_account_number,actual_account_numbers,match_status,reason FROM workflow_match_detail WHERE match_run_id=? ORDER BY id",r.get("id")));return Map.of("runs",runs,"resolutions",jdbc.queryForList("SELECT action,from_status,to_status,conclusion,operator_name,created_at FROM workflow_match_resolution WHERE workflow_id=? ORDER BY id DESC",id));}
-    @Transactional public WorkflowView resolveMatch(Long id,MatchResolutionRequest req,String operator){Workflow w=require(id);requireBillingWorkflow(w);if(!Set.of("PARTIAL_MATCH","EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("workflow is not awaiting exception resolution");String action=req.getAction().trim().toUpperCase(),from=w.getStatus(),to;if("RETRY".equals(action))to="WAITING_PLATFORM_CHANGE";else if("CLOSE_EXCEPTION".equals(action)){if(!hasText(req.getConclusion()))throw BizException.badRequest("conclusion is required");to="RESOLVED_EXCEPTION";w.setCompletedAt(LocalDateTime.now());}else throw BizException.badRequest("invalid resolution action");w.setStatus(to);workflowMapper.updateById(w);jdbc.update("INSERT INTO workflow_match_resolution(workflow_id,action,from_status,to_status,conclusion,operator_name) VALUES(?,?,?,?,?,?)",id,action,from,to,hasText(req.getConclusion())?req.getConclusion().trim():null,operator==null?"system":operator);return get(id);}
+    @Transactional public WorkflowView resolveMatch(Long id,MatchResolutionRequest req,String operator){Workflow w=require(id);requireBillingWorkflow(w);if(!Set.of("PARTIAL_MATCH","EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("workflow is not awaiting exception resolution");String action=req.getAction().trim().toUpperCase(),from=w.getStatus(),to;if("RETRY".equals(action))to="WAITING_PLATFORM_CHANGE";else if("CLOSE_EXCEPTION".equals(action)){if(!hasText(req.getConclusion()))throw BizException.badRequest("conclusion is required");to="RESOLVED_EXCEPTION";w.setCompletedAt(LocalDateTime.now());}else throw BizException.badRequest("invalid resolution action");w.setStatus(to);workflowMapper.updateById(w);if("CLOSE_EXCEPTION".equals(action))applyStallBusinessType(w);jdbc.update("INSERT INTO workflow_match_resolution(workflow_id,action,from_status,to_status,conclusion,operator_name) VALUES(?,?,?,?,?,?)",id,action,from,to,hasText(req.getConclusion())?req.getConclusion().trim():null,operator==null?"system":operator);return get(id);}
     @Transactional public WorkflowView updateOaProcessNo(Long id,String value){Workflow w=requirePlatformInfoEditable(id);String oa=trimToNull(value,100);w.setOaProcessNo(oa);if(hasText(oa)&&"WAITING_OA_SUBMISSION".equals(w.getStatus())){stateMachine.requireTransition("WAITING_OA_SUBMISSION","WAITING_PLATFORM_CHANGE");w.setStatus("WAITING_PLATFORM_CHANGE");w.setWaitingPlatformAt(LocalDateTime.now());}else if(!hasText(oa)&&"WAITING_PLATFORM_CHANGE".equals(w.getStatus())){w.setStatus("WAITING_OA_SUBMISSION");w.setWaitingPlatformAt(null);}workflowMapper.updateById(w);return get(id);}
     @Transactional public WorkflowView updateCompletionRemark(Long id,String value){Workflow w=requirePlatformInfoEditable(id);w.setCompletionRemark(trimToNull(value,1000));workflowMapper.updateById(w);return get(id);}
     private Workflow requirePlatformInfoEditable(Long id){Workflow w=require(id);requireBillingWorkflow(w);if(!Set.of("WAITING_OA_SUBMISSION","WAITING_PLATFORM_CHANGE","PLATFORM_VERIFYING","PARTIAL_MATCH","EXCEPTION","VERIFIED","COMPLETED","RESOLVED_EXCEPTION").contains(w.getStatus()))throw BizException.badRequest("仅待 OA 提交、平台处理阶段或已完成流程可以维护 OA 信息");return w;}
@@ -476,10 +486,20 @@ public class WorkflowService {
         v.setMerchantName(hasText(resolvedName)?resolvedName:row.getMerchantName());
         v.setBillingAccountName(billingAccount==null?null:(hasText(billingAccount.getUserName())?billingAccount.getUserName():billingAccount.getAccountName()));
         SysUser applicant=row.getApplicantId()==null?null:userMapper.selectById(row.getApplicantId());
-        v.setOriginalContactPhone(row.getOriginalContactPhone());v.setUpdateSmsPhone(row.getUpdateSmsPhone());v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(displayName(applicant,row.getApplicantName()));v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
+        v.setOriginalContactPhone(row.getOriginalContactPhone());v.setUpdateSmsPhone(row.getUpdateSmsPhone());v.setRequestedStallBusinessType(row.getRequestedStallBusinessType());if(hasText(row.getRequestedStallBusinessType())){List<String> labels=jdbc.queryForList("SELECT item_label FROM business_dictionary WHERE dict_type='BUSINESS_TYPE' AND item_value=? LIMIT 1",String.class,row.getRequestedStallBusinessType());v.setRequestedStallBusinessTypeLabel(labels.isEmpty()?row.getRequestedStallBusinessType():labels.get(0));}v.setTargetAccountNumber(row.getTargetAccountNumber());v.setRequestedBillingStartTime(row.getRequestedBillingStartTime());v.setApplicantName(displayName(applicant,row.getApplicantName()));v.setStatus(row.getStatus());v.setSubmittedAt(row.getSubmittedAt());v.setExpectedAccountAction(row.getExpectedAccountAction());v.setRemark(row.getRemark());v.setOaProcessNo(row.getOaProcessNo());v.setCompletionRemark(row.getCompletionRemark());v.setCreatedAt(row.getCreatedAt());v.setUpdatedAt(row.getUpdatedAt());v.setDevices(workflowDevices);v.setExpectedChanges(expectedChanges(row.getId()));return v; }
     private SysUser findUser(String username){if(!hasText(username)||userMapper==null)return null;return userMapper.selectOne(new QueryWrapper<SysUser>().eq("username",username).last("LIMIT 1"));}
     private boolean ownedBy(Workflow workflow,String username){if(!hasText(username))return false;SysUser user=findUser(username);if(user!=null&&workflow.getApplicantId()!=null)return Objects.equals(workflow.getApplicantId(),user.getId());return Objects.equals(workflow.getApplicantName(),username);}
     private String displayName(SysUser user,String fallback){return user!=null&&hasText(user.getDisplayName())?user.getDisplayName().trim():fallback;}
     private String nextWorkflowNo(){return "WF"+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))+UUID.randomUUID().toString().substring(0,4).toUpperCase();}
+    public void applyStallBusinessType(Workflow row){
+        if(row==null||!"NEW_MERCHANT".equals(row.getWorkflowType())||!hasText(row.getRequestedStallBusinessType())||row.getStallId()==null)return;
+        jdbc.update("UPDATE stall SET business_type=? WHERE id=? AND UPPER(COALESCE(business_type,''))<>'CK' AND COALESCE(business_type,'')=COALESCE(?,'')",row.getRequestedStallBusinessType(),row.getStallId(),row.getOriginalStallBusinessType());
+    }
+    private void restoreStallBusinessType(Workflow row){
+        if(row==null||!"NEW_MERCHANT".equals(row.getWorkflowType())||!hasText(row.getRequestedStallBusinessType())||row.getStallId()==null)return;
+        jdbc.update("UPDATE stall SET business_type=? WHERE id=? AND business_type=?",row.getOriginalStallBusinessType(),row.getStallId(),row.getRequestedStallBusinessType());
+    }
+    private boolean isWarehouse(Stall stall){return stall!=null&&"CK".equalsIgnoreCase(Objects.toString(stall.getBusinessType(),"").trim());}
+    private boolean isEnabledBusinessType(String value){Integer count=jdbc.queryForObject("SELECT COUNT(*) FROM business_dictionary WHERE dict_type='BUSINESS_TYPE' AND item_value=? AND status=1",Integer.class,value.trim());return count!=null&&count>0;}
     private boolean hasText(String s){return s!=null&&!s.isBlank();}
 }

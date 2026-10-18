@@ -130,6 +130,8 @@ public class RequestPermissionResolver {
             if (path.contains("/permissions")) return admin("system.user.permission.manage");
             return admin(read ? "system.user.view" : "system.user.manage");
         }
+        if (path.startsWith("/api/v1/dictionaries") && read && "BUSINESS_TYPE".equalsIgnoreCase(request.getParameter("type")))
+            return new Rule("workflow.view","APPLICANT",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
         if (path.startsWith("/api/v1/dictionaries") || path.startsWith("/api/v1/cable-specifications") || path.startsWith("/api/v1/power-switch-specifications") || path.startsWith("/api/v1/air-conditioner-specifications"))
             return read ? view("system.dictionary.view") : manage("system.dictionary.manage");
         if (path.startsWith("/api/v1/webhooks/config")) return read ? view("system.webhook.view") : manage("system.webhook.manage");
