@@ -8,7 +8,7 @@ import java.util.List;
     private Long id; private String workflowNo; private String workflowType;
     private String merchantCode; private String merchantName; private String contactName; private String contactPhone;
     private String originalContactPhone; private Boolean updateSmsPhone;
-    private Long stallId; private String stallCode; private String stallName; private String floorCode; private String floorName; private String stallBusinessType; private String stallBusinessCategory;
+    private Long stallId; private String stallCode; private String stallName; private String floorCode; private String floorName; private String stallBusinessType; private String requestedStallBusinessType; private String requestedStallBusinessTypeLabel; private String stallBusinessCategory;
     private String targetAccountNumber; private LocalDateTime requestedBillingStartTime;
     private String billingAccountName;
     private String applicantName; private String status; private LocalDateTime submittedAt;

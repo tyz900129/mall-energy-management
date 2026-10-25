@@ -18,6 +18,8 @@ public class Workflow {
     private String originalContactPhone;
     private Boolean updateSmsPhone;
     private Long stallId;
+    private String requestedStallBusinessType;
+    private String originalStallBusinessType;
     private String targetAccountNumber;
     private LocalDateTime requestedBillingStartTime;
     private Long applicantId;

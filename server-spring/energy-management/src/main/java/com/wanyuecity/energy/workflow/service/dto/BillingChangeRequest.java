@@ -17,6 +17,7 @@ public class BillingChangeRequest {
     private Boolean updateSmsPhone;
     private String originalContactPhone;
     private Long stallId;
+    private String stallBusinessType;
     private LocalDateTime effectiveTime;
     private Boolean usesWater;
     private String remark;
