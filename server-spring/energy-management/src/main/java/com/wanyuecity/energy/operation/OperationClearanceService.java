@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -166,6 +167,69 @@ public class OperationClearanceService {
                         "c.exception_description exceptionDescription,c.status,c.submitted_at submittedAt" + from + where +
                         " ORDER BY c.period_date DESC,c.submitted_at DESC LIMIT ? OFFSET ?", args.toArray());
         return Map.of("records", rows, "total", total == null ? 0 : total, "current", page, "size", size);
+    }
+
+    public byte[] exportCsv(String username, boolean all, String keyword, String date) {
+        Map<String, Object> user = one("SELECT id FROM sys_user WHERE username=?", username);
+        List<Object> args = new ArrayList<>();
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        if (!all) {
+            where.append(" AND (c.submitter_user_id=? OR c.manager_user_id=?)");
+            args.add(user.get("id"));
+            args.add(user.get("id"));
+        }
+        if (date != null && !date.isBlank()) {
+            where.append(" AND c.period_date=?");
+            args.add(Date.valueOf(date));
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            where.append(" AND (s.stall_code LIKE ? OR c.merchant_name_snapshot LIKE ?)");
+            String value = "%" + keyword.trim() + "%";
+            args.add(value);
+            args.add(value);
+        }
+        String from = " FROM operation_clearance_record c JOIN stall s ON s.id=c.stall_id";
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT c.period_date periodDate," +
+                        "s.stall_code stallCode,c.merchant_name_snapshot merchantName,c.submitter_name submitterName," +
+                        "c.manager_name_snapshot managerName,c.template_name_snapshot templateName," +
+                        "c.electricity_off electricityOff,c.water_off waterOff,c.gas_off gasOff,c.door_closed doorClosed," +
+                        "c.status,c.exception_description exceptionDescription,c.submitted_at submittedAt" + from + where +
+                        " ORDER BY c.period_date DESC,c.submitted_at DESC", args.toArray());
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        csv.append("日清日期,铺位,商户,提交人,责任商管,表单,电,水,气,门窗,状态,异常说明,提交时间\n");
+        for (Map<String, Object> row : rows) {
+            appendCsv(csv, row.get("periodDate"));
+            appendCsv(csv, row.get("stallCode"));
+            appendCsv(csv, row.get("merchantName"));
+            appendCsv(csv, row.get("submitterName"));
+            appendCsv(csv, row.get("managerName"));
+            appendCsv(csv, row.get("templateName"));
+            appendCsv(csv, boolText(row.get("electricityOff")));
+            appendCsv(csv, boolText(row.get("waterOff")));
+            appendCsv(csv, boolText(row.get("gasOff")));
+            appendCsv(csv, boolText(row.get("doorClosed")));
+            appendCsv(csv, "NORMAL".equals(row.get("status")) ? "正常" : "异常");
+            appendCsv(csv, row.get("exceptionDescription"));
+            appendCsv(csv, row.get("submittedAt"));
+            csv.setLength(csv.length() - 1);
+            csv.append('\n');
+        }
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String boolText(Object value) {
+        if (value instanceof Number number) return number.intValue() != 0 ? "已关" : "未关";
+        return Boolean.parseBoolean(String.valueOf(value)) ? "已关" : "未关";
+    }
+
+    private void appendCsv(StringBuilder csv, Object value) {
+        String text = value == null ? "" : String.valueOf(value);
+        if (text.indexOf(',') >= 0 || text.indexOf('"') >= 0 || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) {
+            csv.append('"').append(text.replace("\"", "\"\"")).append('"');
+        } else {
+            csv.append(text);
+        }
+        csv.append(',');
     }
 
     private Map<String, Object> scheduleMap(Schedule schedule) {

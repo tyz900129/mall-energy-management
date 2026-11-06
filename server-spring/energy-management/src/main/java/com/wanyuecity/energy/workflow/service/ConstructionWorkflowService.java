@@ -8,6 +8,7 @@ import com.wanyuecity.energy.stall.entity.Stall;
 import com.wanyuecity.energy.stall.mapper.StallMapper;
 import com.wanyuecity.energy.system.entity.SysUser;
 import com.wanyuecity.energy.system.mapper.SysUserMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.wanyuecity.energy.system.service.SysUserService;
 import com.wanyuecity.energy.workflow.entity.ConstructionAcceptance;
 import com.wanyuecity.energy.workflow.entity.ConstructionInspection;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +47,7 @@ public class ConstructionWorkflowService {
     private final StallMapper stallMapper;
     private final SysUserMapper userMapper;
     private final SysUserService userService;
+    private final JdbcTemplate jdbc;
     private final ConstructionInspectionMapper inspectionMapper;
     private final ConstructionAcceptanceMapper acceptanceMapper;
 
@@ -338,7 +341,7 @@ public class ConstructionWorkflowService {
         String phone = trim(user.getPhone());
         if (!text(phone)) throw BizException.badRequest("当前用户未维护联系电话，请先联系管理员完善用户资料");
         Set<String> roles = Set.copyOf(userService.findRoleCodes(user.getId()));
-        if (roles.contains("DEVICE_VERIFIER")) {
+        if (roles.contains("PROPERTY_MANAGER") || roles.contains("DEVICE_VERIFIER")) {
             detail.setPropertyEngineerName(name); detail.setPropertyEngineerPhone(phone);
             detail.setCommercialManagerName(required(req.getCommercialManagerName(), "请选择或填写商管负责人"));
             detail.setCommercialManagerPhone(required(req.getCommercialManagerPhone(), "请填写商管负责人电话"));
@@ -347,6 +350,15 @@ public class ConstructionWorkflowService {
             detail.setPropertyEngineerName(required(req.getPropertyEngineerName(), "请选择或填写物业部工程专员"));
             detail.setPropertyEngineerPhone(required(req.getPropertyEngineerPhone(), "请填写工程专员电话"));
         }
+    }
+
+    /** 施工申请内部联系人候选：PROPERTY=物业管理员；COMMERCIAL=商管人员/商管主管。 */
+    public List<Map<String,Object>> contactOptions(String side){
+        String codes = "PROPERTY".equalsIgnoreCase(side) ? "'PROPERTY_MANAGER'" : "'APPLICANT','OPS_PATROL_MANAGER'";
+        return jdbc.queryForList("SELECT u.id,u.display_name displayName,u.phone FROM sys_user u "
+                + "JOIN sys_user_role ur ON ur.user_id=u.id JOIN sys_role r ON r.id=ur.role_id "
+                + "WHERE u.status=1 AND r.code IN (" + codes + ") "
+                + "GROUP BY u.id,u.display_name,u.phone ORDER BY u.display_name");
     }
 
     private String required(String value, String message) { if (!text(value)) throw BizException.badRequest(message); return value.trim(); }

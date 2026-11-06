@@ -28,6 +28,9 @@ public class SysUser {
     /** 1 = enabled, 0 = disabled. */
     private Integer status;
 
+    /** 所属部门（商管处用于展示与排班，物业/客服课用于权限裁剪）。 */
+    private Long departmentId;
+
     private LocalDateTime lastLoginAt;
 
     @TableField(fill = FieldFill.INSERT)

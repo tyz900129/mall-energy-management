@@ -24,6 +24,7 @@ public class SysUserView {
     private LocalDateTime updatedAt;
     private List<String> roles;
     private List<Long> roleIds;
+    private Long departmentId;
 
     public static SysUserView from(SysUser u, List<String> roles, List<Long> roleIds) {
         return new SysUserView(
@@ -37,6 +38,7 @@ public class SysUserView {
                 u.getCreatedAt(),
                 u.getUpdatedAt(),
                 roles,
-                roleIds);
+                roleIds,
+                u.getDepartmentId());
     }
 }

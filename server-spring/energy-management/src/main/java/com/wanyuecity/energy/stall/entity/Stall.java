@@ -35,6 +35,9 @@ public class Stall {
 
     private String remark;
 
+    /** Operation stall scan token (operation_qr_token column). */
+    private String operationQrToken;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

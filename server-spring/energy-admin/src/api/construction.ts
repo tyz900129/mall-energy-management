@@ -80,6 +80,7 @@ export const constructionApi = {
   ,closeInspection: (id:number,inspectionId:number) => http.post(`/api/v1/construction-workflows/${id}/inspections/${inspectionId}/close`)
   ,requestAcceptance: (id:number,data:Record<string,any>) => http.post(`/api/v1/construction-workflows/${id}/acceptance-request`,data)
   ,decideAcceptance: (id:number,data:Record<string,any>) => http.post(`/api/v1/construction-workflows/${id}/acceptance-result`,data)
+  ,contactOptions: (side:'PROPERTY'|'COMMERCIAL') => http.get<Array<{id:number;displayName:string;phone?:string}>>('/api/v1/construction-workflows/contact-options',{params:{side}})
   ,publicGet: (token:string) => http.get(`/api/v1/construction-public/${token}`)
   ,attachments: (id:number) => http.get(`/api/v1/construction-workflows/${id}/attachments`)
   ,uploadAttachment: (id:number,targetType:'INSPECTION'|'ACCEPTANCE',targetId:number,photoType:string,file:File,onProgress?:(value:number)=>void) => {

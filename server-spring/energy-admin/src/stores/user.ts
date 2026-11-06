@@ -33,6 +33,25 @@ export const useUserStore = defineStore('user', () => {
 
   async function autoLogin(){const deviceToken=localStorage.getItem('device_login_token');if(!deviceToken)return false;try{const resp:any=await authApi.deviceLogin({deviceToken,fingerprint:await fingerprint()});saveSession(resp);return true}catch{localStorage.removeItem('device_login_token');return false}}
 
+  function clearSession() {
+    token.value = ''
+    user.value = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+  }
+
+  /**
+   * 恢复登录态：先校验现有 JWT，失效时用本机设备凭据静默换新 token。
+   * 公开 H5 页面（如巡检填报）打开时调用，用于自动带出填报人信息。
+   */
+  async function restoreSession(): Promise<UserInfo | null> {
+    if (token.value || localStorage.getItem('token')) {
+      try { return await fetchMe() } catch { clearSession() }
+    }
+    if (await autoLogin()) return user.value
+    return null
+  }
+
   async function fetchMe() {
     const u: any = await authApi.me()
     user.value = u
@@ -41,16 +60,18 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function logout() {
-    token.value = ''
-    user.value = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearSession()
     localStorage.removeItem('device_login_token')
   }
 
   function hasPermission(code: string) {
+    const roles = user.value?.roles || []
+    if (roles.includes('SUPER_ADMIN')) return true
+    if (roles.includes('SYSTEM_ADMIN')) {
+      return !code.startsWith('system.user.') && code !== 'construction.delete'
+    }
     return !!user.value?.permissions?.includes(code)
   }
 
-  return { token, user, login, autoLogin, fetchMe, logout, hasPermission }
+  return { token, user, login, autoLogin, fetchMe, restoreSession, logout, hasPermission }
 })

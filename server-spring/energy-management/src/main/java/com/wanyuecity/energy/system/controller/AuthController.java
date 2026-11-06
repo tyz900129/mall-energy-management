@@ -98,7 +98,7 @@ public class AuthController {
 
         LoginResponse.UserInfo info = new LoginResponse.UserInfo(
                 user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), user.getPhone(), roles,
-                permissions);
+                permissions, departmentCode(user), departmentName(user));
         return new LoginResponse(token, tokenProvider.getExpireMinutes(), info);
     }
     private void auditLogin(String username,Long userId,boolean success,String reason,HttpServletRequest http){try{String result="{\"success\":"+success+(reason==null?"":",\"reason\":\""+reason+"\"")+"}";auditLogService.record(username,userId,"LOGIN","AUTH",userId==null?null:userId.toString(),null,result,http.getRemoteAddr(),http.getHeader("User-Agent"));}catch(Exception e){log.error("login audit persistence failed: {}",e.getClass().getSimpleName());}}
@@ -117,8 +117,19 @@ public class AuthController {
         List<String> roles = userService.findRoleCodes(user.getId());
         LoginResponse.UserInfo info = new LoginResponse.UserInfo(
                 user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), user.getPhone(), roles,
-                List.copyOf(permissionService.effectivePermissionCodes(user.getId())));
+                List.copyOf(permissionService.effectivePermissionCodes(user.getId())),
+                departmentCode(user), departmentName(user));
         return ApiResponse.ok(info);
+    }
+
+    private String departmentCode(SysUser user) {
+        PermissionService.DepartmentInfo department = permissionService.department(user.getId());
+        return department == null ? null : department.code();
+    }
+
+    private String departmentName(SysUser user) {
+        PermissionService.DepartmentInfo department = permissionService.department(user.getId());
+        return department == null ? null : department.name();
     }
 
     /** Health probe: returns 200 if the JWT secret loaded, never throws. */

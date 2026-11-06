@@ -8,6 +8,8 @@ export interface WebhookConfig {
   enabled: number
   eventTypes: string
   updatedAt?: string
+  departmentIds?: number[]
+  departmentNames?: string
 }
 
 export interface WebhookConfigInput {
@@ -16,6 +18,7 @@ export interface WebhookConfigInput {
   webhookUrl?: string
   enabled: boolean
   eventTypes: string
+  departmentIds?: number[]
 }
 
 export const webhookApi = {

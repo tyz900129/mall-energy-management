@@ -3,6 +3,8 @@ package com.wanyuecity.energy.system.controller;
 import com.wanyuecity.energy.core.ApiResponse;
 import com.wanyuecity.energy.system.service.SysRoleService;
 import com.wanyuecity.energy.system.service.dto.SysRoleMenuAssignRequest;
+import com.wanyuecity.energy.system.service.dto.SysRolePermissionAssignRequest;
+import com.wanyuecity.energy.system.service.dto.SysRolePermissionView;
 import com.wanyuecity.energy.system.service.dto.SysRoleUpsertRequest;
 import com.wanyuecity.energy.system.service.dto.SysRoleView;
 import jakarta.validation.Valid;
@@ -61,5 +63,18 @@ public class SysRoleController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRoleView> assignMenus(@PathVariable Long id, @Valid @RequestBody SysRoleMenuAssignRequest req) {
         return ApiResponse.ok(roleService.assignMenus(id, req.getMenuIds()));
+    }
+
+    @GetMapping("/{id}/permissions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<SysRolePermissionView> permissions(@PathVariable Long id) {
+        return ApiResponse.ok(roleService.permissions(id));
+    }
+
+    @PutMapping("/{id}/permissions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<SysRolePermissionView> assignPermissions(
+            @PathVariable Long id, @RequestBody SysRolePermissionAssignRequest req) {
+        return ApiResponse.ok(roleService.assignPermissions(id, req));
     }
 }

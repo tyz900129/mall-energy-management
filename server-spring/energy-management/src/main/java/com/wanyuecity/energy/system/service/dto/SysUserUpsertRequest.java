@@ -35,4 +35,7 @@ public class SysUserUpsertRequest {
 
     /** 仅创建时生效；编辑角色请用 /users/{id}/roles */
     private List<Long> roleIds;
+
+    /** 所属部门：商管处用于展示/排班，物业/客服课用于权限裁剪 */
+    private Long departmentId;
 }

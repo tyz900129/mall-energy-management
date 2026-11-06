@@ -11,6 +11,7 @@
       <el-input v-model="query.keyword" placeholder="铺位或商户名称" clearable/>
       <el-date-picker v-model="query.periodDate" type="date" value-format="YYYY-MM-DD" placeholder="日清日期" clearable/>
       <el-button type="primary" @click="search">查询</el-button>
+      <el-button v-if="canExport" plain @click="exportCsv">导出</el-button>
     </div>
     <div class="table-card">
       <el-table :data="rows" v-loading="loading" border>
@@ -49,10 +50,12 @@ const user=useUserStore(),rows=ref<any[]>([]),total=ref(0),loading=ref(false),sc
 const settingsVisible=ref(false),settingsSaving=ref(false),settingsForm=reactive({startTime:'21:00',endTime:'09:00'})
 const query=reactive({keyword:'',periodDate:'',pageNum:1,pageSize:20})
 const canConfigure=computed(()=>user.hasPermission('operation.clearance.setting.manage'))
+const canExport=computed(()=>user.hasPermission('operation.clearance.export'))
 
 async function load(){loading.value=true;try{const result:any=await operationClearanceApi.page(query);rows.value=result.records||[];total.value=Number(result.total)||0}finally{loading.value=false}}
 async function loadSchedule(){const result:any=await operationClearanceApi.schedule();scheduleText.value=result.scheduleText||`${result.startTime||'21:00'}至${result.endTime||'09:00'}`}
 function search(){query.pageNum=1;load()}
+async function exportCsv(){const blob:any=await operationClearanceApi.export({keyword:query.keyword,periodDate:query.periodDate});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`商户日清记录_${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url)}
 const checks=(row:any)=>[{name:'电',ok:!!row.electricityOff},{name:'水',ok:!!row.waterOff},{name:'气',ok:!!row.gasOff},{name:'门窗',ok:!!row.doorClosed}]
 async function openSettings(){const result:any=await operationClearanceApi.settings();settingsForm.startTime=result.startTime;settingsForm.endTime=result.endTime;settingsVisible.value=true}
 async function saveSettings(){if(!settingsForm.startTime||!settingsForm.endTime)return ElMessage.warning('请选择开始和结束时间');if(settingsForm.startTime===settingsForm.endTime)return ElMessage.warning('开始时间和结束时间不能相同');settingsSaving.value=true;try{const result:any=await operationClearanceApi.updateSettings(settingsForm);scheduleText.value=result.scheduleText;settingsVisible.value=false;ElMessage.success('日清提交时间已更新')}finally{settingsSaving.value=false}}

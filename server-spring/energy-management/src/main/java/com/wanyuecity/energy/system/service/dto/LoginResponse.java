@@ -31,5 +31,7 @@ public class LoginResponse {
         private String phone;
         private List<String> roles;
         private List<String> permissions;
+        private String departmentCode;
+        private String departmentName;
     }
 }

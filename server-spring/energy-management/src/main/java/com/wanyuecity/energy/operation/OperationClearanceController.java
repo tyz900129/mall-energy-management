@@ -1,6 +1,9 @@
 package com.wanyuecity.energy.operation;
 
 import com.wanyuecity.energy.core.ApiResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +15,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/operations/clearances")
@@ -63,16 +70,34 @@ public class OperationClearanceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','OPS_PATROL_MANAGER','CS_AGENT','CS_MANAGER','AUDITOR')")
     public ApiResponse<Map<String, Object>> page(@RequestParam(defaultValue = "") String keyword,
                                                   @RequestParam(defaultValue = "") String periodDate,
                                                   @RequestParam(defaultValue = "1") int pageNum,
                                                   @RequestParam(defaultValue = "20") int pageSize,
                                                   Authentication authentication) {
-        boolean all = authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_SUPER_ADMIN") ||
-                        authority.getAuthority().equals("ROLE_SYSTEM_ADMIN") ||
-                        authority.getAuthority().equals("ROLE_DEVICE_VERIFIER"));
+        boolean all = allScope(authentication);
         return ApiResponse.ok(service.page(authentication.getName(), all, keyword, periodDate, pageNum, pageSize));
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','OPS_PATROL_MANAGER','CS_MANAGER','AUDITOR')")
+    public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "") String keyword,
+                                         @RequestParam(defaultValue = "") String periodDate,
+                                         Authentication authentication) {
+        byte[] content = service.exportCsv(authentication.getName(), allScope(authentication), keyword, periodDate);
+        String filename = URLEncoder.encode("商户日清记录_" + LocalDate.now() + ".csv", StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(content);
+    }
+
+    private boolean allScope(Authentication authentication) {
+        Set<String> roles = Set.of("ROLE_SUPER_ADMIN", "ROLE_SYSTEM_ADMIN", "ROLE_DEVICE_VERIFIER",
+                "ROLE_OPS_PATROL_MANAGER", "ROLE_CS_AGENT", "ROLE_CS_MANAGER", "ROLE_AUDITOR");
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> roles.contains(authority.getAuthority()));
     }
 }

@@ -15,6 +15,7 @@ import java.util.Base64;
 @Service
 @RequiredArgsConstructor
 public class DeviceCredentialService {
+    private static final int DEVICE_DAYS = 180;
     private final JdbcTemplate jdbc;
     private final SecureRandom random = new SecureRandom();
 
@@ -25,7 +26,7 @@ public class DeviceCredentialService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         jdbc.update("DELETE FROM user_device_credential WHERE user_id=? AND fingerprint_hash=?", userId, hash(fingerprint));
         jdbc.update("INSERT INTO user_device_credential(user_id,token_hash,fingerprint_hash,device_name,expires_at) VALUES(?,?,?,?,?)",
-                userId, hash(token), hash(fingerprint), trim(deviceName,120), LocalDateTime.now().plusDays(30));
+                userId, hash(token), hash(fingerprint), trim(deviceName,120), LocalDateTime.now().plusDays(DEVICE_DAYS));
         return token;
     }
 
@@ -34,7 +35,9 @@ public class DeviceCredentialService {
         var ids = jdbc.query("SELECT user_id FROM user_device_credential WHERE token_hash=? AND fingerprint_hash=? AND expires_at>NOW() LIMIT 1",
                 (rs,n)->rs.getLong(1), hash(token), hash(fingerprint));
         if (ids.isEmpty()) throw BizException.unauthorized("设备自动登录已失效，请使用密码登录");
-        jdbc.update("UPDATE user_device_credential SET last_used_at=NOW() WHERE token_hash=?", hash(token));
+        // 每次使用顺延有效期，常用设备可长期保持自动登录
+        jdbc.update("UPDATE user_device_credential SET last_used_at=NOW(),expires_at=? WHERE token_hash=?",
+                LocalDateTime.now().plusDays(DEVICE_DAYS), hash(token));
         return ids.get(0);
     }
 

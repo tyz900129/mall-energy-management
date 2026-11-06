@@ -12,6 +12,9 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
+// 公开 H5 页面（巡检、核验、访客申请等）允许匿名访问，401 时不能在页面内强行跳登录
+const PUBLIC_PAGE_PREFIXES = ['/patrol/', '/ops-patrol/', '/verify/', '/construction-public/', '/operation/stall/', '/access/visitor-apply', '/warehouse/']
+
 http.interceptors.response.use(
   (resp) => {
     const data = resp.data
@@ -28,10 +31,11 @@ http.interceptors.response.use(
     if (status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      if (location.pathname !== '/login') {
+      const publicPage = PUBLIC_PAGE_PREFIXES.some(prefix => location.pathname.startsWith(prefix))
+      if (!publicPage && location.pathname !== '/login') {
         location.href = '/login'
+        ElMessage.error('登录已过期')
       }
-      ElMessage.error('登录已过期')
     } else {
       ElMessage.error(msg || '网络错误')
     }

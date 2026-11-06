@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>万悦城后勤管理系统 - 已实现功能说明</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa;
+    color: #303133;
+    line-height: 1.6;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+  
+  .header {
+    background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+    color: white;
+    padding: 60px 40px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+  }
+  .header h1 { font-size: 32px; margin-bottom: 10px; }
+  .header p { font-size: 16px; opacity: 0.9; }
+  .header .meta { margin-top: 20px; display: flex; gap: 30px; font-size: 14px; }
+  .header .meta span { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; }
+
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+  .section h2 {
+    font-size: 22px;
+    color: #303133;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #409eff;
+    display: inline-block;
+  }
+  .section h3 {
+    font-size: 18px;
+    color: #409eff;
+    margin: 20px 0 12px 0;
+  }
+  .section h4 {
+    font-size: 15px;
+    color: #606266;
+    margin: 15px 0 8px 0;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  
+  .feature-card {
+    background: #f8f9fc;
+    border-radius: 8px;
+    padding: 18px;
+    border-left: 4px solid #409eff;
+  }
+  .feature-card.green { border-left-color: #67c23a; }
+  .feature-card.orange { border-left-color: #e6a23c; }
+  .feature-card.purple { border-left-color: #909399; }
+  .feature-card.red { border-left-color: #f56c6c; }
+  
+  .feature-card h4 { margin-top: 0; color: #303133; font-size: 16px; }
+  .feature-card ul { list-style: none; padding: 0; }
+  .feature-card li {
+    padding: 4px 0;
+    padding-left: 18px;
+    position: relative;
+    font-size: 14px;
+    color: #606266;
+  }
+  .feature-card li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #67c23a;
+    font-weight: bold;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ebeef5;
+  }
+  th {
+    background: #f5f7fa;
+    color: #606266;
+    font-weight: 600;
+  }
+  tr:hover { background: #fafafa; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-right: 5px;
+  }
+  .tag-blue { background: #ecf5ff; color: #409eff; }
+  .tag-green { background: #f0f9eb; color: #67c23a; }
+  .tag-orange { background: #fdf6ec; color: #e6a23c; }
+  .tag-red { background: #fef0f0; color: #f56c6c; }
+  .tag-gray { background: #f4f4f5; color: #909399; }
+
+  .menu-tree {
+    background: #f8f9fc;
+    padding: 20px;
+    border-radius: 8px;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    line-height: 2;
+    color: #606266;
+  }
+  .menu-tree .l1 { color: #303133; font-weight: 600; }
+  .menu-tree .l2 { padding-left: 24px; }
+  .menu-tree .l3 { padding-left: 48px; color: #909399; }
+
+  .tech-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .tech-item {
+    background: #ecf5ff;
+    color: #409eff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+  }
+
+  .highlight-box {
+    background: linear-gradient(135deg, #f0f9eb 0%, #ecf5ff 100%);
+    padding: 20px;
+    border-radius: 8px;
+    margin: 15px 0;
+  }
+  .highlight-box strong { color: #409eff; }
+
+  @media (max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .header { padding: 40px 20px; }
+    .header h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>万悦城后勤管理系统</h1>
+    <p>已实现功能说明文档</p>
+    <div class="meta">
+      <span>数据库版本 V64</span>
+      <span>更新日期 2026-10-10</span>
+      <span>GitHub: tyz900129/mall-energy-management</span>
+    </div>
+  </div>
+
+  <!-- 系统概述 -->
+  <div class="section">
+    <h2>一、系统概述</h2>
+    <p>万悦城后勤管理系统是面向商场运营、工程、商管、安保及保洁人员的内部业务平台。系统已从最初的能源管理扩展为涵盖商户与铺位、计量设备、能源用量、工程资料、设施拓扑、业务流程、施工管理、设备巡检、异常通知、门禁访客和系统管理的一体化后勤管理平台。</p>
+    
+    <h3>技术架构</h3>
+    <div class="grid-2">
+      <div>
+        <h4>后端技术栈</h4>
+        <div class="tech-stack">
+          <span class="tech-item">Java 17</span>
+          <span class="tech-item">Spring Boot 3.3</span>
+          <span class="tech-item">Spring Security + JWT</span>
+          <span class="tech-item">MyBatis-Plus 3.5</span>
+          <span class="tech-item">MySQL 8</span>
+          <span class="tech-item">Flyway</span>
+          <span class="tech-item">OpenCV + YuNet</span>
+          <span class="tech-item">Apache POI</span>
+          <span class="tech-item">OkHttp</span>
+        </div>
+      </div>
+      <div>
+        <h4>前端技术栈</h4>
+        <div class="tech-stack">
+          <span class="tech-item">Vue 3.4</span>
+          <span class="tech-item">TypeScript 5.4</span>
+          <span class="tech-item">Vite 4.5</span>
+          <span class="tech-item">Element Plus 2.7</span>
+          <span class="tech-item">Pinia 2.1</span>
+          <span class="tech-item">Vue Router 4.3</span>
+          <span class="tech-item">Axios 1.6</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 功能模块总览 -->
+  <div class="section">
+    <h2>二、功能模块总览</h2>
+    <div class="grid-3">
+      <div class="feature-card">
+        <h4>🏠 工作台</h4>
+        <ul>
+          <li>核心指标展示</li>
+          <li>待处理事项</li>
+          <li>业务概况统计</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>📋 业务流程</h4>
+        <ul>
+          <li>水电费变更流程</li>
+          <li>商户施工流程</li>
+          <li>施工巡检配置</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>🏪 经营基础资料</h4>
+        <ul>
+          <li>商户账户管理</li>
+          <li>铺位管理</li>
+          <li>计量设备绑定</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>⚡ 能源管理</h4>
+        <ul>
+          <li>数据大屏</li>
+          <li>用量分析</li>
+          <li>历史用量同步</li>
+          <li>水电账单录入</li>
+        </ul>
+      </div>
+      <div class="feature-card red">
+        <h4>🏗️ 设施设备</h4>
+        <ul>
+          <li>配电拓扑管理</li>
+          <li>供水/排水拓扑</li>
+          <li>排油烟/补风拓扑</li>
+        </ul>
+      </div>
+      <div class="feature-card">
+        <h4>🔧 运维管理</h4>
+        <ul>
+          <li>巡检任务管理</li>
+          <li>设施设备台账</li>
+          <li>问题与整改</li>
+          <li>异常中心</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>🚪 门禁访客</h4>
+        <ul>
+          <li>门禁设备管理</li>
+          <li>人员管理</li>
+          <li>访客预约审批</li>
+          <li>人脸质量检测</li>
+          <li>通行记录</li>
+          <li>公开访客申请</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>📊 数据与集成</h4>
+        <ul>
+          <li>源平台配置</li>
+          <li>数据同步与日志</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>⚙️ 系统管理</h4>
+        <ul>
+          <li>用户与权限</li>
+          <li>基础字典</li>
+          <li>Webhook 通知</li>
+          <li>操作审计</li>
+          <li>数据迁移</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 工作台 -->
+  <div class="section">
+    <h2>三、工作台</h2>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>核心指标</h4>
+        <ul>
+          <li>计费账户数量统计</li>
+          <li>铺位数量统计</li>
+          <li>已绑定设备铺位数</li>
+          <li>本月提交流程数</li>
+          <li>仓库数量统计</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>待处理事项</h4>
+        <ul>
+          <li>待现场核验任务</li>
+          <li>待 OA 提交流程</li>
+          <li>待审批访客</li>
+          <li>待复核人员</li>
+          <li>即将到期提醒</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:15px; color:#909399; font-size:14px;">指标按实际业务口径统计，菜单根据当前用户的有效权限动态显示。</p>
+  </div>
+
+  <!-- 业务流程 -->
+  <div class="section">
+    <h2>四、业务流程</h2>
+
+    <h3>4.1 水电费变更流程</h3>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>申请与采集</h4>
+        <ul>
+          <li>支持新商户开户</li>
+          <li>支持已有商户增加铺位</li>
+          <li>支持已有商户撤柜</li>
+          <li>商户代码、名称、铺位采集</li>
+          <li>联系人、联系电话、生效时间</li>
+          <li>联系电话与原计费账户对比</li>
+          <li>铺位计费账户冲突检查</li>
+          <li>撤柜流程衔接处理</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>核验与审批</h4>
+        <ul>
+          <li>自动生成现场核验任务</li>
+          <li>手机端现场核验、读数</li>
+          <li>倍率、照片、时间水印采集</li>
+          <li>电表水表照片数量及内容校验</li>
+          <li>OA 提交资料、申请批注</li>
+          <li>设备表号/序列号、倍率、读数生成</li>
+          <li>OA 流程编号和完结备注维护</li>
+        </ul>
+      </div>
+    </div>
+    <div class="highlight-box">
+      <strong>流程状态：</strong>待现场核验 → 待 OA 提交 → 等待平台处理 → 已完成。根据平台同步后的设备与计费账户绑定关系自动判断流程是否完成。超级管理员可复位或彻底删除流程。防止重复点击生成多条相同草稿。
+    </div>
+
+    <h3>4.2 商户施工流程</h3>
+    <div class="grid-2">
+      <div class="feature-card orange">
+        <h4>申请与许可证</h4>
+        <ul>
+          <li>入场装修申请</li>
+          <li>撤场施工申请</li>
+          <li>铺位选择与施工时间</li>
+          <li>商户/施工公司/负责人资料</li>
+          <li>根据角色自动填充内部负责人</li>
+          <li>生成固定格式施工许可证</li>
+          <li>许可证独立打印 + 二维码</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>巡检与验收</h4>
+        <ul>
+          <li>扫码查看许可证</li>
+          <li>安保现场巡检</li>
+          <li>工程现场巡检</li>
+          <li>保洁现场巡检</li>
+          <li>验收申请与验收记录</li>
+          <li>入场验收合格 → 铺位在用</li>
+          <li>撤场验收合格 → 铺位空置</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>4.3 施工现场巡检配置</h3>
+    <div class="grid-3">
+      <div class="feature-card">
+        <h4>题库管理</h4>
+        <ul>
+          <li>安保巡检题库</li>
+          <li>工程巡检题库</li>
+          <li>保洁巡检题库</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>题型支持</h4>
+        <ul>
+          <li>正常/异常题</li>
+          <li>是/否题</li>
+          <li>单选 / 多选题</li>
+          <li>数字 / 文字题</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>高级特性</h4>
+        <ul>
+          <li>必填、启用/停用、排序</li>
+          <li>正常值设置</li>
+          <li>异常必须上传照片</li>
+          <li>题目快照 + 答案快照</li>
+          <li>动态权限显示巡检类型</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 经营基础资料 -->
+  <div class="section">
+    <h2>五、经营基础资料</h2>
+    
+    <h3>5.1 商户账户管理</h3>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>账户同步与维护</h4>
+        <ul>
+          <li>同步能源平台计费账户</li>
+          <li>商户代码本地维护</li>
+          <li>联系人电话维护</li>
+          <li>启停状态管理</li>
+          <li>关联铺位管理</li>
+          <li>隐藏停用计费账户</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>商户代码规则</h4>
+        <ul>
+          <li>六位数字商户代码校验</li>
+          <li>标准账户名称生成</li>
+          <li>查询通道按六位代码处理</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>5.2 铺位管理</h3>
+    <div class="grid-2">
+      <div class="feature-card orange">
+        <h4>铺位信息</h4>
+        <ul>
+          <li>铺位编码、名称</li>
+          <li>当前商户、楼层</li>
+          <li>面积、业态、状态</li>
+          <li>铺位名称自动提取商户名</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>基础字典与导入</h4>
+        <ul>
+          <li>楼层、区域、业态、品类字典</li>
+          <li>Excel 导入导出</li>
+          <li>铺位工程资料维护</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>5.3 计量设备绑定</h3>
+    <div class="grid-2">
+      <div class="feature-card red">
+        <h4>设备信息</h4>
+        <ul>
+          <li>设备 ID、设备名称</li>
+          <li>能源类型</li>
+          <li>通讯地址、序列号</li>
+          <li>网关、通道名称</li>
+          <li>产品名称</li>
+        </ul>
+      </div>
+      <div class="feature-card">
+        <h4>绑定管理</h4>
+        <ul>
+          <li>按铺位维护水电设备绑定</li>
+          <li>每台设备仅绑定一个启用账户</li>
+          <li>设备过滤名单</li>
+          <li>过滤设备不参与同步</li>
+          <li>可按需补采历史账单数据</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>5.4 铺位工程资料</h3>
+    <div class="grid-3">
+      <div class="feature-card green">
+        <h4>供配电</h4>
+        <ul>
+          <li>供配电回路</li>
+          <li>电缆规格</li>
+          <li>供电端开关</li>
+          <li>电表位置</li>
+        </ul>
+      </div>
+      <div class="feature-card blue" style="border-left-color:#409eff;">
+        <h4>给排水</h4>
+        <ul>
+          <li>是否供水</li>
+          <li>水表口径及位置</li>
+          <li>是否排水</li>
+          <li>排水管口径及管路编号</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>通风空调</h4>
+        <ul>
+          <li>排油烟设备编号</li>
+          <li>补风机编号</li>
+          <li>空调设备型号/类型</li>
+          <li>空调功率/出风量</li>
+          <li>风口数量</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:10px; color:#909399; font-size:14px;">电缆规格、开关规格、电表位置、管径、风机和空调规格均通过基础字典维护。铺位工程资料可与设施拓扑中的铺位节点双向关联。</p>
+  </div>
+
+  <!-- 能源管理 -->
+  <div class="section">
+    <h2>六、能源管理</h2>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>数据同步</h4>
+        <ul>
+          <li>按设备产品类型自动选择测量点</li>
+          <li>月度用量月累计同步计算</li>
+          <li>日数据分批同步（保留近三个月）</li>
+          <li>历史月份补采</li>
+          <li>过滤设备保留历史数据</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>用量分析</h4>
+        <ul>
+          <li>按连营/自营/超市/总部/酒店分类</li>
+          <li>分组变化拆分统计</li>
+          <li>周/月/季/半年/年度维度</li>
+          <li>趋势、同比、占比分析</li>
+          <li>有效数据设备数量</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="feature-card orange">
+        <h4>数据大屏</h4>
+        <ul>
+          <li>用量趋势图</li>
+          <li>同比对比</li>
+          <li>分析维度占比</li>
+          <li>有效设备数量</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>水电账单</h4>
+        <ul>
+          <li>手工录入年月</li>
+          <li>电费金额与用量</li>
+          <li>水费金额与用量</li>
+          <li>月度/季度/半年/年度同比曲线</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设施拓扑 -->
+  <div class="section">
+    <h2>七、设施拓扑管理</h2>
+    <p>已实现配电、供水、排水、排油烟和补风机五类独立拓扑。新风与补风按同一业务含义管理。</p>
+    
+    <div class="grid-3">
+      <div class="feature-card red">
+        <h4>配电拓扑</h4>
+        <ul>
+          <li>变压器节点</li>
+          <li>开关节点</li>
+          <li>配电箱节点</li>
+          <li>终端箱节点</li>
+          <li>用电设备节点</li>
+          <li>双电源输入</li>
+          <li>备用上级</li>
+          <li>节点详情与二维码</li>
+        </ul>
+      </div>
+      <div class="feature-card" style="border-left-color:#409eff;">
+        <h4>供水/排水拓扑</h4>
+        <ul>
+          <li>节点层级管理</li>
+          <li>铺位关联</li>
+          <li>二维码查看</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>排油烟/补风拓扑</h4>
+        <ul>
+          <li>节点层级管理</li>
+          <li>铺位关联</li>
+          <li>二维码查看</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 运维管理 -->
+  <div class="section">
+    <h2>八、运维管理</h2>
+    
+    <h3>8.1 设施设备巡检</h3>
+    <div class="highlight-box">
+      该模块使用独立设施设备台账，不与能源平台水电表强制关联。
+    </div>
+    <div class="grid-2">
+      <div class="feature-card orange">
+        <h4>设备台账</h4>
+        <ul>
+          <li>变压器、配电柜</li>
+          <li>消防栓、空调</li>
+          <li>供水设备、电梯</li>
+          <li>设备分类管理</li>
+          <li>每台设备独立二维码</li>
+          <li>扫码直接进入巡检表单</li>
+          <li>巡检记录保存设备快照</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>巡检管理</h4>
+        <ul>
+          <li>巡检类型管理</li>
+          <li>巡检频率设置</li>
+          <li>巡检内容配置</li>
+          <li>巡检计划</li>
+          <li>巡检任务</li>
+          <li>任务提醒</li>
+          <li>问题整改管理</li>
+          <li>巡检数据大屏</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>8.2 异常中心与通知</h3>
+    <div class="grid-2">
+      <div class="feature-card red">
+        <h4>异常检测</h4>
+        <ul>
+          <li>计费账户异常</li>
+          <li>设备关系异常</li>
+          <li>流程预期变化异常</li>
+          <li>同步数据异常</li>
+          <li>多账户绑定检测</li>
+          <li>提示/警告/错误/严重四级</li>
+          <li>关联流程中数据不重复告警</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>Webhook 通知</h4>
+        <ul>
+          <li>企业微信机器人</li>
+          <li>飞书机器人</li>
+          <li>钉钉机器人</li>
+          <li>多机器人管理</li>
+          <li>按事件选择通知目标</li>
+          <li>流程通知独立配置</li>
+          <li>核验通知独立配置</li>
+          <li>异常告警独立配置</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 门禁访客管理 -->
+  <div class="section">
+    <h2>九、门禁访客管理 <span class="tag tag-green">新增模块 V50+</span></h2>
+    <p>海康威视人脸识别门禁系统集成，支持设备管理、人员管理、访客预约审批、人脸质量检测、通行记录等完整功能。</p>
+
+    <h3>9.1 门禁设备管理</h3>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>设备与门禁点</h4>
+        <ul>
+          <li>门禁点管理（入口/出口）</li>
+          <li>门禁设备 CRUD</li>
+          <li>设备连通性探测</li>
+          <li>设备能力发现</li>
+          <li>写入模式切换（只读/可写）</li>
+          <li>登录凭据加密存储</li>
+          <li>设备在线状态</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>海康 ISAPI 协议</h4>
+        <ul>
+          <li>Digest 认证</li>
+          <li>设备信息读取</li>
+          <li>人员分页读取</li>
+          <li>卡片分页读取</li>
+          <li>人脸照片读取</li>
+          <li>通行事件读取</li>
+          <li>人员创建/删除/更新</li>
+          <li>人脸照片上传</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>9.2 人员管理</h3>
+    <div class="grid-2">
+      <div class="feature-card orange">
+        <h4>长期人员</h4>
+        <ul>
+          <li>人员主档管理</li>
+          <li>身份证加密存储</li>
+          <li>性别自动识别</li>
+          <li>人脸照片管理</li>
+          <li>有效期管理</li>
+          <li>人员-设备映射</li>
+          <li>审批状态管理</li>
+        </ul>
+      </div>
+      <div class="feature-card purple">
+        <h4>扫描与同步</h4>
+        <ul>
+          <li>设备人员只读扫描</li>
+          <li>设备卡片只读扫描</li>
+          <li>扫描结果汇总比对</li>
+          <li>扫描结果导入主档</li>
+          <li>冲突检测处理</li>
+          <li>卡号加密 + SHA256 哈希</li>
+          <li>每日自动扫描比对</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>9.3 访客预约与审批</h3>
+    <div class="grid-2">
+      <div class="feature-card red">
+        <h4>预约流程</h4>
+        <ul>
+          <li>访客预约创建</li>
+          <li>铺位关联（商户/物业/商管）</li>
+          <li>身份证信息采集</li>
+          <li>人脸照片上传</li>
+          <li>有效期设置</li>
+          <li>审批通过下发设备</li>
+          <li>审批拒绝 / 撤销</li>
+          <li>失败自动回滚</li>
+        </ul>
+      </div>
+      <div class="feature-card">
+        <h4>高级特性</h4>
+        <ul>
+          <li>续期申请与审批</li>
+          <li>到期自动撤销（10分钟检查）</li>
+          <li>加密快照留存 6 个月</li>
+          <li>长期未通行人员复核</li>
+          <li>复核任务生成与审批</li>
+          <li>个人中心自助维护</li>
+          <li>存量人员身份认领</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>9.4 人脸质量检测 <span class="tag tag-green">核心功能</span></h3>
+    <div class="highlight-box">
+      <strong>双重检测机制：</strong>系统本地检测（OpenCV + YuNet）+ 设备端检测（海康门禁 dry-run），确保人脸质量达标，减少同步失败。
+    </div>
+    <div class="grid-2">
+      <div class="feature-card green">
+        <h4>系统本地检测 (OpenCV)</h4>
+        <ul>
+          <li>YuNet 人脸检测模型</li>
+          <li>图片解码校验</li>
+          <li>分辨率检查（≥400px）</li>
+          <li>人脸数量检测（仅1人）</li>
+          <li>人脸占比检查（8%~82%）</li>
+          <li>姿态端正检查（倾斜/侧转）</li>
+          <li>亮度检查（45~220）</li>
+          <li>清晰度检查（Laplacian 方差）</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>设备端检测 (海康 ISAPI)</h4>
+        <ul>
+          <li>创建临时人员（1小时有效）</li>
+          <li>上传人脸到设备</li>
+          <li>验证设备特征提取</li>
+          <li>检测后自动清理临时数据</li>
+          <li>返回检测结果与设备名</li>
+          <li>真实设备校验，最准确可靠</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>9.5 公开访客申请 <span class="tag tag-blue">对外服务</span></h3>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>自助申请页面</h4>
+        <ul>
+          <li>无需登录，公开访问</li>
+          <li>姓名、手机号、身份证号</li>
+          <li>到访单位类型选择</li>
+          <li>铺位搜索（模糊匹配）</li>
+          <li>身份证正反面照片</li>
+          <li>人脸照片上传</li>
+          <li>实时人脸质量检测</li>
+          <li>移动端适配</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>安全防护</h4>
+        <ul>
+          <li>IP 限流（每10分钟5次）</li>
+          <li>蜜罐字段防机器人</li>
+          <li>Token 上传凭证（2小时有效）</li>
+          <li>输入清洗（控制字符/长度截断）</li>
+          <li>客户端图片压缩</li>
+          <li>前置摄像头调用（移动端）</li>
+          <li>协议确认勾选</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>9.6 通行记录</h3>
+    <div class="grid-2">
+      <div class="feature-card purple">
+        <h4>事件同步</h4>
+        <ul>
+          <li>定时同步（每30分钟）</li>
+          <li>手动同步触发</li>
+          <li>游标增量同步</li>
+          <li>现场照片下载保存</li>
+          <li>同步状态查询</li>
+          <li>照片原图/缩略图</li>
+          <li>过期照片自动清理（1个月）</li>
+        </ul>
+      </div>
+      <div class="feature-card red">
+        <h4>查询与分析</h4>
+        <ul>
+          <li>全部通行记录分页</li>
+          <li>本人通行记录</li>
+          <li>人员匹配关联</li>
+          <li>每日人员状态分析</li>
+          <li>过期人员统计</li>
+          <li>即将到期统计</li>
+          <li>长期未通行统计</li>
+          <li>今日通行人数</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户与权限 -->
+  <div class="section">
+    <h2>十、用户与权限</h2>
+    
+    <h3>10.1 角色体系</h3>
+    <table>
+      <thead>
+        <tr><th>角色</th><th>说明</th><th>主要权限</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag tag-red">超级管理员</span></td>
+          <td>SUPER_ADMIN</td>
+          <td>拥有完整权限，包括用户管理、个人授权、高风险数据迁移</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-orange">系统管理员</span></td>
+          <td>SYSTEM_ADMIN</td>
+          <td>除用户管理、个人授权和高风险操作外的大部分业务权限</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-blue">设备核验员</span></td>
+          <td>DEVICE_VERIFIER</td>
+          <td>现场核验相关权限，门禁权限需单独授予</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-green">申请人</span></td>
+          <td>APPLICANT</td>
+          <td>工单、商户查询、本人门禁、访客申请等</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-gray">只读用户</span></td>
+          <td>VIEWER</td>
+          <td>仅本人门禁查看与维护权限</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>10.2 细粒度授权</h3>
+    <div class="grid-2">
+      <div class="feature-card">
+        <h4>权限机制</h4>
+        <ul>
+          <li>用户继承角色默认权限</li>
+          <li>额外授予单项权限</li>
+          <li>明确拒绝某项权限</li>
+          <li>授权失效时间</li>
+          <li>授权原因记录</li>
+          <li>变更记录审计</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>登录与安全</h4>
+        <ul>
+          <li>JWT Token 认证</li>
+          <li>设备指纹自动登录</li>
+          <li>退出后切换其他账户</li>
+          <li>新注册用户默认无权限</li>
+          <li>密码加密存储（BCrypt）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据同步、审计与迁移 -->
+  <div class="section">
+    <h2>十一、数据同步、审计与迁移</h2>
+    <div class="grid-3">
+      <div class="feature-card">
+        <h4>平台同步</h4>
+        <ul>
+          <li>源平台连接配置</li>
+          <li>同步任务管理</li>
+          <li>账户数据同步</li>
+          <li>设备数据同步</li>
+          <li>关系数据同步</li>
+          <li>月度用量同步</li>
+          <li>近期日数据同步</li>
+          <li>分批同步提升速度</li>
+        </ul>
+      </div>
+      <div class="feature-card green">
+        <h4>同步日志</h4>
+        <ul>
+          <li>同步批次记录</li>
+          <li>进度跟踪</li>
+          <li>成功数/失败数</li>
+          <li>无数据数统计</li>
+          <li>详细日志查询</li>
+          <li>失败状态保留</li>
+          <li>失败不覆盖当前数据</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>数据迁移与审计</h4>
+        <ul>
+          <li>基础字典导入导出</li>
+          <li>铺位数据导入导出</li>
+          <li>系统资料一键导出</li>
+          <li>系统资料一键导入</li>
+          <li>包含数据库及附件</li>
+          <li>失败不覆盖原数据</li>
+          <li>关键操作审计日志</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 菜单结构 -->
+  <div class="section">
+    <h2>十二、菜单结构</h2>
+    <div class="menu-tree">
+<div class="l1">🏠 工作台</div>
+<div class="l1">📋 业务流程</div>
+<div class="l2">├─ 全部流程</div>
+<div class="l2">├─ 水电费变更</div>
+<div class="l2">├─ 商户施工流程</div>
+<div class="l2">├─ 发起施工申请</div>
+<div class="l2">├─ 施工巡检配置</div>
+<div class="l2">└─ 商户账户查询</div>
+<div class="l1">🏪 经营基础资料</div>
+<div class="l2">├─ 商户账户管理</div>
+<div class="l2">├─ 铺位管理</div>
+<div class="l2">└─ 计量设备绑定</div>
+<div class="l1">⚡ 能源管理</div>
+<div class="l2">├─ 数据大屏</div>
+<div class="l2">├─ 用量分析</div>
+<div class="l2">├─ 设备分析维度</div>
+<div class="l2">├─ 历史用量同步</div>
+<div class="l2">└─ 水电账单录入</div>
+<div class="l1">🏗️ 设施设备</div>
+<div class="l2">├─ 配电拓扑管理</div>
+<div class="l2">├─ 供水拓扑管理</div>
+<div class="l2">├─ 排水拓扑管理</div>
+<div class="l2">├─ 排油烟拓扑管理</div>
+<div class="l2">└─ 补风机拓扑管理</div>
+<div class="l1">🔧 运维管理</div>
+<div class="l2">├─ 巡检数据大屏</div>
+<div class="l2">├─ 巡检任务</div>
+<div class="l2">├─ 设施设备台账</div>
+<div class="l2">├─ 设施设备分类</div>
+<div class="l2">├─ 问题与整改</div>
+<div class="l2">├─ 巡检配置</div>
+<div class="l2">└─ 异常中心</div>
+<div class="l1">🚪 门禁管理 <span class="tag tag-green">新增</span></div>
+<div class="l2">├─ 门禁数据大屏</div>
+<div class="l2">├─ 门禁点管理</div>
+<div class="l2">├─ 设备管理</div>
+<div class="l2">├─ 人员管理</div>
+<div class="l2">├─ 访客预约</div>
+<div class="l2">├─ 续期申请</div>
+<div class="l2">├─ 通行记录</div>
+<div class="l2">├─ 人员复核</div>
+<div class="l2">└─ 个人中心</div>
+<div class="l1">📊 数据与集成</div>
+<div class="l2">├─ 源平台配置</div>
+<div class="l2">└─ 数据同步与日志</div>
+<div class="l1">⚙️ 系统管理</div>
+<div class="l2">├─ 用户与权限</div>
+<div class="l2">├─ 基础字典</div>
+<div class="l2">├─ Webhook 通知</div>
+<div class="l2">├─ 操作审计</div>
+<div class="l2">└─ 数据迁移</div>
+    </div>
+    <p style="margin-top:15px; color:#909399; font-size:14px;">菜单会根据当前用户的有效权限动态显示。</p>
+  </div>
+
+  <!-- 安全与配置 -->
+  <div class="section">
+    <h2>十三、安全与配置</h2>
+    <div class="grid-2">
+      <div class="feature-card red">
+        <h4>安全措施</h4>
+        <ul>
+          <li>JWT Token 认证</li>
+          <li>密码 BCrypt 加密存储</li>
+          <li>平台密码 AES-256-GCM 加密</li>
+          <li>Webhook 地址加密存储</li>
+          <li>身份证号加密存储</li>
+          <li>卡号加密 + SHA256 哈希</li>
+          <li>所有危险操作权限校验</li>
+          <li>关键操作审计日志</li>
+          <li>公开接口 IP 限流</li>
+          <li>蜜罐字段防机器人</li>
+        </ul>
+      </div>
+      <div class="feature-card orange">
+        <h4>环境变量配置</h4>
+        <ul>
+          <li>MYSQL_HOST / PORT / DB / USER / PASSWORD</li>
+          <li>JWT_SECRET</li>
+          <li>PLATFORM_CREDENTIAL_SECRET</li>
+          <li>ENERGY_DEFAULT_ADMIN_PASSWORD</li>
+          <li>ENERGY_PUBLIC_BASE_URL</li>
+          <li>ENERGY_UPLOAD_BASE</li>
+          <li>ENERGY_MIGRATION_BASE</li>
+          <li>ENERGY_CORS_ALLOWED_ORIGINS</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据库版本演进 -->
+  <div class="section">
+    <h2>十四、数据库版本演进（Flyway）</h2>
+    <table>
+      <thead>
+        <tr><th>版本</th><th>模块</th><th>主要内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>V1</td><td>系统初始化</td><td>用户、角色、菜单、审计日志表</td></tr>
+        <tr><td>V2</td><td>源平台</td><td>平台配置、同步批次、当前数据表</td></tr>
+        <tr><td>V3</td><td>铺位商户</td><td>铺位、商户、设备绑定表</td></tr>
+        <tr><td>V4</td><td>对账</td><td>对账相关表</td></tr>
+        <tr><td>V5</td><td>设备绑定</td><td>一设备一启用账户强制约束</td></tr>
+        <tr><td>V6</td><td>工作流</td><td>水电费变更流程表</td></tr>
+        <tr><td>V7</td><td>核验</td><td>现场核验任务表</td></tr>
+        <tr><td>V8</td><td>附件</td><td>附件存储表</td></tr>
+        <tr><td>V9</td><td>Webhook</td><td>通知机器人配置表</td></tr>
+        <tr><td>V10-V17</td><td>流程增强</td><td>平台匹配、业务字典、本地档案、多账户规则、核验照片规则、简化角色等</td></tr>
+        <tr><td>V18-V25</td><td>施工与设备</td><td>自注册、施工流程、设备分组、工程资料、电缆规格等</td></tr>
+        <tr><td>V26-V33</td><td>设施拓扑</td><td>配电拓扑、空调规格、供水排水、双电源等</td></tr>
+        <tr><td>V34-V40</td><td>用量分析</td><td>月度用量、日数据、同步排除、用量分析维度、设施拓扑等</td></tr>
+        <tr><td>V41-V49</td><td>权限与施工</td><td>细粒度权限、施工巡检、施工验收、定时巡检、设备台账等</td></tr>
+        <tr><td><strong>V50</strong></td><td><strong>门禁初始化</strong></td><td><strong>门禁点、设备、人员、访客、通行事件、复核表 + 15项权限</strong></td></tr>
+        <tr><td>V51</td><td>门禁凭据</td><td>设备登录用户名密码加密存储</td></tr>
+        <tr><td>V52</td><td>人员扫描</td><td>人员扫描任务和快照表</td></tr>
+        <tr><td>V53</td><td>人员主档</td><td>身份证加密、审批状态、留存快照、设备能力等</td></tr>
+        <tr><td>V54</td><td>卡片扫描</td><td>卡片扫描任务和快照表（卡号加密+哈希）</td></tr>
+        <tr><td>V55</td><td>自助资料</td><td>人员编号统一、自助管理权限</td></tr>
+        <tr><td>V56</td><td>身份认领</td><td>人员认领功能和认领日志</td></tr>
+        <tr><td>V57</td><td>数据治理</td><td>手机号作为工号的数据补全</td></tr>
+        <tr><td><strong>V58</strong></td><td><strong>公开访客</strong></td><td><strong>公开访客申请 Token 字段</strong></td></tr>
+        <tr><td>V59</td><td>事件同步</td><td>事件同步游标、照片 MIME 类型</td></tr>
+        <tr><td>V60-V64</td><td>权限调整</td><td>VIEWER 自助权限、角色权限优化、核验员权限收窄等</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 项目目录 -->
+  <div class="section">
+    <h2>十五、项目目录结构</h2>
+    <div class="menu-tree">
+<div class="l1">mall-energy-management/</div>
+<div class="l2">├── deploy/                          <span class="l3"># 部署配置</span></div>
+<div class="l3">├── auto-nginx.conf              # Nginx 配置</div>
+<div class="l3">├── energy-management.service    # systemd 服务</div>
+<div class="l3">└── systemd-start-energy.sh     # 启动脚本</div>
+<div class="l2">└── server-spring/                   <span class="l3"># 主项目</span></div>
+<div class="l3">├── design/                       # 早期设计文档</div>
+<div class="l3">├── energy-management/            # Spring Boot 后端</div>
+<div class="l3">│   └── src/main/java/com/wanyuecity/energy/</div>
+<div class="l3">│       ├── access/              # 门禁访客模块</div>
+<div class="l3">│       ├── config/              # 配置类</div>
+<div class="l3">│       ├── core/                # 核心工具（ApiResponse/BizException）</div>
+<div class="l3">│       ├── inspection/          # 巡检模块</div>
+<div class="l3">│       ├── security/            # 安全认证</div>
+<div class="l3">│       └── EnergyApplication.java</div>
+<div class="l3">├── energy-admin/                 # Vue 3 管理前端</div>
+<div class="l3">│   ├── src/api/                  # API 接口</div>
+<div class="l3">│   ├── src/views/                # 页面组件</div>
+<div class="l3">│   ├── src/router/               # 路由</div>
+<div class="l3">│   ├── src/stores/               # Pinia 状态</div>
+<div class="l3">│   └── vite.config.ts</div>
+<div class="l3">└── pom.xml                       # Maven 配置</div>
+    </div>
+  </div>
+
+  <div style="text-align:center; padding:30px; color:#909399; font-size:14px;">
+    <p>万悦城后勤管理系统 · 已实现功能说明</p>
+    <p>数据库版本 V64 · 更新于 2026-10-10</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -75,6 +75,41 @@
           <el-menu-item v-if="can('operation.violation.view')" index="/operation/violation-items">违规项目管理</el-menu-item>
           <el-menu-item v-if="can('operation.accountability.view')" index="/operation/accountability">追责管理</el-menu-item>
         </el-sub-menu>
+        <el-sub-menu v-if="hasAny('qr.inspection.config','qr.inspection.plan.manage','qr.inspection.task.create','qr.inspection.view')" index="qr-inspection-management">
+          <template #title><el-icon><Grid /></el-icon><span>二维码巡检</span></template>
+          <el-menu-item v-if="can('qr.inspection.config')" index="/qr-inspection/templates">巡检模板配置</el-menu-item>
+          <el-menu-item v-if="can('qr.inspection.plan.manage')" index="/qr-inspection/plans">巡检计划管理</el-menu-item>
+          <el-menu-item v-if="can('qr.inspection.task.create') || can('qr.inspection.view')" index="/qr-inspection/joint-tasks">联合巡检</el-menu-item>
+          <el-menu-item v-if="can('qr.inspection.view')" index="/qr-inspection/report">巡检汇总报告</el-menu-item>
+          <el-menu-item v-if="can('qr.inspection.view')" index="/qr-inspection/records">巡检记录管理</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="hasAny('patrol.point.view','patrol.issue.view')" index="patrol-management">
+          <template #title><el-icon><Tickets /></el-icon><span>巡场管理</span></template>
+          <el-menu-item v-if="can('patrol.submit')" index="/patrol/entry">今日巡场</el-menu-item>
+          <el-menu-item v-if="can('patrol.issue.view')" index="/patrol/issues">巡场问题</el-menu-item>
+          <el-menu-item v-if="can('patrol.issue.view')" index="/patrol/submissions">巡场记录</el-menu-item>
+          <el-menu-item v-if="can('patrol.config')" index="/patrol/points">巡场点位</el-menu-item>
+          <el-menu-item v-if="can('patrol.config')" index="/patrol/departments">整改部门</el-menu-item>
+          <el-menu-item v-if="can('patrol.config')" index="/patrol/duties">值班排班</el-menu-item>
+          <el-menu-item v-if="can('patrol.config')" index="/patrol/categories">分类字典</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="hasAny('complaint.view','complaint.create','complaint.stats.view')" index="service-management">
+          <template #title><el-icon><ChatDotRound /></el-icon><span>服务管理</span></template>
+          <el-menu-item v-if="can('complaint.view')" index="/complaints">客诉管理</el-menu-item>
+          <el-menu-item v-if="can('complaint.stats.view')" index="/complaints/dashboard">客诉数据报表</el-menu-item>
+          <el-menu-item v-if="can('complaint.staff.manage')" index="/complaints/staff">客诉人员名单</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="can('ops.patrol.report')" index="ops-patrol-management">
+          <template #title><el-icon><Shop /></el-icon><span>营运巡场管理</span></template>
+          <el-menu-item index="/ops-patrol/tasks">任务看板</el-menu-item>
+          <el-menu-item index="/ops-patrol/issues">营运问题</el-menu-item>
+          <el-menu-item index="/ops-patrol/handovers">交接记录</el-menu-item>
+          <el-menu-item index="/ops-patrol/reports">履职报表</el-menu-item>
+          <el-menu-item v-if="can('ops.patrol.config')" index="/ops-patrol/items">检查项库</el-menu-item>
+          <el-menu-item v-if="can('ops.patrol.config')" index="/ops-patrol/duties">干部排班</el-menu-item>
+          <el-menu-item v-if="can('ops.patrol.config')" index="/ops-patrol/slots">时段设置</el-menu-item>
+          <el-menu-item v-if="can('ops.patrol.dept')" index="/ops-patrol/depts">处室与群配置</el-menu-item>
+        </el-sub-menu>
         <el-sub-menu v-if="hasAny('integration.config.view','integration.sync.view')" index="data-integration">
           <template #title><el-icon><Connection /></el-icon><span>数据与集成</span></template>
           <el-menu-item v-if="can('integration.config.view')" index="/platform/config">源平台配置</el-menu-item>
@@ -131,7 +166,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting, Key, Management
+  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting, Key, Management, Shop, Grid
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { enumLabel } from '@/utils/format'

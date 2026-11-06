@@ -29,9 +29,10 @@ class ConstructionWorkflowServiceTest {
     private final StallMapper stallMapper = mock(StallMapper.class);
     private final SysUserMapper userMapper = mock(SysUserMapper.class);
     private final SysUserService userService = mock(SysUserService.class);
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
     private final ConstructionInspectionMapper inspectionMapper = mock(ConstructionInspectionMapper.class);
     private final ConstructionAcceptanceMapper acceptanceMapper = mock(ConstructionAcceptanceMapper.class);
-    private final ConstructionWorkflowService service = new ConstructionWorkflowService(workflowMapper, detailMapper, stallMapper, userMapper, userService, inspectionMapper, acceptanceMapper);
+    private final ConstructionWorkflowService service = new ConstructionWorkflowService(workflowMapper, detailMapper, stallMapper, userMapper, userService, jdbc, inspectionMapper, acceptanceMapper);
 
     @Test
     void completingLegacyAcceptanceRecordsOccupiedStatus() {

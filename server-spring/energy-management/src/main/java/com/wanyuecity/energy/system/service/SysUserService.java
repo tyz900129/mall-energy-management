@@ -26,7 +26,8 @@ import java.util.Set;
 public class SysUserService {
 
     private static final Set<String> ASSIGNABLE_ROLE_CODES = Set.of(
-            "SUPER_ADMIN", "SYSTEM_ADMIN", "DEVICE_VERIFIER", "APPLICANT", "VIEWER");
+            "SUPER_ADMIN", "SYSTEM_ADMIN", "DEVICE_VERIFIER", "APPLICANT", "VIEWER",
+            "PROPERTY_MANAGER", "OPS_PATROL_MANAGER", "CS_AGENT", "CS_MANAGER");
 
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
@@ -112,6 +113,7 @@ public class SysUserService {
         u.setEmail(req.getEmail());
         u.setPhone(req.getPhone());
         u.setStatus(req.getStatus() == null ? 1 : req.getStatus());
+        u.setDepartmentId(req.getDepartmentId());
         userMapper.insert(u);
         replaceUserRoles(u.getId(), req.getRoleIds());
         return get(u.getId());
@@ -129,6 +131,7 @@ public class SysUserService {
         u.setDisplayName(req.getDisplayName());
         u.setEmail(req.getEmail());
         u.setPhone(req.getPhone());
+        u.setDepartmentId(req.getDepartmentId());
         if (req.getStatus() != null) {
             u.setStatus(req.getStatus());
         }

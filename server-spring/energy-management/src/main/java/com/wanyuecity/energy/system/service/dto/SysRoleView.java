@@ -17,8 +17,17 @@ public class SysRoleView {
     private String name;
     private String description;
     private List<Long> menuIds;
+    private Integer userCount;
+    private Integer permissionCount;
 
     public static SysRoleView from(SysRole r, List<Long> menuIds) {
-        return new SysRoleView(r.getId(), r.getCode(), r.getName(), r.getDescription(), menuIds);
+        SysRoleView v = new SysRoleView(r.getId(), r.getCode(), r.getName(), r.getDescription(), menuIds, null, null);
+        v.setUserCount(0);
+        v.setPermissionCount(0);
+        return v;
+    }
+
+    public static SysRoleView from(SysRole r, List<Long> menuIds, Integer userCount, Integer permissionCount) {
+        return new SysRoleView(r.getId(), r.getCode(), r.getName(), r.getDescription(), menuIds, userCount, permissionCount);
     }
 }

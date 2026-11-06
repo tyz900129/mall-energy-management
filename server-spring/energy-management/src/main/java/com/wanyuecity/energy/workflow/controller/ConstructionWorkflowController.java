@@ -28,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @RestController
@@ -46,6 +48,12 @@ public class ConstructionWorkflowController {
             Authentication authentication) {
         return ApiResponse.ok(service.list(status, workflowType, keyword,
                 ownOnly(authentication) ? authentication.getName() : null, pageNum, pageSize));
+    }
+
+    @GetMapping("/contact-options")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','AUDITOR','VIEWER')")
+    public ApiResponse<List<Map<String,Object>>> contactOptions(@RequestParam String side) {
+        return ApiResponse.ok(service.contactOptions(side));
     }
 
     @GetMapping("/{id}")

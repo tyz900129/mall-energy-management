@@ -2,6 +2,7 @@ package com.wanyuecity.energy.security;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -82,8 +83,15 @@ public class SecurityConfig {
                                 ,"/api/v1/inspection-equipment/public-qr/**"
                                 ,"/api/v1/access-public/**"
                                 ,"/api/v1/operation-public/**"
+                                ,"/api/v1/patrol-public/**"
+                                ,"/api/v1/ops-patrol-public/**"
                                 ,"/api/v1/system/migration/exports/*/download"
+                                ,"/api/v1/qr-inspection/stalls/*/entry"
+                                ,"/api/v1/qr-inspection/rectify/*"
                         ).permitAll()
+                        // 旧巡检 H5（免登录，接口内部按 entry_token 校验当日有效性）
+                        .requestMatchers(HttpMethod.GET, "/api/v1/patrol/entry", "/api/v1/patrol/points/*/form").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/patrol/submissions").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )

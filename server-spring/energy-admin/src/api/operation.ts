@@ -15,7 +15,8 @@ export const operationClearanceApi={
  updateSettings:(data:{startTime:string;endTime:string})=>http.put('/api/v1/operations/clearances/settings',data),
  submit:(token:string,data:Record<string,any>)=>http.post(`/api/v1/operations/clearances/stall/${encodeURIComponent(token)}`,data),
  today:(token:string)=>http.get(`/api/v1/operations/clearances/stall/${encodeURIComponent(token)}/today`),
- page:(params:Record<string,any>)=>http.get('/api/v1/operations/clearances',{params})
+ page:(params:Record<string,any>)=>http.get('/api/v1/operations/clearances',{params}),
+ export:(params:Record<string,any>)=>http.get('/api/v1/operations/clearances/export',{params,responseType:'blob'})
 }
 export const operationTemplateApi={list:()=>http.get('/api/v1/operations/clearance-templates'),stall:(token:string)=>http.get(`/api/v1/operations/clearance-templates/stall/${encodeURIComponent(token)}`),save:(data:any)=>http.post('/api/v1/operations/clearance-templates',data),update:(id:number,data:any)=>http.put(`/api/v1/operations/clearance-templates/${id}`,data),remove:(id:number)=>http.delete(`/api/v1/operations/clearance-templates/${id}`)}
 export const operationDashboardApi={get:(periodDate:string)=>http.get('/api/v1/operations/dashboard',{params:{periodDate}})}

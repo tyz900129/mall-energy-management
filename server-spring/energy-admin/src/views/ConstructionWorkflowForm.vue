@@ -53,10 +53,10 @@
       <section>
         <h3>内部负责人</h3>
         <el-row :gutter="16">
-          <el-col :xs="24" :sm="6"><el-form-item label="物业部工程专员姓名" prop="propertyEngineerName"><el-input v-model="form.propertyEngineerName" :disabled="isVerifier" maxlength="64" /></el-form-item></el-col>
-          <el-col :xs="24" :sm="6"><el-form-item label="工程专员联系电话" prop="propertyEngineerPhone"><el-input v-model="form.propertyEngineerPhone" :disabled="isVerifier" maxlength="32" inputmode="tel" /></el-form-item></el-col>
-          <el-col :xs="24" :sm="6"><el-form-item label="商管负责人" prop="commercialManagerName"><el-input v-model="form.commercialManagerName" :disabled="!isVerifier" maxlength="64" /></el-form-item></el-col>
-          <el-col :xs="24" :sm="6"><el-form-item label="商管负责人电话" prop="commercialManagerPhone"><el-input v-model="form.commercialManagerPhone" :disabled="!isVerifier" maxlength="32" inputmode="tel" /></el-form-item></el-col>
+          <el-col :xs="24" :sm="6"><el-form-item label="物业部工程专员姓名" prop="propertyEngineerName"><el-select v-if="isCommercialRole" v-model="selectedPropertyId" filterable placeholder="请选择物业管理员" style="width:100%" @change="pickProperty"><el-option v-for="c in propertyContacts" :key="c.id" :label="(c.displayName||c.display_name)+(c.phone?'（'+c.phone+'）':'')" :value="c.id" /></el-select><el-input v-else v-model="form.propertyEngineerName" :disabled="isPropertyRole" maxlength="64" /></el-form-item></el-col>
+          <el-col :xs="24" :sm="6"><el-form-item label="工程专员联系电话" prop="propertyEngineerPhone"><el-input v-model="form.propertyEngineerPhone" :disabled="isPropertyRole" maxlength="32" inputmode="tel" /></el-form-item></el-col>
+          <el-col :xs="24" :sm="6"><el-form-item label="商管负责人" prop="commercialManagerName"><el-select v-if="isPropertyRole" v-model="selectedCommercialId" filterable placeholder="请选择商管人员" style="width:100%" @change="pickCommercial"><el-option v-for="c in commercialContacts" :key="c.id" :label="(c.displayName||c.display_name)+(c.phone?'（'+c.phone+'）':'')" :value="c.id" /></el-select><el-input v-else v-model="form.commercialManagerName" :disabled="isCommercialRole" maxlength="64" /></el-form-item></el-col>
+          <el-col :xs="24" :sm="6"><el-form-item label="商管负责人电话" prop="commercialManagerPhone"><el-input v-model="form.commercialManagerPhone" :disabled="isCommercialRole" maxlength="32" inputmode="tel" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit /></el-form-item>
       </section>
@@ -87,7 +87,20 @@ const typeOptions = [
   { value: 'MERCHANT_CONSTRUCTION_ENTRY', label: '施工入场申请' },
   { value: 'MERCHANT_CONSTRUCTION_EXIT', label: '撤场施工申请' }
 ]
-const isVerifier = computed(() => !!userStore.user?.roles?.includes('DEVICE_VERIFIER'))
+const isPropertyRole = computed(() => !!userStore.user?.roles?.some((role: string) => ['PROPERTY_MANAGER', 'DEVICE_VERIFIER'].includes(role)))
+const isCommercialRole = computed(() => !!userStore.user?.roles?.some((role: string) => ['APPLICANT', 'OPS_PATROL_MANAGER'].includes(role)))
+const selectedPropertyId = ref<number>()
+const selectedCommercialId = ref<number>()
+const propertyContacts = ref<any[]>([])
+const commercialContacts = ref<any[]>([])
+function pickProperty(id: number) {
+  const c = propertyContacts.value.find(x => x.id === id)
+  if (c) { form.propertyEngineerName = c.displayName || c.display_name || ''; form.propertyEngineerPhone = c.phone || '' }
+}
+function pickCommercial(id: number) {
+  const c = commercialContacts.value.find(x => x.id === id)
+  if (c) { form.commercialManagerName = c.displayName || c.display_name || ''; form.commercialManagerPhone = c.phone || '' }
+}
 const form = reactive({
   requestKey,
   workflowType: 'MERCHANT_CONSTRUCTION_ENTRY' as ConstructionWorkflowType,
@@ -140,7 +153,10 @@ onMounted(async () => {
   await userStore.fetchMe()
   const name=userStore.user?.displayName||userStore.user?.username||''
   const phone=userStore.user?.phone||''
-  if(isVerifier.value){form.propertyEngineerName=name;form.propertyEngineerPhone=phone}else{form.commercialManagerName=name;form.commercialManagerPhone=phone}
+  if (isPropertyRole.value) { form.propertyEngineerName=name; form.propertyEngineerPhone=phone }
+  else if (isCommercialRole.value) { form.commercialManagerName=name; form.commercialManagerPhone=phone }
+  if (isCommercialRole.value) { const list: any = await constructionApi.contactOptions('PROPERTY'); propertyContacts.value = Array.isArray(list) ? list : [] }
+  if (isPropertyRole.value) { const list: any = await constructionApi.contactOptions('COMMERCIAL'); commercialContacts.value = Array.isArray(list) ? list : [] }
   const result: any = await stallApi.page({ pageNum: 1, pageSize: 500 })
   allStalls.value = result.records || []
 })

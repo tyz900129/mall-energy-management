@@ -1,9 +1,128 @@
 package com.wanyuecity.energy.notification.service;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper; import com.wanyuecity.energy.core.BizException; import com.wanyuecity.energy.notification.entity.WebhookConfig; import com.wanyuecity.energy.notification.mapper.WebhookConfigMapper; import com.wanyuecity.energy.notification.service.dto.*; import com.wanyuecity.energy.platform.crypto.CredentialCryptoService; import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.net.URI; import java.util.*;
-@Service @RequiredArgsConstructor public class WebhookConfigService {private final WebhookConfigMapper mapper;private final CredentialCryptoService crypto;
- public List<WebhookConfigView> list(){return mapper.selectList(new QueryWrapper<WebhookConfig>().orderByDesc("id")).stream().map(this::view).toList();}
- @Transactional public WebhookConfigView save(Long id,WebhookConfigRequest req){String provider=req.getProvider().trim().toUpperCase();if(!Set.of("WECOM","FEISHU","DINGTALK").contains(provider))throw BizException.badRequest("不支持的机器人类型");WebhookConfig c=id==null?new WebhookConfig():mapper.selectById(id);if(c==null)throw BizException.notFound("webhook config not found");if(id!=null&&!provider.equals(c.getProvider())&&(req.getWebhookUrl()==null||req.getWebhookUrl().isBlank()))throw BizException.badRequest("更换机器人平台时必须填写新的 Webhook 地址");c.setName(req.getName().trim());c.setProvider(provider);c.setEnabled(Boolean.FALSE.equals(req.getEnabled())?0:1);c.setEventTypes(normalizeEvents(req.getEventTypes()));if(req.getWebhookUrl()!=null&&!req.getWebhookUrl().isBlank()){validateUrl(provider,req.getWebhookUrl());var enc=crypto.encrypt(req.getWebhookUrl().trim());c.setWebhookUrlCiphertext(enc.ciphertext());c.setWebhookUrlIv(enc.iv());}if(id==null&&c.getWebhookUrlCiphertext()==null)throw BizException.badRequest("Webhook 地址不能为空");if(id==null)mapper.insert(c);else mapper.updateById(c);return view(c);}
- @Transactional public void delete(Long id){if(mapper.selectById(id)==null)throw BizException.notFound("机器人配置不存在");mapper.deleteById(id);}
- private String normalizeEvents(String value){if(value==null||value.isBlank())throw BizException.badRequest("请至少选择一种通知");LinkedHashSet<String> out=new LinkedHashSet<>();for(String e:value.split(",")){String v=e.trim().toUpperCase();if(!v.matches("[A-Z][A-Z0-9_]{2,79}"))throw BizException.badRequest("包含无效的通知事件："+v);out.add(v);}String normalized=String.join(",",out);if(normalized.length()>500)throw BizException.badRequest("选择的通知事件过多");return normalized;}
- private void validateUrl(String provider,String value){try{URI u=URI.create(value.trim());String host=u.getHost()==null?"":u.getHost().toLowerCase();boolean valid="https".equalsIgnoreCase(u.getScheme())&&switch(provider){case "WECOM"->host.equals("qyapi.weixin.qq.com")&&u.getPath().startsWith("/cgi-bin/webhook/send");case "FEISHU"->(host.equals("open.feishu.cn")||host.equals("open.larksuite.com"))&&u.getPath().contains("/open-apis/bot/v2/hook/");case "DINGTALK"->host.equals("oapi.dingtalk.com")&&u.getPath().startsWith("/robot/send");default->false;};if(!valid)throw new Exception();}catch(Exception e){throw BizException.badRequest("Webhook 地址与所选机器人类型不匹配");}}
- private WebhookConfigView view(WebhookConfig c){WebhookConfigView v=new WebhookConfigView();v.setId(c.getId());v.setName(c.getName());v.setProvider(c.getProvider());v.setWebhookUrlConfigured(c.getWebhookUrlCiphertext()!=null);v.setEnabled(c.getEnabled());v.setEventTypes(c.getEventTypes());v.setUpdatedAt(c.getUpdatedAt());return v;}}
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.wanyuecity.energy.core.BizException;
+import com.wanyuecity.energy.notification.entity.WebhookConfig;
+import com.wanyuecity.energy.notification.mapper.WebhookConfigMapper;
+import com.wanyuecity.energy.notification.service.dto.*;
+import com.wanyuecity.energy.platform.crypto.CredentialCryptoService;
+import com.wanyuecity.energy.qrinspection.entity.SysDepartmentWebhook;
+import com.wanyuecity.energy.qrinspection.mapper.SysDepartmentWebhookMapper;
+import com.wanyuecity.energy.system.entity.SysDepartment;
+import com.wanyuecity.energy.system.mapper.SysDepartmentMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.net.URI;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class WebhookConfigService {
+    private final WebhookConfigMapper mapper;
+    private final CredentialCryptoService crypto;
+    private final SysDepartmentWebhookMapper deptWebhookMapper;
+    private final SysDepartmentMapper deptMapper;
+
+    public List<WebhookConfigView> list() {
+        return mapper.selectList(new QueryWrapper<WebhookConfig>().orderByDesc("id")).stream().map(this::view).toList();
+    }
+
+    @Transactional
+    public WebhookConfigView save(Long id, WebhookConfigRequest req) {
+        String provider = req.getProvider().trim().toUpperCase();
+        if (!Set.of("WECOM", "FEISHU", "DINGTALK").contains(provider)) throw BizException.badRequest("不支持的机器人类型");
+        WebhookConfig c = id == null ? new WebhookConfig() : mapper.selectById(id);
+        if (c == null) throw BizException.notFound("webhook config not found");
+        if (id != null && !provider.equals(c.getProvider()) && (req.getWebhookUrl() == null || req.getWebhookUrl().isBlank()))
+            throw BizException.badRequest("更换机器人平台时必须填写新的 Webhook 地址");
+        c.setName(req.getName().trim());
+        c.setProvider(provider);
+        c.setEnabled(Boolean.FALSE.equals(req.getEnabled()) ? 0 : 1);
+        c.setEventTypes(normalizeEvents(req.getEventTypes()));
+        if (req.getWebhookUrl() != null && !req.getWebhookUrl().isBlank()) {
+            validateUrl(provider, req.getWebhookUrl());
+            var enc = crypto.encrypt(req.getWebhookUrl().trim());
+            c.setWebhookUrlCiphertext(enc.ciphertext());
+            c.setWebhookUrlIv(enc.iv());
+        }
+        if (id == null && c.getWebhookUrlCiphertext() == null) throw BizException.badRequest("Webhook 地址不能为空");
+        if (id == null) mapper.insert(c); else mapper.updateById(c);
+        syncDepartmentBindings(c.getId(), req.getDepartmentIds());
+        return view(c);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        if (mapper.selectById(id) == null) throw BizException.notFound("机器人配置不存在");
+        deptWebhookMapper.delete(new QueryWrapper<SysDepartmentWebhook>().eq("webhook_config_id", id));
+        mapper.deleteById(id);
+    }
+
+    /** 覆盖式同步该机器人的部门主群绑定（PRIMARY），请求里不传 departmentIds 时保持不变 */
+    private void syncDepartmentBindings(Long configId, List<Long> departmentIds) {
+        if (departmentIds == null) return;
+        deptWebhookMapper.delete(new QueryWrapper<SysDepartmentWebhook>()
+                .eq("webhook_config_id", configId).eq("bind_type", "PRIMARY"));
+        for (Long deptId : new LinkedHashSet<>(departmentIds)) {
+            if (deptId == null) continue;
+            SysDepartment d = deptMapper.selectById(deptId);
+            if (d == null) throw BizException.badRequest("部门不存在: " + deptId);
+            SysDepartmentWebhook dw = new SysDepartmentWebhook();
+            dw.setDepartmentId(deptId);
+            dw.setWebhookConfigId(configId);
+            dw.setBindType("PRIMARY");
+            dw.setEnabled(1);
+            deptWebhookMapper.insert(dw);
+        }
+    }
+
+    private String normalizeEvents(String value) {
+        if (value == null || value.isBlank()) throw BizException.badRequest("请至少选择一种通知");
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        for (String e : value.split(",")) {
+            String v = e.trim().toUpperCase();
+            if (!v.matches("[A-Z][A-Z0-9_]{2,79}")) throw BizException.badRequest("包含无效的通知事件：" + v);
+            out.add(v);
+        }
+        String normalized = String.join(",", out);
+        if (normalized.length() > 500) throw BizException.badRequest("选择的通知事件过多");
+        return normalized;
+    }
+
+    private void validateUrl(String provider, String value) {
+        try {
+            URI u = URI.create(value.trim());
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase();
+            boolean valid = "https".equalsIgnoreCase(u.getScheme()) && switch (provider) {
+                case "WECOM" -> host.equals("qyapi.weixin.qq.com") && u.getPath().startsWith("/cgi-bin/webhook/send");
+                case "FEISHU" -> (host.equals("open.feishu.cn") || host.equals("open.larksuite.com")) && u.getPath().contains("/open-apis/bot/v2/hook/");
+                case "DINGTALK" -> host.equals("oapi.dingtalk.com") && u.getPath().startsWith("/robot/send");
+                default -> false;
+            };
+            if (!valid) throw new Exception();
+        } catch (Exception e) { throw BizException.badRequest("Webhook 地址与所选机器人类型不匹配"); }
+    }
+
+    private WebhookConfigView view(WebhookConfig c) {
+        WebhookConfigView v = new WebhookConfigView();
+        v.setId(c.getId());
+        v.setName(c.getName());
+        v.setProvider(c.getProvider());
+        v.setWebhookUrlConfigured(c.getWebhookUrlCiphertext() != null);
+        v.setEnabled(c.getEnabled());
+        v.setEventTypes(c.getEventTypes());
+        v.setUpdatedAt(c.getUpdatedAt());
+        List<Long> deptIds = deptWebhookMapper.selectList(new QueryWrapper<SysDepartmentWebhook>()
+                        .eq("webhook_config_id", c.getId()).eq("bind_type", "PRIMARY").eq("enabled", 1))
+                .stream().map(SysDepartmentWebhook::getDepartmentId).collect(Collectors.toList());
+        v.setDepartmentIds(deptIds);
+        if (!deptIds.isEmpty()) {
+            v.setDepartmentNames(deptMapper.selectBatchIds(deptIds).stream()
+                    .map(SysDepartment::getName).collect(Collectors.joining("、")));
+        }
+        return v;
+    }
+}

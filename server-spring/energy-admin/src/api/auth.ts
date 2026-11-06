@@ -9,6 +9,8 @@ export interface UserInfo {
   phone?: string
   roles: string[]
   permissions: string[]
+  departmentCode?: string
+  departmentName?: string
 }
 export interface LoginResponse {
   token: string

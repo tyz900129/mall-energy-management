@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 const routes = [
@@ -7,13 +8,22 @@ const routes = [
   { path: '/construction-public/:token', name: 'ConstructionPublic', component: () => import('@/views/ConstructionPublic.vue'), meta: { public: true, title: '施工许可证与现场巡检' } },
   { path: '/access/visitor-apply', name: 'VisitorApply', component: () => import('@/views/VisitorApply.vue'), meta: { public: true, title: '访客门禁申请' } },
   { path: '/operation/stall/:token', name: 'OperationStallScan', component: () => import('@/views/OperationStallScan.vue'), meta: { public: true, title: '铺位服务' } },
+  { path: '/warehouse/inspect', name: 'WarehouseInspectForm', component: () => import('@/views/WarehouseInspectForm.vue'), meta: { public: true, title: '仓库巡检' } },
+  { path: '/warehouse/rectify/:token', name: 'QrRectify', component: () => import('@/views/QrRectify.vue'), meta: { public: true, title: '整改提交' } },
   { path: '/operation/accountability/:id/print', name: 'OperationAccountabilityPrint', component: () => import('@/views/OperationAccountabilityPrint.vue'), meta: { title: '打印追责单', permission:'operation.accountability.view' } },
+  { path: '/patrol/entry', name: 'PatrolEntry', component: () => import('@/views/PatrolEntry.vue'), meta: { public: true, title: '今日巡场', identityPermission: 'patrol.submit' } },
+  { path: '/patrol/form', name: 'PatrolForm', component: () => import('@/views/PatrolForm.vue'), meta: { public: true, title: '点位巡检', identityPermission: 'patrol.submit' } },
+  { path: '/patrol/i/:token', name: 'PatrolIssueFeedback', component: () => import('@/views/PatrolIssueFeedback.vue'), meta: { public: true, title: '问题整改反馈' } },
+  { path: '/patrol/d/:token', name: 'PatrolDeptWorkbench', component: () => import('@/views/PatrolDeptWorkbench.vue'), meta: { public: true, title: '部门整改工作台' } },
+  { path: '/ops-patrol/entry', name: 'OpsPatrolEntry', component: () => import('@/views/OpsPatrolEntry.vue'), meta: { public: true, title: '营运巡场填报', identityPermission: 'ops.patrol.execute' } },
+  { path: '/complaints/quick', name: 'ComplaintQuickForm', component: () => import('@/views/ComplaintQuickForm.vue'), meta: { title: '客诉快速登记', permission: 'complaint.create' } },
   {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '工作台', permission:'dashboard.view' } },
+      { path: 'no-permission', name: 'NoPermission', component: () => import('@/views/NoPermission.vue'), meta: { title: '无访问权限' } },
       { path: 'workflow', name: 'WorkflowList', component: () => import('@/views/WorkflowList.vue'), meta: { title: '流程中心', permission:'workflow.view' } },
       { path: 'workflow/new-merchant', name: 'WorkflowNewMerchant', component: () => import('@/views/WorkflowNewMerchant.vue'), meta: { title: '水电费变更', permission:'workflow.create' } },
       { path: 'workflow/merchant-query', name: 'MerchantQuery', component: () => import('@/views/MerchantQuery.vue'), meta: { title: '商户账户查询', permission:'merchant.query' } },
@@ -61,6 +71,20 @@ const routes = [
       { path: 'operation/property-inspections', name: 'OperationPropertyInspection', component: () => import('@/views/OperationPropertyInspection.vue'), meta: { title: '物业清场检查', permission:'operation.property.view' } },
       { path: 'operation/violation-items', name: 'OperationViolationItem', component: () => import('@/views/OperationViolationItem.vue'), meta: { title: '违规项目管理', permission:'operation.violation.view' } },
       { path: 'operation/accountability', name: 'OperationAccountability', component: () => import('@/views/OperationAccountability.vue'), meta: { title: '追责管理', permission:'operation.accountability.view' } },
+      { path: 'patrol/points', name: 'PatrolPoints', component: () => import('@/views/PatrolPoints.vue'), meta: { title: '巡场点位', permission:'patrol.config' } },
+      { path: 'patrol/departments', name: 'PatrolDepartments', component: () => import('@/views/PatrolDepartments.vue'), meta: { title: '整改部门', permission:'patrol.config' } },
+      { path: 'patrol/duties', name: 'PatrolDuties', component: () => import('@/views/PatrolDuties.vue'), meta: { title: '值班排班', permission:'patrol.config' } },
+      { path: 'patrol/categories', name: 'PatrolCategories', component: () => import('@/views/PatrolCategories.vue'), meta: { title: '分类字典', permission:'patrol.config' } },
+      { path: 'patrol/issues', name: 'PatrolIssues', component: () => import('@/views/PatrolIssues.vue'), meta: { title: '巡场问题', permission:'patrol.issue.view' } },
+      { path: 'patrol/submissions', name: 'PatrolSubmissions', component: () => import('@/views/PatrolSubmissions.vue'), meta: { title: '巡场记录', permission:'patrol.issue.view' } },
+      { path: 'ops-patrol/depts', name: 'OpsPatrolDepts', component: () => import('@/views/OpsPatrolDepts.vue'), meta: { title: '处室与群配置', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/slots', name: 'OpsPatrolSlots', component: () => import('@/views/OpsPatrolSlots.vue'), meta: { title: '时段设置', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/items', name: 'OpsPatrolItems', component: () => import('@/views/OpsPatrolItems.vue'), meta: { title: '检查项库', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/duties', name: 'OpsPatrolDuties', component: () => import('@/views/OpsPatrolDuties.vue'), meta: { title: '干部排班', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/tasks', name: 'OpsPatrolTasks', component: () => import('@/views/OpsPatrolTasks.vue'), meta: { title: '任务看板', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/issues', name: 'OpsPatrolIssues', component: () => import('@/views/OpsPatrolIssues.vue'), meta: { title: '营运问题', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/handovers', name: 'OpsPatrolHandovers', component: () => import('@/views/OpsPatrolHandovers.vue'), meta: { title: '交接记录', permission:'ops.patrol.report' } },
+      { path: 'ops-patrol/reports', name: 'OpsPatrolReports', component: () => import('@/views/OpsPatrolReports.vue'), meta: { title: '履职报表', permission:'ops.patrol.report' } },
       { path: 'merchant', name: 'Merchant', component: () => import('@/views/Merchant.vue'), meta: { title: '商户账户管理', permission:'merchant.menu' } },
       { path: 'stall', name: 'Stall', component: () => import('@/views/Stall.vue'), meta: { title: '铺位管理', permission:'stall.menu' } },
       { path: 'stall/:id/engineering', name: 'StallEngineering', component: () => import('@/views/StallEngineering.vue'), meta: { title: '铺位工程资料', permission:'stall.engineering.view' } },
@@ -69,7 +93,17 @@ const routes = [
       { path: 'system/dictionary', name: 'BusinessDictionary', component: () => import('@/views/BusinessDictionary.vue'), meta: { title: '基础字典', permission:'system.dictionary.view' } },
       { path: 'system/webhook', name: 'WebhookConfig', component: () => import('@/views/WebhookConfig.vue'), meta: { title: 'Webhook 通知', permission:'system.webhook.view' } },
       { path: 'system/audit', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '操作审计', permission:'system.audit.view' } },
-      { path: 'system/migration', name: 'SystemMigration', component: () => import('@/views/SystemMigration.vue'), meta: { title: '数据迁移', permission:'system.migration.manage' } }
+      { path: 'system/migration', name: 'SystemMigration', component: () => import('@/views/SystemMigration.vue'), meta: { title: '数据迁移', permission:'system.migration.manage' } },
+      // 二维码巡检（仓库 / 联合巡检）
+      { path: 'qr-inspection/templates', name: 'QrInspectionTemplateConfig', component: () => import('@/views/QrInspectionTemplateConfig.vue'), meta: { title: '巡检模板配置', permission:'qr.inspection.config' } },
+      { path: 'qr-inspection/plans', name: 'QrInspectionPlans', component: () => import('@/views/QrInspectionPlans.vue'), meta: { title: '巡检计划管理', permission:'qr.inspection.plan.manage' } },
+      { path: 'qr-inspection/joint-tasks', name: 'QrInspectionJointTasks', component: () => import('@/views/QrInspectionJointTasks.vue'), meta: { title: '联合巡检', permission:'qr.inspection.view' } },
+      { path: 'qr-inspection/report', name: 'QrInspectionReport', component: () => import('@/views/QrInspectionReport.vue'), meta: { title: '巡检汇总报告', permission:'qr.inspection.view' } },
+      { path: 'qr-inspection/records', name: 'QrInspectionRecords', component: () => import('@/views/QrInspectionRecords.vue'), meta: { title: '巡检记录管理', permission:'qr.inspection.view' } },
+      // 服务管理（客诉管理）
+      { path: 'complaints', name: 'ComplaintList', component: () => import('@/views/ComplaintList.vue'), meta: { title: '客诉管理', permission:'complaint.view' } },
+      { path: 'complaints/dashboard', name: 'ComplaintDashboard', component: () => import('@/views/ComplaintDashboard.vue'), meta: { title: '客诉数据报表', permission:'complaint.stats.view' } },
+      { path: 'complaints/staff', name: 'ComplaintStaff', component: () => import('@/views/ComplaintStaff.vue'), meta: { title: '客诉人员名单', permission:'complaint.staff.manage' } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }
@@ -85,14 +119,43 @@ router.afterEach((to) => {
   document.title = pageTitle ? `${pageTitle} - 万悦城后勤管理系统` : '万悦城后勤管理系统'
 })
 
+const ACCESS_CANDIDATES: Array<[string, string]> = [
+  ['/dashboard', 'dashboard.view'],
+  ['/inspection/tasks', 'inspection.task.view'],
+  ['/ops-patrol/tasks', 'ops.patrol.report'],
+  ['/access/dashboard', 'access.dashboard.view'],
+  ['/access/self', 'access.self.view'],
+  ['/operation/merchant-responsibilities', 'operation.merchant.view'],
+  ['/workflow', 'workflow.view'],
+  ['/construction', 'construction.view'],
+  ['/workflow/merchant-query', 'merchant.query'],
+]
+
+function firstAccessiblePath(userStore: ReturnType<typeof useUserStore>) {
+  return ACCESS_CANDIDATES.find(([, code]) => userStore.hasPermission(code))?.[0] || '/no-permission'
+}
+
 router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
-  if (to.meta.public) return next()
+  if (to.meta.public) {
+    const identityPermission = to.meta.identityPermission as string | undefined
+    if (!identityPermission) return next()
+    // 公开页允许匿名访问；已登录（含设备长期登录态）时按角色/部门校验使用范围
+    const current = await userStore.restoreSession()
+    if (!current) return next()
+    if (!userStore.hasPermission(identityPermission)) {
+      ElMessage.warning('您所属部门无权使用该功能，请联系管理员')
+      return next('/no-permission')
+    }
+    return next()
+  }
   if (!userStore.token) return next({ name: 'Login', query: { redirect: to.fullPath } })
   try { await userStore.fetchMe() } catch { userStore.logout(); return next({ name: 'Login' }) }
   const permission=to.meta.permission as string|undefined
   if(permission&&!userStore.hasPermission(permission)){
-    const fallback=userStore.hasPermission('dashboard.view')?'/dashboard':userStore.hasPermission('access.self.view')?'/access/self':userStore.hasPermission('workflow.view')?'/workflow':userStore.hasPermission('construction.view')?'/construction':userStore.hasPermission('merchant.query')?'/workflow/merchant-query':'/login'
+    ElMessage.warning('您当前的角色或部门没有访问该功能的权限')
+    const fallback = firstAccessiblePath(userStore)
+    if (fallback === to.path) return next('/no-permission')
     return next(fallback)
   }
   next()

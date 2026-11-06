@@ -11,11 +11,48 @@ public class RequestPermissionResolver {
     public record Rule(String permissionCode, String bridgeRole, Set<String> acceptedRoles) {}
 
     public Rule resolve(HttpServletRequest request) {
+        // getRequestURI() 带 context-path（生产为 /energy），这里统一剥离后再匹配 /api/v1
         String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
         String method = request.getMethod();
         boolean read = HttpMethod.GET.matches(method);
         if (!path.startsWith("/api/v1/")) return null;
         if (path.startsWith("/api/v1/operation-public/")) return null;
+        if (path.startsWith("/api/v1/patrol-public/")) return null;
+        if (path.startsWith("/api/v1/ops-patrol-public/")) return null;
+        // 旧巡检 H5 免登录入口：token 校验在业务层（roundByToken 校验当日有效性）
+        if (path.equals("/api/v1/patrol/entry")) return null;
+        if (path.matches("/api/v1/patrol/points/\\d+/form")) return null;
+        if (path.equals("/api/v1/patrol/submissions") && !read) return null;
+
+        if (path.startsWith("/api/v1/ops-patrol/")) {
+            if (path.contains("/depts") || path.contains("/webhooks") || path.contains("/floor-options"))
+                return read ? opsView() : opsDept();
+            if (path.contains("/slots") || path.contains("/check-items") || path.contains("/duties"))
+                return read ? opsView() : opsManage("ops.patrol.config");
+            if (path.contains("/issues")) {
+                if (path.endsWith("/assign") || path.endsWith("/rectify")) return opsManage("ops.patrol.assign");
+                if (path.endsWith("/review")) return opsManage("ops.patrol.review");
+                return read ? opsView() : opsManage("ops.patrol.assign");
+            }
+            if (path.contains("/reports")) return opsReport();
+            if (path.contains("/tasks") && !read) return opsManage("ops.patrol.config");
+            return opsView();
+        }
+
+        if (path.startsWith("/api/v1/patrol/")) {
+            if (path.endsWith("/entry") || path.contains("/form")) return patrolSubmit();
+            if (path.startsWith("/api/v1/patrol/submissions")) return read ? patrolView("patrol.issue.view") : patrolSubmit();
+            if (path.contains("/issues")) {
+                if (path.endsWith("/assign")) return patrolManage("patrol.issue.assign");
+                if (path.endsWith("/review")) return patrolManage("patrol.issue.review");
+                return patrolView("patrol.issue.view");
+            }
+            return read ? patrolView("patrol.point.view") : patrolManage("patrol.config");
+        }
 
         if (path.startsWith("/api/v1/dashboard")) return view("dashboard.view");
         if (path.startsWith("/api/v1/operations/merchant-responsibilities"))
@@ -35,6 +72,10 @@ public class RequestPermissionResolver {
             return new Rule("operation.property.view","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","DEVICE_VERIFIER"));
         }
         if (path.startsWith("/api/v1/operations/clearances")) {
+            if (path.endsWith("/export"))
+                return new Rule("operation.clearance.export", "APPLICANT",
+                        Set.of("SUPER_ADMIN", "SYSTEM_ADMIN", "APPLICANT", "DEVICE_VERIFIER",
+                                "OPS_PATROL_MANAGER", "CS_MANAGER", "AUDITOR"));
             if (path.endsWith("/settings")) return manage("operation.clearance.setting.manage");
             if (path.endsWith("/period")) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (!read) return new Rule("operation.clearance.submit","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
@@ -54,6 +95,8 @@ public class RequestPermissionResolver {
                     : new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (path.contains("/events/mine")) return new Rule("access.event.view.self", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (path.endsWith("/events/sync") || path.endsWith("/events/sync-status")) return manage("access.event.sync");
+            // 通行记录缩略图/原图：与「我的通行记录」用同一门槛；是否属于本人由 Controller 二次校验
+            if (path.matches(".*/events/[0-9]+/(thumbnail|snapshot)$")) return new Rule("access.event.view.self", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (path.contains("/events")) return view("access.event.view.all");
             if (path.contains("/visitors/mine")) return new Rule("visitor.view.own", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
             if (path.contains("/renewals/mine")) return read ? new Rule("access.self.view", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER")) : new Rule("access.self.manage", "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT","VIEWER"));
@@ -155,6 +198,13 @@ public class RequestPermissionResolver {
     }
 
     private Rule view(String code) { return new Rule(code, "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","VIEWER")); }
+    private Rule patrolSubmit() { return new Rule("patrol.submit", "DEVICE_VERIFIER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","PROPERTY_MANAGER","DEVICE_VERIFIER")); }
+    private Rule opsView() { return new Rule("ops.patrol.report", "OPS_PATROL_MANAGER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","OPS_PATROL_MANAGER","AUDITOR")); }
+    private Rule opsDept() { return new Rule("ops.patrol.dept", "OPS_PATROL_MANAGER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","OPS_PATROL_MANAGER")); }
+    private Rule opsManage(String code) { return new Rule(code, "OPS_PATROL_MANAGER", Set.of("SUPER_ADMIN","OPS_PATROL_MANAGER")); }
+    private Rule opsReport() { return new Rule("ops.patrol.report", "AUDITOR", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","OPS_PATROL_MANAGER","AUDITOR")); }
+    private Rule patrolView(String code) { return new Rule(code, "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","PROPERTY_MANAGER","DEVICE_VERIFIER")); }
+    private Rule patrolManage(String code) { return new Rule(code, "SYSTEM_ADMIN", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","PROPERTY_MANAGER")); }
     private Rule manage(String code) { return new Rule(code, "SYSTEM_ADMIN", Set.of("SUPER_ADMIN","SYSTEM_ADMIN")); }
     private Rule admin(String code) { return new Rule(code, "SUPER_ADMIN", Set.of("SUPER_ADMIN")); }
     private Rule applicant(String code) { return new Rule(code, "APPLICANT", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","APPLICANT")); }

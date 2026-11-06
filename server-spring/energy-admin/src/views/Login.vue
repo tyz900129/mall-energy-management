@@ -15,7 +15,7 @@
             登录
           </el-button>
         </el-form-item>
-        <el-checkbox v-model="rememberDevice" style="margin-bottom:14px">在此设备上自动登录（30天）</el-checkbox>
+        <el-checkbox v-model="rememberDevice" style="margin-bottom:14px">在此设备上自动登录（180天）</el-checkbox>
       </el-form>
       <div class="register-link"><el-button v-if="hasDeviceLogin" link type="warning" @click="cancelAutoLogin">取消自动登录，使用其他账号</el-button><el-button link type="primary" @click="registerVisible=true">没有账号？自主注册</el-button></div>
     </el-card>

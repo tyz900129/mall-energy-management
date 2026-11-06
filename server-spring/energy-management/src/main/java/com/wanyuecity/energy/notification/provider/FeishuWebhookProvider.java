@@ -12,7 +12,8 @@ import java.util.regex.Pattern;
 
 @Component
 public class FeishuWebhookProvider implements NotificationProvider {
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\((https?://[^)]+)\\)\\s*$", Pattern.MULTILINE);
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\((https?://[^)]+)\\)");
+    private static final Pattern IMAGE_LINK = Pattern.compile("!\\[[^\\]]*]\\(https?://[^)]+\\)");
     private static final Pattern FONT_TAG = Pattern.compile("</?font(?:\\s+[^>]*)?>", Pattern.CASE_INSENSITIVE);
     private final OkHttpClient http = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(5)).readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
     private final ObjectMapper json;
@@ -35,26 +36,40 @@ public class FeishuWebhookProvider implements NotificationProvider {
     }
 
     Map<String, Object> buildPayload(NotificationMessage msg) {
-        String markdown = FONT_TAG.matcher(msg.content() == null ? "" : msg.content()).replaceAll("").trim();
+        String markdown = IMAGE_LINK.matcher(FONT_TAG.matcher(msg.content() == null ? "" : msg.content()).replaceAll("").trim()).replaceAll("").trim();
         Matcher link = MARKDOWN_LINK.matcher(markdown);
-        String buttonText = null, buttonUrl = null;
+        List<Map<String, String>> buttons = new ArrayList<>();
         while (link.find()) {
-            buttonText = link.group(1).replaceFirst("^[^\\p{L}\\p{N}]+\\s*", "").trim();
-            buttonUrl = link.group(2);
+            String text = link.group(1).replaceFirst("^[^\\p{L}\\p{N}]+\\s*", "").trim();
+            buttons.add(Map.of("text", text, "url", link.group(2)));
         }
-        if (buttonUrl != null) markdown = MARKDOWN_LINK.matcher(markdown).replaceAll("").trim();
+        if (!buttons.isEmpty()) markdown = MARKDOWN_LINK.matcher(markdown).replaceAll("").trim();
+        // 飞书自定义机器人不能内嵌外链图片，现场照片降级为可点开原图的行内链接（不占用底部按钮位）
+        if (msg.imageUrls() != null && !msg.imageUrls().isEmpty()) {
+            StringBuilder photos = new StringBuilder();
+            int index = 1;
+            for (String imageUrl : msg.imageUrls()) {
+                if (index > 6) break;
+                photos.append("[").append(index++).append("](").append(imageUrl).append(") ");
+            }
+            markdown = markdown + "\n**现场照片**：" + photos.toString().trim();
+        }
         String title = extractTitle(markdown);
         markdown = markdown.replaceFirst("(?m)^#{1,6}\\s+.*(?:\\R|$)", "").trim();
 
         List<Map<String, Object>> elements = new ArrayList<>();
         elements.add(Map.of("tag", "div", "text", Map.of("tag", "lark_md", "content", markdown)));
-        if (buttonUrl != null) {
-            Map<String, Object> button = new LinkedHashMap<>();
-            button.put("tag", "button");
-            button.put("text", Map.of("tag", "plain_text", "content", buttonText == null || buttonText.isBlank() ? "查看详情" : buttonText));
-            button.put("type", "primary");
-            button.put("url", buttonUrl);
-            elements.add(Map.of("tag", "action", "actions", List.of(button)));
+        if (!buttons.isEmpty()) {
+            List<Map<String, Object>> actions = new ArrayList<>();
+            for (Map<String, String> b : buttons) {
+                Map<String, Object> button = new LinkedHashMap<>();
+                button.put("tag", "button");
+                button.put("text", Map.of("tag", "plain_text", "content", b.get("text").isBlank() ? "查看详情" : b.get("text")));
+                button.put("type", "primary");
+                button.put("url", b.get("url"));
+                actions.add(button);
+            }
+            elements.add(Map.of("tag", "action", "actions", actions));
         }
         Map<String, Object> card = new LinkedHashMap<>();
         card.put("config", Map.of("wide_screen_mode", true, "enable_forward", true));
