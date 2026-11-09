@@ -61,6 +61,60 @@
       <el-empty v-else description="暂无数据" :image-size="60" />
     </el-card>
 
+    <el-card shadow="never" class="card">
+      <template #header>
+        <div class="card-head">
+          <span>同环比分析</span>
+          <div class="mini-selects">
+            <span class="muted">统计周期</span>
+            <el-select v-model="compareGranularity" size="small" style="width:100px" @change="loadCompare">
+              <el-option label="周" value="week" />
+              <el-option label="月" value="month" />
+              <el-option label="季度" value="quarter" />
+              <el-option label="半年" value="half" />
+            </el-select>
+          </div>
+        </div>
+      </template>
+      <div class="cmp-note">环比 = 对比上一期；同比 = 对比去年同期；基数为 0 时显示“—”。季度按 12-2、3-5、6-8、9-11 划分，半年按 3-8、9-2 划分。</div>
+      <el-row :gutter="12">
+        <el-col :xs="24" :md="12">
+          <div class="cmp-block">
+            <div class="cmp-title">客诉数量</div>
+            <div v-if="comparePeriods.length" class="cmp-table">
+              <div class="cmp-tr cmp-head">
+                <span>期间</span><span class="ta-r">本期</span><span class="ta-r">环比</span><span class="ta-r">同比</span>
+              </div>
+              <div v-for="row in compareRows" :key="row.key" class="cmp-tr">
+                <span class="cmp-period">{{ row.label }}</span>
+                <span class="ta-r">{{ row.count }}</span>
+                <span class="ta-r" :class="rateClass(row.countChainRate)" :title="`上期 ${row.prevCount} 条`">{{ rateText(row.countChainRate) }}</span>
+                <span class="ta-r" :class="rateClass(row.countYoyRate)" :title="`去年同期 ${row.yoyCount} 条`">{{ rateText(row.countYoyRate) }}</span>
+              </div>
+            </div>
+            <el-empty v-else description="暂无数据" :image-size="50" />
+          </div>
+        </el-col>
+        <el-col :xs="24" :md="12">
+          <div class="cmp-block">
+            <div class="cmp-title">客诉费用金额</div>
+            <div v-if="comparePeriods.length" class="cmp-table">
+              <div class="cmp-tr cmp-head">
+                <span>期间</span><span class="ta-r">本期</span><span class="ta-r">环比</span><span class="ta-r">同比</span>
+              </div>
+              <div v-for="row in compareRows" :key="row.key" class="cmp-tr">
+                <span class="cmp-period">{{ row.label }}</span>
+                <span class="ta-r">¥{{ money(row.amount) }}</span>
+                <span class="ta-r" :class="rateClass(row.amountChainRate)" :title="`上期 ¥${money(row.prevAmount)}`">{{ rateText(row.amountChainRate) }}</span>
+                <span class="ta-r" :class="rateClass(row.amountYoyRate)" :title="`去年同期 ¥${money(row.yoyAmount)}`">{{ rateText(row.amountYoyRate) }}</span>
+              </div>
+            </div>
+            <el-empty v-else description="暂无数据" :image-size="50" />
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
     <el-row :gutter="12" class="card">
       <el-col :xs="24" :md="14">
         <el-card shadow="never">
@@ -198,6 +252,8 @@ const efficiency = ref<any>({})
 const cost = ref<any>({})
 const ranking = ref<any[]>([])
 const crossRows = ref<any[]>([])
+const compareGranularity = ref('month')
+const comparePeriods = ref<any[]>([])
 
 const dimension = ref('category')
 const dim1 = ref('businessType')
@@ -230,7 +286,7 @@ function params() {
 }
 
 async function loadAll() {
-  await Promise.all([loadOverview(), loadDistribution(), loadEfficiency(), loadCost(), loadRanking(), loadTrend()])
+  await Promise.all([loadOverview(), loadDistribution(), loadEfficiency(), loadCost(), loadRanking(), loadTrend(), loadCompare()])
 }
 
 async function loadOverview() { overview.value = await complaintApi.statsOverview(params()) }
@@ -238,6 +294,10 @@ async function loadDistribution() {
   distribution.value = await complaintApi.statsDistribution({ ...params(), dimension: dimension.value }) as any
 }
 async function loadTrend() { trend.value = await complaintApi.statsTrend({ ...params(), granularity: 'month' }) as any }
+async function loadCompare() {
+  const data: any = await complaintApi.statsPeriodCompare({ ...params(), granularity: compareGranularity.value })
+  comparePeriods.value = data.periods || []
+}
 async function loadEfficiency() { efficiency.value = await complaintApi.statsEfficiency(params()) }
 async function loadCost() { cost.value = await complaintApi.statsCost(params()) }
 async function loadRanking() {
@@ -282,6 +342,22 @@ const trendDots = computed(() => trend.value.map((item: any, index: number) => (
   y: 160 - Number(item.value || 0) / trendMax.value * 140
 })))
 const trendPoints = computed(() => trendDots.value.map(p => `${p.x},${p.y}`).join(' '))
+
+const compareRows = computed(() => [...comparePeriods.value].reverse())
+
+function rateText(rate: any) {
+  if (rate === null || rate === undefined) return '—'
+  const value = Number(rate)
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
+}
+
+function rateClass(rate: any) {
+  if (rate === null || rate === undefined) return ''
+  const value = Number(rate)
+  if (value > 0) return 'rate-up'
+  if (value < 0) return 'rate-down'
+  return ''
+}
 </script>
 
 <style scoped>
@@ -310,6 +386,18 @@ const trendPoints = computed(() => trendDots.value.map(p => `${p.x},${p.y}`).joi
 .trend-axis { display: flex; justify-content: space-between; color: #909399; font-size: 12px; }
 .muted { color: #909399; margin-top: 6px; font-size: 12px; }
 .eff-summary { color: #606266; font-size: 13px; margin-bottom: 12px; }
+.cmp-note { color: #909399; font-size: 12px; margin-bottom: 10px; }
+
+.cmp-block { border: 1px solid #ebeef5; border-radius: 8px; padding: 10px 12px; }
+.cmp-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #303133; }
+.cmp-table { display: flex; flex-direction: column; font-size: 13px; }
+.cmp-tr { display: grid; grid-template-columns: 1.5fr .9fr .8fr .8fr; gap: 6px; padding: 6px 4px; border-bottom: 1px dashed #f0f0f0; align-items: center; }
+.cmp-tr:last-child { border-bottom: none; }
+.cmp-head { color: #909399; font-size: 12px; border-bottom: 1px solid #ebeef5; }
+.cmp-period { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-r { text-align: right; }
+.rate-up { color: #f56c6c; font-weight: 600; }
+.rate-down { color: #67c23a; font-weight: 600; }
 
 @media (max-width: 768px) {
   .dash { padding: 0; }

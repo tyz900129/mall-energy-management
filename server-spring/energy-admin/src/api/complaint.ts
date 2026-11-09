@@ -42,6 +42,7 @@ export const complaintApi = {
   statsOverview: (params: Record<string, any>) => http.get(`${base}/stats/overview`, { params }),
   statsDistribution: (params: Record<string, any>) => http.get(`${base}/stats/distribution`, { params }),
   statsTrend: (params: Record<string, any>) => http.get(`${base}/stats/trend`, { params }),
+  statsPeriodCompare: (params: Record<string, any>) => http.get(`${base}/stats/period-compare`, { params }),
   statsCross: (params: Record<string, any>) => http.get(`${base}/stats/cross`, { params }),
   statsRanking: (params: Record<string, any>) => http.get(`${base}/stats/ranking`, { params }),
   statsEfficiency: (params: Record<string, any>) => http.get(`${base}/stats/efficiency`, { params }),

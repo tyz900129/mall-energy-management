@@ -8,9 +8,14 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -189,6 +194,210 @@ public class ComplaintStatsService {
         return result;
     }
 
+    /**
+     * 周期同环比：客诉数量与金额。
+     * granularity 支持 week/month/quarter/half；季度按 12-2、3-5、6-8、9-11 划分，半年按 3-8、9-2 划分。
+     */
+    public Map<String, Object> periodCompare(ComplaintStatsQuery q) {
+        String granularity = normalizeGranularity(q.getGranularity());
+        LocalDate lastDate = jdbc.queryForObject("SELECT MAX(occur_date) FROM cs_complaint", LocalDate.class);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("granularity", granularity);
+        if (lastDate == null) {
+            result.put("periods", List.of());
+            return result;
+        }
+        List<Period> periods;
+        if (q.getStart() != null && q.getEnd() != null) {
+            periods = periodsBetween(granularity, periodOf(granularity, q.getStart()), periodOf(granularity, q.getEnd()));
+        } else {
+            int limit = switch (granularity) {
+                case "week" -> 12;
+                case "month" -> 12;
+                case "quarter" -> 8;
+                default -> 4;
+            };
+            periods = periodsEndingAt(granularity, periodOf(granularity, lastDate), limit);
+        }
+        if (periods.isEmpty()) {
+            result.put("periods", List.of());
+            return result;
+        }
+        // 同比需回看一年，环比需回看一期，统一多取一个月保证覆盖
+        LocalDate begin = periods.get(0).start().minusYears(1).minusMonths(1);
+        LocalDate end = periods.get(periods.size() - 1).end();
+        Filter f = filter(withoutDateRange(q));
+        String bounds = "c.occur_date>=? AND c.occur_date<=?";
+        String where = f.whereClause().isBlank() ? " WHERE " + bounds : f.whereClause() + " AND " + bounds;
+        List<Object> args = new ArrayList<>(f.args());
+        args.add(begin);
+        args.add(end);
+        String keyExpr = switch (granularity) {
+            case "week" -> "DATE_FORMAT(c.occur_date,'%x-W%v')";
+            case "month" -> "DATE_FORMAT(c.occur_date,'%Y-%m')";
+            case "quarter" -> QUARTER_KEY;
+            default -> HALF_KEY;
+        };
+        Map<String, Map<String, Object>> rows = new LinkedHashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                "SELECT " + keyExpr + " k, COUNT(*) cnt, "
+                        + "COALESCE(SUM(CASE WHEN c.no_cost=1 THEN 0 ELSE c.company_cost+c.merchant_cost END),0) amt "
+                        + "FROM cs_complaint c" + where + " GROUP BY k", args.toArray())) {
+            rows.put(String.valueOf(row.get("k")), row);
+        }
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Period p : periods) {
+            Map<String, Object> cur = rowOf(rows, p.key());
+            Map<String, Object> prev = rowOf(rows, periodOf(granularity, p.start().minusDays(1)).key());
+            Map<String, Object> yoy = rowOf(rows, periodOf(granularity, p.start().minusYears(1)).key());
+            long count = number(cur.get("cnt")).longValue();
+            BigDecimal amount = decimal(cur.get("amt"));
+            long prevCount = number(prev.get("cnt")).longValue();
+            BigDecimal prevAmount = decimal(prev.get("amt"));
+            long yoyCount = number(yoy.get("cnt")).longValue();
+            BigDecimal yoyAmount = decimal(yoy.get("amt"));
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("key", p.key());
+            item.put("label", p.label());
+            item.put("count", count);
+            item.put("amount", amount);
+            item.put("prevCount", prevCount);
+            item.put("yoyCount", yoyCount);
+            item.put("prevAmount", prevAmount);
+            item.put("yoyAmount", yoyAmount);
+            item.put("countChainRate", rate(count, prevCount));
+            item.put("countYoyRate", rate(count, yoyCount));
+            item.put("amountChainRate", rate(amount.doubleValue(), prevAmount.doubleValue()));
+            item.put("amountYoyRate", rate(amount.doubleValue(), yoyAmount.doubleValue()));
+            items.add(item);
+        }
+        result.put("periods", items);
+        return result;
+    }
+
+    // ================= 周期计算 =================
+
+    private record Period(String key, String label, LocalDate start, LocalDate end) { }
+
+    private String normalizeGranularity(String granularity) {
+        if (granularity == null || granularity.isBlank()) return "month";
+        return switch (granularity) {
+            case "week", "month", "quarter", "half" -> granularity;
+            default -> throw BizException.badRequest("不支持的统计周期: " + granularity);
+        };
+    }
+
+    private ComplaintStatsQuery withoutDateRange(ComplaintStatsQuery q) {
+        ComplaintStatsQuery copy = new ComplaintStatsQuery();
+        copy.setBusinessType(q.getBusinessType());
+        copy.setFloor(q.getFloor());
+        copy.setCategory(q.getCategory());
+        copy.setStatus(q.getStatus());
+        copy.setSatisfaction(q.getSatisfaction());
+        copy.setChannel(q.getChannel());
+        copy.setBrandName(q.getBrandName());
+        return copy;
+    }
+
+    private Period periodOf(String granularity, LocalDate date) {
+        return switch (granularity) {
+            case "week" -> weekPeriod(date);
+            case "quarter" -> quarterPeriod(date);
+            case "half" -> halfPeriod(date);
+            default -> monthPeriod(date);
+        };
+    }
+
+    private Period weekPeriod(LocalDate date) {
+        LocalDate start = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate end = start.plusDays(6);
+        String key = String.format("%d-W%02d", date.get(WeekFields.ISO.weekBasedYear()), date.get(WeekFields.ISO.weekOfWeekBasedYear()));
+        String label = start + "~" + end.getMonthValue() + "-" + end.getDayOfMonth();
+        return new Period(key, label, start, end);
+    }
+
+    private Period monthPeriod(LocalDate date) {
+        LocalDate start = date.withDayOfMonth(1);
+        LocalDate end = start.plusMonths(1).minusDays(1);
+        String label = String.format("%d年%02d月", start.getYear(), start.getMonthValue());
+        return new Period(String.format("%d-%02d", start.getYear(), start.getMonthValue()), label, start, end);
+    }
+
+    /** 季度：12-2 冬季、3-5 春季、6-8 夏季、9-11 秋季；12 月归入次年冬季。 */
+    private Period quarterPeriod(LocalDate date) {
+        int month = date.getMonthValue();
+        int year = date.getYear();
+        String code;
+        int startMonth;
+        int startYear;
+        int seasonYear;
+        if (month == 12) {
+            code = "W"; startMonth = 12; startYear = year; seasonYear = year + 1;
+        } else if (month <= 2) {
+            code = "W"; startMonth = 12; startYear = year - 1; seasonYear = year;
+        } else if (month <= 5) {
+            code = "SP"; startMonth = 3; startYear = year; seasonYear = year;
+        } else if (month <= 8) {
+            code = "SU"; startMonth = 6; startYear = year; seasonYear = year;
+        } else {
+            code = "AU"; startMonth = 9; startYear = year; seasonYear = year;
+        }
+        LocalDate start = LocalDate.of(startYear, startMonth, 1);
+        LocalDate end = start.plusMonths(3).minusDays(1);
+        String label = String.format("%d.%02d-%d.%02d", startYear, startMonth, end.getYear(), end.getMonthValue());
+        return new Period(code + seasonYear, label, start, end);
+    }
+
+    /** 半年：3-8 为上半年，9-2 为下半年（跨年）。 */
+    private Period halfPeriod(LocalDate date) {
+        int month = date.getMonthValue();
+        int year = date.getYear();
+        LocalDate start;
+        int keyYear;
+        boolean first;
+        if (month >= 3 && month <= 8) {
+            first = true; start = LocalDate.of(year, 3, 1); keyYear = year;
+        } else if (month <= 2) {
+            first = false; start = LocalDate.of(year - 1, 9, 1); keyYear = year - 1;
+        } else {
+            first = false; start = LocalDate.of(year, 9, 1); keyYear = year;
+        }
+        LocalDate end = start.plusMonths(6).minusDays(1);
+        String label = String.format("%d.%02d-%d.%02d", start.getYear(), start.getMonthValue(), end.getYear(), end.getMonthValue());
+        return new Period("H" + (first ? 1 : 2) + keyYear, label, start, end);
+    }
+
+    private List<Period> periodsEndingAt(String granularity, Period end, int limit) {
+        LinkedList<Period> list = new LinkedList<>();
+        Period current = end;
+        for (int i = 0; i < limit; i++) {
+            list.addFirst(current);
+            current = periodOf(granularity, current.start().minusDays(1));
+        }
+        return list;
+    }
+
+    private List<Period> periodsBetween(String granularity, Period from, Period to) {
+        List<Period> list = new ArrayList<>();
+        Period current = from;
+        for (int i = 0; i < 120; i++) {
+            list.add(current);
+            if (current.key().equals(to.key())) break;
+            current = periodOf(granularity, current.end().plusDays(1));
+        }
+        return list;
+    }
+
+    private Map<String, Object> rowOf(Map<String, Map<String, Object>> rows, String key) {
+        return rows.getOrDefault(key, Map.of());
+    }
+
+    /** 同环比百分比，基数为 0 时返回 null（前端显示 -）。 */
+    private BigDecimal rate(double current, double base) {
+        if (base == 0) return null;
+        return BigDecimal.valueOf((current - base) / base * 100).setScale(1, RoundingMode.HALF_UP);
+    }
+
     // ================= 内部工具 =================
 
     private String dimension(String dimension) {
@@ -264,6 +473,16 @@ public class ComplaintStatsService {
         if (value instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
         return BigDecimal.ZERO;
     }
+
+    private static final String QUARTER_KEY = "CONCAT(CASE "
+            + "WHEN MONTH(c.occur_date)<=2 THEN 'W' "
+            + "WHEN MONTH(c.occur_date)=12 THEN 'W' "
+            + "WHEN MONTH(c.occur_date)<=5 THEN 'SP' "
+            + "WHEN MONTH(c.occur_date)<=8 THEN 'SU' ELSE 'AU' END, "
+            + "CASE WHEN MONTH(c.occur_date)=12 THEN YEAR(c.occur_date)+1 ELSE YEAR(c.occur_date) END)";
+    private static final String HALF_KEY = "CONCAT('H', "
+            + "CASE WHEN MONTH(c.occur_date) BETWEEN 3 AND 8 THEN '1' ELSE '2' END, "
+            + "CASE WHEN MONTH(c.occur_date)<=2 THEN YEAR(c.occur_date)-1 ELSE YEAR(c.occur_date) END)";
 
     private static final String DICT_JOINS = """
             LEFT JOIN cs_complaint_dict cd ON cd.dict_type='CATEGORY' AND cd.item_value=c.category

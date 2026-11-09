@@ -219,6 +219,13 @@ public class ComplaintController {
         return ApiResponse.ok(statsService.trend(query));
     }
 
+    /** 周期同环比：数量与金额，granularity=week/month/quarter/half。 */
+    @GetMapping("/stats/period-compare")
+    @PreAuthorize("hasAuthority('complaint.stats.view')")
+    public ApiResponse<Map<String, Object>> periodCompare(ComplaintStatsQuery query) {
+        return ApiResponse.ok(statsService.periodCompare(query));
+    }
+
     @GetMapping("/stats/cross")
     @PreAuthorize("hasAuthority('complaint.stats.view')")
     public ApiResponse<List<Map<String, Object>>> cross(ComplaintStatsQuery query) {
