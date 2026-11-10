@@ -23,6 +23,16 @@ public class RequestPermissionResolver {
         if (path.startsWith("/api/v1/operation-public/")) return null;
         if (path.startsWith("/api/v1/patrol-public/")) return null;
         if (path.startsWith("/api/v1/ops-patrol-public/")) return null;
+        // 日历任务移动回执：token 校验、脱敏与限流都在 CalendarPublicService 内完成
+        if (path.startsWith("/api/v1/calendar-public/")) return null;
+        if (path.startsWith("/api/v1/calendar/")) {
+            if (path.contains("/generation-logs"))
+                return new Rule("calendar.report", "VIEWER", Set.of("SUPER_ADMIN","SYSTEM_ADMIN","PROPERTY_MANAGER","VIEWER"));
+            if (read)
+                return new Rule("calendar.view", "VIEWER",
+                        Set.of("SUPER_ADMIN","SYSTEM_ADMIN","PROPERTY_MANAGER","OPS_PATROL_MANAGER","DEVICE_VERIFIER","CS_AGENT","CS_MANAGER","VIEWER","APPLICANT"));
+            return new Rule("calendar.manage", "SYSTEM_ADMIN", Set.of("SUPER_ADMIN","SYSTEM_ADMIN"));
+        }
         // 旧巡检 H5 免登录入口：token 校验在业务层（roundByToken 校验当日有效性）
         if (path.equals("/api/v1/patrol/entry")) return null;
         if (path.matches("/api/v1/patrol/points/\\d+/form")) return null;

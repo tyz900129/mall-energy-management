@@ -32,7 +32,7 @@ public class CalendarController {
     }
 
     @GetMapping("/generation-logs")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','PROPERTY_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','PROPERTY_MANAGER','VIEWER')")
     public ApiResponse<List<Map<String,Object>>> logs(@RequestParam(required=false) Long planId,@RequestParam(required=false) String from,@RequestParam(required=false) String to){
         LocalDate f=(from==null||from.isBlank())?null:LocalDate.parse(from);
         LocalDate t=(to==null||to.isBlank())?null:LocalDate.parse(to);
