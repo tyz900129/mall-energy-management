@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanyuecity.energy.core.BizException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -470,11 +471,21 @@ public class PatrolService {
             String feedbackToken = randomToken();
             String status = department == null ? "UNASSIGNED" : "ASSIGNED";
             LocalDateTime dueAt = department == null ? null : nextDueAt(department, now);
-            long issueId = insert("INSERT INTO patrol_issue(issue_no,submission_id,round_id,point_id,point_name,area,floor,department_id,category,urgency,description,status,due_at,assigned_by,assigned_at,feedback_token,submitter_name,submitted_at) "
-                            + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    issueNo, submissionId, round.get("id"), pointId, point.get("name"), point.get("area"), point.get("floor"),
-                    departmentId, category, urgency, note, status, dueAt, department == null ? null : submitterName,
-                    department == null ? null : now, feedbackToken, submitterName, now);
+            long issueId;
+            for (int attempt = 1; ; attempt++) {
+                try {
+                    issueId = insert("INSERT INTO patrol_issue(issue_no,submission_id,round_id,point_id,point_name,area,floor,department_id,category,urgency,description,status,due_at,assigned_by,assigned_at,feedback_token,submitter_name,submitted_at) "
+                                    + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            issueNo, submissionId, round.get("id"), pointId, point.get("name"), point.get("area"), point.get("floor"),
+                            departmentId, category, urgency, note, status, dueAt, department == null ? null : submitterName,
+                            department == null ? null : now, feedbackToken, submitterName, now);
+                    break;
+                } catch (DuplicateKeyException ex) {
+                    // 并发提交时可能取到相同流水号，重新取最大号重试
+                    if (attempt >= 5) throw ex;
+                    issueNo = nextIssueNo(date);
+                }
+            }
             logIssue(issueId, "CREATE", null, departmentId, null, status, note, submitterName);
             Map<String, Object> issueRow = issueRow(issueId);
             // 异常上报推送：独立事件类型，配置了订阅的机器人都会收到（含现场照片）
@@ -944,8 +955,12 @@ public class PatrolService {
     }
 
     private String nextIssueNo(LocalDate date) {
-        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM patrol_issue WHERE DATE(created_at)=?", Long.class, Date.valueOf(date));
-        return "XC" + date.format(BASIC_DATE) + String.format("%04d", (count == null ? 0 : count) + 1);
+        String prefix = "XC" + date.format(BASIC_DATE);
+        // 以已存在的最大流水号为准，避免删除问题单后 COUNT 回退造成编号冲突
+        Long max = jdbc.queryForObject(
+                "SELECT COALESCE(MAX(CAST(SUBSTRING(issue_no, ?) AS UNSIGNED)), 0) FROM patrol_issue WHERE issue_no LIKE ?",
+                Long.class, prefix.length() + 1, prefix + "%");
+        return prefix + String.format("%04d", (max == null ? 0 : max) + 1);
     }
 
     private String writeCheckItems(Object raw) {
