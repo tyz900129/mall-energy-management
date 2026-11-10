@@ -697,6 +697,7 @@ public class QrInspectionService {
     public QrInspectionIssue feedback(String token, String text, List<String> photoUrls, String byName, String byId) {
         QrInspectionIssue issue = issueMapper.byToken(token);
         if (issue == null) throw BizException.badRequest("整改链接无效或已过期");
+        if ("CLOSED".equals(issue.getStatus())) throw BizException.badRequest("该整改任务已关闭，不能重复提交");
         if (text == null || text.isBlank()) throw BizException.badRequest("整改说明不能为空");
         issue.setFeedbackText(text);
         issue.setFeedbackPhotosJson(jsonWrite(photoUrls));

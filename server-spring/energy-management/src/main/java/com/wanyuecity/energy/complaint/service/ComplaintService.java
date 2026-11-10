@@ -88,6 +88,12 @@ public class ComplaintService {
         return jdbc.queryForList(SELECT_LIST + " " + filter.where() + " ORDER BY c.occur_date DESC, c.id DESC", filter.args().toArray());
     }
 
+    /** 受数据范围约束的详情查询：商管角色只能查看本人作为责任商管的单据。 */
+    public Map<String, Object> detail(Long id, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
+        return detail(id);
+    }
+
     public Map<String, Object> detail(Long id) {
         Map<String, Object> data;
         try {
@@ -193,7 +199,8 @@ public class ComplaintService {
     }
 
     @Transactional
-    public Map<String, Object> update(Long id, ComplaintRequest req, SysUser operator) {
+    public Map<String, Object> update(Long id, ComplaintRequest req, SysUser operator, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         CsComplaint c = requireComplaint(id);
         validate(req);
         apply(c, req);
@@ -209,7 +216,8 @@ public class ComplaintService {
     }
 
     @Transactional
-    public Map<String, Object> changeStatus(Long id, String target, String note, SysUser operator) {
+    public Map<String, Object> changeStatus(Long id, String target, String note, SysUser operator, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         if (target == null || target.isBlank()) throw BizException.badRequest("请选择目标状态");
         CsComplaint c = requireComplaint(id);
         String current = c.getStatus();
@@ -227,7 +235,8 @@ public class ComplaintService {
     }
 
     @Transactional
-    public Map<String, Object> close(Long id, String satisfaction, String note, SysUser operator) {
+    public Map<String, Object> close(Long id, String satisfaction, String note, SysUser operator, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         CsComplaint c = requireComplaint(id);
         if (!"resolved".equals(c.getStatus())) {
             throw BizException.badRequest("只有「已解决」的客诉可以关闭");
@@ -255,7 +264,8 @@ public class ComplaintService {
 
     // ================= 附件 =================
 
-    public List<Map<String, Object>> addAttachments(Long id, org.springframework.web.multipart.MultipartFile[] files) {
+    public List<Map<String, Object>> addAttachments(Long id, org.springframework.web.multipart.MultipartFile[] files, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         requireComplaint(id);
         int existing = attachmentService.list(ATTACHMENT_TYPE, id).size();
         int incoming = files == null ? 0 : files.length;
@@ -263,18 +273,21 @@ public class ComplaintService {
         return attachmentService.saveAll(ATTACHMENT_TYPE, id, files);
     }
 
-    public java.util.List<Map<String, Object>> attachments(Long id) {
+    public java.util.List<Map<String, Object>> attachments(Long id, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         requireComplaint(id);
         return attachmentService.list(ATTACHMENT_TYPE, id);
     }
 
-    public void deleteAttachment(Long id, Long attachmentId) {
+    public void deleteAttachment(Long id, Long attachmentId, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         requireComplaint(id);
         assertAttachmentOwner(id, attachmentId);
         attachmentService.deleteById(attachmentId);
     }
 
-    public org.springframework.core.io.Resource loadAttachment(Long id, Long attachmentId) {
+    public org.springframework.core.io.Resource loadAttachment(Long id, Long attachmentId, Long scopeUserId) {
+        requireVisible(id, scopeUserId);
         requireComplaint(id);
         assertAttachmentOwner(id, attachmentId);
         return attachmentService.load(attachmentId);
@@ -298,6 +311,16 @@ public class ComplaintService {
         CsComplaint c = complaintMapper.selectById(id);
         if (c == null) throw BizException.notFound("客诉不存在: " + id);
         return c;
+    }
+
+    /** 与列表同一数据范围：商管角色仅能操作本人作为责任商管的单据。 */
+    private void requireVisible(Long id, Long scopeUserId) {
+        if (scopeUserId == null) return;
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM cs_complaint_participant p WHERE p.complaint_id=? AND p.participant_type='MANAGER' "
+                        + "AND (p.user_id=? OR p.staff_id IN (SELECT s.id FROM cs_staff s WHERE s.source_user_id=?))",
+                Integer.class, id, scopeUserId, scopeUserId);
+        if (count == null || count == 0) throw BizException.notFound("客诉不存在: " + id);
     }
 
     private void validate(ComplaintRequest req) {

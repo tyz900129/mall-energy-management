@@ -46,8 +46,8 @@ public class ComplaintController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('complaint.view')")
-    public ApiResponse<Map<String, Object>> detail(@PathVariable Long id) {
-        return ApiResponse.ok(service.detail(id));
+    public ApiResponse<Map<String, Object>> detail(@PathVariable Long id, Authentication auth) {
+        return ApiResponse.ok(service.detail(id, service.scopeUserId(auth.getAuthorities())));
     }
 
     @PostMapping
@@ -59,13 +59,13 @@ public class ComplaintController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('complaint.update')")
     public ApiResponse<Map<String, Object>> update(@PathVariable Long id, @RequestBody ComplaintRequest request, Authentication auth) {
-        return ApiResponse.ok(service.update(id, request, service.currentUser(auth.getName())));
+        return ApiResponse.ok(service.update(id, request, service.currentUser(auth.getName()), service.scopeUserId(auth.getAuthorities())));
     }
 
     @PostMapping("/{id}/status")
     @PreAuthorize("hasAuthority('complaint.update')")
     public ApiResponse<Map<String, Object>> changeStatus(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
-        return ApiResponse.ok(service.changeStatus(id, body.get("status"), body.get("note"), service.currentUser(auth.getName())));
+        return ApiResponse.ok(service.changeStatus(id, body.get("status"), body.get("note"), service.currentUser(auth.getName()), service.scopeUserId(auth.getAuthorities())));
     }
 
     @PostMapping("/{id}/close")
@@ -73,7 +73,7 @@ public class ComplaintController {
     public ApiResponse<Map<String, Object>> close(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body,
                                                   Authentication auth) {
         Map<String, String> payload = body == null ? Map.of() : body;
-        return ApiResponse.ok(service.close(id, payload.get("satisfaction"), payload.get("note"), service.currentUser(auth.getName())));
+        return ApiResponse.ok(service.close(id, payload.get("satisfaction"), payload.get("note"), service.currentUser(auth.getName()), service.scopeUserId(auth.getAuthorities())));
     }
 
     @DeleteMapping("/{id}")
@@ -173,20 +173,21 @@ public class ComplaintController {
     @PostMapping("/{id}/attachments")
     @PreAuthorize("hasAuthority('complaint.create') or hasAuthority('complaint.update')")
     public ApiResponse<List<Map<String, Object>>> upload(@PathVariable Long id,
-                                                          @RequestParam(value = "photos", required = false) MultipartFile[] photos) {
-        return ApiResponse.ok(service.addAttachments(id, photos));
+                                                          @RequestParam(value = "photos", required = false) MultipartFile[] photos,
+                                                          Authentication auth) {
+        return ApiResponse.ok(service.addAttachments(id, photos, service.scopeUserId(auth.getAuthorities())));
     }
 
     @GetMapping("/{id}/attachments")
     @PreAuthorize("hasAuthority('complaint.view')")
-    public ApiResponse<List<Map<String, Object>>> attachments(@PathVariable Long id) {
-        return ApiResponse.ok(service.attachments(id));
+    public ApiResponse<List<Map<String, Object>>> attachments(@PathVariable Long id, Authentication auth) {
+        return ApiResponse.ok(service.attachments(id, service.scopeUserId(auth.getAuthorities())));
     }
 
     @GetMapping("/{id}/attachments/{attachmentId}/file")
     @PreAuthorize("hasAuthority('complaint.view')")
-    public ResponseEntity<Resource> file(@PathVariable Long id, @PathVariable Long attachmentId) {
-        Resource resource = service.loadAttachment(id, attachmentId);
+    public ResponseEntity<Resource> file(@PathVariable Long id, @PathVariable Long attachmentId, Authentication auth) {
+        Resource resource = service.loadAttachment(id, attachmentId, service.scopeUserId(auth.getAuthorities()));
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(service.attachmentMimeType(attachmentId)))
                 .body(resource);
@@ -194,8 +195,8 @@ public class ComplaintController {
 
     @DeleteMapping("/{id}/attachments/{attachmentId}")
     @PreAuthorize("hasAuthority('complaint.update') or hasAuthority('complaint.create')")
-    public ApiResponse<Void> deleteAttachment(@PathVariable Long id, @PathVariable Long attachmentId) {
-        service.deleteAttachment(id, attachmentId);
+    public ApiResponse<Void> deleteAttachment(@PathVariable Long id, @PathVariable Long attachmentId, Authentication auth) {
+        service.deleteAttachment(id, attachmentId, service.scopeUserId(auth.getAuthorities()));
         return ApiResponse.ok(null);
     }
 

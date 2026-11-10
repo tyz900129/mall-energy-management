@@ -5,6 +5,7 @@ import com.wanyuecity.energy.patrol.PatrolAttachmentService;
 import com.wanyuecity.energy.platform.service.MerchantNameParser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -906,16 +907,26 @@ public class OpsPatrolService {
                     Long.class, accountNumber, repeatKey, item.get("item_code"));
             repeat = count != null && count > 0 ? 1 : 0;
         }
-        long issueId = insert("INSERT INTO ops_patrol_issue(issue_no,task_id,task_item_id,dept_id,merchant_id,account_number,"
-                        + "merchant_name,merchant_code,account_name_raw,stall_id,stall_code,floor_name,"
-                        + "category,urgency,description,status,due_at,owner_user_id,owner_name,repeat_flag,submitter_id,submitter_name) "
-                        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING',?,?,?,?,?,?)",
-                issueNo, task.get("id"), item.get("id"), deptId, merchantId, accountNumber.isBlank() ? null : accountNumber,
-                merchantName.isBlank() ? null : merchantName, merchantCode.isBlank() ? null : merchantCode,
-                accountNameRaw.isBlank() ? null : accountNameRaw,
-                stallId, stallCode.isBlank() ? null : stallCode, floorName.isBlank() ? null : floorName,
-                category, urgency.isBlank() ? "NORMAL" : urgency, description, dueAt,
-                submitterId, submitterName, repeat, submitterId, submitterName);
+        long issueId;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                issueId = insert("INSERT INTO ops_patrol_issue(issue_no,task_id,task_item_id,dept_id,merchant_id,account_number,"
+                                + "merchant_name,merchant_code,account_name_raw,stall_id,stall_code,floor_name,"
+                                + "category,urgency,description,status,due_at,owner_user_id,owner_name,repeat_flag,submitter_id,submitter_name) "
+                                + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING',?,?,?,?,?,?)",
+                        issueNo, task.get("id"), item.get("id"), deptId, merchantId, accountNumber.isBlank() ? null : accountNumber,
+                        merchantName.isBlank() ? null : merchantName, merchantCode.isBlank() ? null : merchantCode,
+                        accountNameRaw.isBlank() ? null : accountNameRaw,
+                        stallId, stallCode.isBlank() ? null : stallCode, floorName.isBlank() ? null : floorName,
+                        category, urgency.isBlank() ? "NORMAL" : urgency, description, dueAt,
+                        submitterId, submitterName, repeat, submitterId, submitterName);
+                break;
+            } catch (DuplicateKeyException ex) {
+                // 并发提交时可能取到相同流水号，重新取最大号重试
+                if (attempt >= 5) throw ex;
+                issueNo = nextIssueNo();
+            }
+        }
         jdbc.update("INSERT INTO ops_patrol_issue_log(issue_id,action,to_status,operator,note) VALUES(?,?,?,?,?)",
                 issueId, "CREATE", "PENDING", submitterName, "检查项不合格：" + text(item.get("item_content")));
         try {
@@ -1033,10 +1044,13 @@ public class OpsPatrolService {
         return rows.get(0);
     }
 
-    private String nextIssueNo() {
+    String nextIssueNo() {
         String prefix = "OP" + LocalDate.now().format(DAY);
-        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM ops_patrol_issue WHERE issue_no LIKE ?", Long.class, prefix + "%");
-        return prefix + String.format("%03d", (count == null ? 0 : count) + 1);
+        // 以已存在的最大流水号为准，避免删除问题单后 COUNT 回退造成编号冲突
+        Long max = jdbc.queryForObject(
+                "SELECT COALESCE(MAX(CAST(SUBSTRING(issue_no, ?) AS UNSIGNED)), 0) FROM ops_patrol_issue WHERE issue_no LIKE ?",
+                Long.class, prefix.length() + 1, prefix + "%");
+        return prefix + String.format("%03d", (max == null ? 0 : max) + 1);
     }
 
     // ================================================================ 交接记录（管理端）
