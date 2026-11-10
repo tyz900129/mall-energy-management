@@ -32,7 +32,8 @@ public class InspectionService {
     private final ObjectMapper json;
     private final NotificationService notificationService;
     @Value("${energy.public-base-url:https://auto.apperload.com}") private String publicBaseUrl;
-    @Value("${energy.task.generate-backfill-days:3}") private int backfillDays;
+    // 补生成窗口：0 表示只生成当天、不补历史（当天仍在 from..to 区间内，照常生成）
+    @Value("${energy.task.generate-backfill-days:0}") private int backfillDays;
 
     public List<Map<String,Object>> types() {
         return jdbc.queryForList("SELECT id,code,name,target_category targetCategory,description,enabled,created_at createdAt,updated_at updatedAt FROM inspection_type ORDER BY enabled DESC,id DESC");
