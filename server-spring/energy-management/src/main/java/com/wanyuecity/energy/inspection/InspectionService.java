@@ -230,9 +230,10 @@ public class InspectionService {
 
     @Transactional
     public int generatePlan(Long planId, LocalDate day){
-        Map<String,Object> p=one("SELECT * FROM inspection_plan WHERE id=?",planId);
+        Map<String,Object> p=one("SELECT p.*,y.code typeCode FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id WHERE p.id=?",planId);
         if(intValue(p.get("enabled"),0)!=1||day.isBefore(toDate(p.get("start_date")))||(p.get("end_date")!=null&&day.isAfter(toDate(p.get("end_date"))))) return 0;
         if(!due(p,day)) return 0;
+        boolean calendar="CALENDAR".equals(String.valueOf(p.get("typeCode")));
         LocalTime execute=((Time)p.get("execute_time")).toLocalTime(); LocalDateTime scheduled=LocalDateTime.of(day,execute); String period=periodKey(p,day);
         LocalDateTime dueAt=scheduled.plusMinutes(intValue(p.get("overdue_minutes"),1440));
         Integer exists=jdbc.queryForObject("SELECT COUNT(*) FROM inspection_task WHERE plan_id=? AND period_key=?",Integer.class,planId,period);
@@ -244,11 +245,11 @@ public class InspectionService {
             if("DEPT".equals(ownerType)&&"PER_CHILD".equals(targetMode)){
                 List<Map<String,Object>> children=jdbc.queryForList("SELECT id,code,name FROM sys_department WHERE parent_id=? AND deleted_at IS NULL AND status='ACTIVE' ORDER BY sort_order,id",ownerId);
                 if(children.isEmpty()) children=jdbc.queryForList("SELECT id,code,name FROM sys_department WHERE id=? AND deleted_at IS NULL",ownerId);
-                for(Map<String,Object> c:children) count+=insertTask(p,period,scheduled,dueAt,"DEPT",String.valueOf(c.get("id")),String.valueOf(c.get("code")),String.valueOf(c.get("name")),null,deptOwner(longValue(c.get("id")),claimMode));
+                for(Map<String,Object> c:children) count+=insertTask(p,period,scheduled,dueAt,"DEPT",String.valueOf(c.get("id")),String.valueOf(c.get("code")),String.valueOf(c.get("name")),null,deptOwner(longValue(c.get("id")),claimMode),calendar);
             } else {
                 Owner o=resolveOwner(ownerType,ownerId,text(p,"assignee_name"),claimMode);
                 for(Map<String,Object> t:jdbc.queryForList("SELECT * FROM inspection_plan_target WHERE plan_id=? AND enabled=1",planId))
-                    count+=insertTask(p,period,scheduled,dueAt,String.valueOf(t.get("target_type")),String.valueOf(t.get("target_id")),text(t,"target_code"),text(t,"target_name"),text(t,"location_text"),o);
+                    count+=insertTask(p,period,scheduled,dueAt,String.valueOf(t.get("target_type")),String.valueOf(t.get("target_id")),text(t,"target_code"),text(t,"target_name"),text(t,"location_text"),o,calendar);
             }
         }catch(RuntimeException e){
             logGeneration(planId,day,period,0,"ERROR",limit(e.getMessage()));
@@ -265,14 +266,14 @@ public class InspectionService {
 
     private static String limit(String s){if(s==null)return null;return s.length()>500?s.substring(0,500):s;}
 
-    private int insertTask(Map<String,Object> p,String period,LocalDateTime scheduled,LocalDateTime dueAt,String targetType,String targetId,String targetCode,String targetName,String locationText,Owner o){
+    private int insertTask(Map<String,Object> p,String period,LocalDateTime scheduled,LocalDateTime dueAt,String targetType,String targetId,String targetCode,String targetName,String locationText,Owner o,boolean calendar){
         try{
             String no="XJ"+LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))+String.format("%04d",Math.abs(UUID.randomUUID().hashCode())%10000);
-            jdbc.update("INSERT INTO inspection_task(task_no,plan_id,inspection_type_id,template_id,target_type,target_id,target_code,target_name,location_text,equipment_snapshot_json,period_key,scheduled_at,due_at,assignee_user_id,assignee_name,access_token,status,source_type,owner_type,owner_id,owner_name,owner_dept_id,owner_dept_name,owner_ancestors,claimed_by,claimed_at,assignee_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING','PLAN',?,?,?,?,?,?,?,?,?)",
+            jdbc.update("INSERT INTO inspection_task(task_no,plan_id,inspection_type_id,template_id,target_type,target_id,target_code,target_name,location_text,equipment_snapshot_json,period_key,scheduled_at,due_at,assignee_user_id,assignee_name,access_token,access_token_expire_at,status,source_type,owner_type,owner_id,owner_name,owner_dept_id,owner_dept_name,owner_ancestors,claimed_by,claimed_at,assignee_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING',?,?,?,?,?,?,?,?,?,?)",
                     no,longValue(p.get("id")),
                     p.get("inspection_type_id"),p.get("template_id"),targetType,targetId,targetCode,targetName,locationText,equipmentSnapshot(targetType,targetId),period,Timestamp.valueOf(scheduled),Timestamp.valueOf(dueAt),
-                    o.assigneeId(),o.assigneeName(),UUID.randomUUID().toString().replace("-",""),
-                    o.type(),o.id(),o.name(),o.deptId(),o.deptName(),o.ancestors(),o.claimedBy(),o.claimedBy()==null?null:Timestamp.valueOf(LocalDateTime.now()),o.assigneeStatus());
+                    o.assigneeId(),o.assigneeName(),UUID.randomUUID().toString().replace("-",""),Timestamp.valueOf(dueAt.plusDays(7)),
+                    calendar?"CALENDAR":"PLAN",o.type(),o.id(),o.name(),o.deptId(),o.deptName(),o.ancestors(),o.claimedBy(),o.claimedBy()==null?null:Timestamp.valueOf(LocalDateTime.now()),o.assigneeStatus());
             return 1;
         }catch(DuplicateKeyException ignored){return 0;}
     }
@@ -297,7 +298,7 @@ public class InspectionService {
         r.put("issues",issues(id,null));return r;
     }
     public Map<String,Object> taskByToken(String token){Map<String,Object> row=one("SELECT id FROM inspection_task WHERE access_token=?",token);return task(longValue(row.get("id")));}
-    public byte[] qr(Long id){Map<String,Object> t=task(id);try{String url=publicBaseUrl.replaceAll("/$","")+"/inspection/tasks?taskToken="+t.get("accessToken");BitMatrix matrix=new QRCodeWriter().encode(url,BarcodeFormat.QR_CODE,420,420);ByteArrayOutputStream out=new ByteArrayOutputStream();MatrixToImageWriter.writeToStream(matrix,"PNG",out);return out.toByteArray();}catch(Exception e){bad("巡检二维码生成失败");return new byte[0];}}
+    public byte[] qr(Long id){Map<String,Object> t=task(id);try{String token=String.valueOf(t.get("accessToken"));String source=String.valueOf(t.get("sourceType"));String path="CALENDAR".equals(source)||"MANUAL".equals(source)?"/calendar/receipt/"+token:"/inspection/tasks?taskToken="+token;String url=publicBaseUrl.replaceAll("/$","")+path;BitMatrix matrix=new QRCodeWriter().encode(url,BarcodeFormat.QR_CODE,420,420);ByteArrayOutputStream out=new ByteArrayOutputStream();MatrixToImageWriter.writeToStream(matrix,"PNG",out);return out.toByteArray();}catch(Exception e){bad("巡检二维码生成失败");return new byte[0];}}
     public byte[] qrByToken(String token){Map<String,Object> row=one("SELECT id FROM inspection_task WHERE access_token=?",token);return qr(longValue(row.get("id")));}
 
     @Transactional

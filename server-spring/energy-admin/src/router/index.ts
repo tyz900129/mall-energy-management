@@ -15,6 +15,7 @@ const routes = [
   { path: '/patrol/entry', name: 'PatrolEntry', component: () => import('@/views/PatrolEntry.vue'), meta: { public: true, title: '今日巡场', identityPermission: 'patrol.submit' } },
   { path: '/patrol/form', name: 'PatrolForm', component: () => import('@/views/PatrolForm.vue'), meta: { public: true, title: '点位巡检', identityPermission: 'patrol.submit' } },
   { path: '/patrol/i/:token', name: 'PatrolIssueFeedback', component: () => import('@/views/PatrolIssueFeedback.vue'), meta: { public: true, title: '问题整改反馈' } },
+  { path: '/calendar/receipt/:token', name: 'CalendarReceipt', component: () => import('@/views/CalendarReceipt.vue'), meta: { public: true, title: '任务回执' } },
   { path: '/patrol/d/:token', name: 'PatrolDeptWorkbench', component: () => import('@/views/PatrolDeptWorkbench.vue'), meta: { public: true, title: '部门整改工作台' } },
   { path: '/ops-patrol/entry', name: 'OpsPatrolEntry', component: () => import('@/views/OpsPatrolEntry.vue'), meta: { public: true, title: '营运巡场填报', identityPermission: 'ops.patrol.execute' } },
   { path: '/complaints/quick', name: 'ComplaintQuickForm', component: () => import('@/views/ComplaintQuickForm.vue'), meta: { title: '客诉快速登记', permission: 'complaint.create' } },

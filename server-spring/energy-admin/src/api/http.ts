@@ -13,7 +13,7 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 })
 
 // 公开 H5 页面（巡检、核验、访客申请等）允许匿名访问，401 时不能在页面内强行跳登录
-const PUBLIC_PAGE_PREFIXES = ['/patrol/', '/ops-patrol/', '/verify/', '/construction-public/', '/operation/stall/', '/access/visitor-apply', '/warehouse/']
+const PUBLIC_PAGE_PREFIXES = ['/patrol/', '/ops-patrol/', '/verify/', '/construction-public/', '/operation/stall/', '/access/visitor-apply', '/warehouse/', '/calendar/receipt/']
 
 http.interceptors.response.use(
   (resp) => {

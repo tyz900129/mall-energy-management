@@ -85,6 +85,7 @@ public class SecurityConfig {
                                 ,"/api/v1/operation-public/**"
                                 ,"/api/v1/patrol-public/**"
                                 ,"/api/v1/ops-patrol-public/**"
+                                ,"/api/v1/calendar-public/**"
                                 ,"/api/v1/system/migration/exports/*/download"
                                 ,"/api/v1/qr-inspection/stalls/*/entry"
                                 ,"/api/v1/qr-inspection/rectify/*"
