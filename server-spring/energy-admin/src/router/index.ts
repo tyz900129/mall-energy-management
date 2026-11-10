@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { firstAccessiblePath } from './menu'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
@@ -52,6 +53,7 @@ const routes = [
       { path: 'exception', name: 'DataException', component: () => import('@/views/DataException.vue'), meta: { title: '异常中心', permission:'exception.view' } },
       { path: 'inspection/dashboard', name: 'InspectionDashboard', component: () => import('@/views/InspectionDashboard.vue'), meta: { title: '巡检数据大屏', permission:'inspection.dashboard.view' } },
       { path: 'inspection/tasks', name: 'InspectionTasks', component: () => import('@/views/InspectionTasks.vue'), meta: { title: '巡检任务', permission:'inspection.task.view' } },
+      { path: 'calendar', name: 'CalendarView', component: () => import('@/views/CalendarView.vue'), meta: { title: '任务日历', permission:'calendar.view' } },
       { path: 'inspection/issues', name: 'InspectionIssues', component: () => import('@/views/InspectionIssues.vue'), meta: { title: '巡检问题整改', permission:'inspection.issue.manage' } },
       { path: 'inspection/config', name: 'InspectionManagement', component: () => import('@/views/InspectionManagement.vue'), meta: { title: '巡检配置', permission:'inspection.plan.manage' } },
       { path: 'inspection/equipment', name: 'InspectionEquipment', component: () => import('@/views/InspectionEquipment.vue'), meta: { title: '设施设备台账', permission:'inspection.equipment.view' } },
@@ -90,6 +92,7 @@ const routes = [
       { path: 'stall/:id/engineering', name: 'StallEngineering', component: () => import('@/views/StallEngineering.vue'), meta: { title: '铺位工程资料', permission:'stall.engineering.view' } },
       { path: 'stall-device', name: 'StallDevice', component: () => import('@/views/StallDevice.vue'), meta: { title: '设备绑定', permission:'metering.menu' } },
       { path: 'system/user', name: 'SystemUser', component: () => import('@/views/SystemUser.vue'), meta: { title: '用户与权限', permission:'system.user.view' } },
+      { path: 'system/organization', name: 'Organization', component: () => import('@/views/Organization.vue'), meta: { title: '组织架构', permission:'system.dept.view' } },
       { path: 'system/dictionary', name: 'BusinessDictionary', component: () => import('@/views/BusinessDictionary.vue'), meta: { title: '基础字典', permission:'system.dictionary.view' } },
       { path: 'system/webhook', name: 'WebhookConfig', component: () => import('@/views/WebhookConfig.vue'), meta: { title: 'Webhook 通知', permission:'system.webhook.view' } },
       { path: 'system/audit', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '操作审计', permission:'system.audit.view' } },
@@ -119,22 +122,6 @@ router.afterEach((to) => {
   document.title = pageTitle ? `${pageTitle} - 万悦城后勤管理系统` : '万悦城后勤管理系统'
 })
 
-const ACCESS_CANDIDATES: Array<[string, string]> = [
-  ['/dashboard', 'dashboard.view'],
-  ['/inspection/tasks', 'inspection.task.view'],
-  ['/ops-patrol/tasks', 'ops.patrol.report'],
-  ['/access/dashboard', 'access.dashboard.view'],
-  ['/access/self', 'access.self.view'],
-  ['/operation/merchant-responsibilities', 'operation.merchant.view'],
-  ['/workflow', 'workflow.view'],
-  ['/construction', 'construction.view'],
-  ['/workflow/merchant-query', 'merchant.query'],
-]
-
-function firstAccessiblePath(userStore: ReturnType<typeof useUserStore>) {
-  return ACCESS_CANDIDATES.find(([, code]) => userStore.hasPermission(code))?.[0] || '/no-permission'
-}
-
 router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
   if (to.meta.public) {
@@ -153,8 +140,9 @@ router.beforeEach(async (to, _from, next) => {
   try { await userStore.fetchMe() } catch { userStore.logout(); return next({ name: 'Login' }) }
   const permission=to.meta.permission as string|undefined
   if(permission&&!userStore.hasPermission(permission)){
+    const fallback = firstAccessiblePath(c => userStore.hasPermission(c))
+    if (to.redirectedFrom?.path === '/') return next(fallback)
     ElMessage.warning('您当前的角色或部门没有访问该功能的权限')
-    const fallback = firstAccessiblePath(userStore)
     if (fallback === to.path) return next('/no-permission')
     return next(fallback)
   }

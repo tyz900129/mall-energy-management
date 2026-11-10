@@ -16,17 +16,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class SysRoleService {
-
-    private static final Set<String> BUILTIN_ROLE_CODES = Set.of(
-            "SUPER_ADMIN", "SYSTEM_ADMIN", "DEVICE_VERIFIER", "APPLICANT", "VIEWER",
-            "PROPERTY_MANAGER", "OPS_PATROL_MANAGER");
 
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
@@ -36,7 +34,8 @@ public class SysRoleService {
 
     public List<SysRoleView> list() {
         List<SysRole> roles = roleMapper.selectList(new QueryWrapper<SysRole>().orderByAsc("id"));
-        return roles.stream().map(r -> SysRoleView.from(r,
+        Map<Long, String> deptNames = deptNames();
+        return roles.stream().map(r -> SysRoleView.from(r, deptNames.get(r.getDeptId()),
                 roleMenuMapper.findMenuIdsByRoleId(r.getId()),
                 countUsers(r.getId()), countPermissions(r.getId()))).toList();
     }
@@ -46,8 +45,8 @@ public class SysRoleService {
         if (r == null) {
             throw BizException.notFound("Role not found: " + id);
         }
-        return SysRoleView.from(r, roleMenuMapper.findMenuIdsByRoleId(id),
-                countUsers(id), countPermissions(id));
+        return SysRoleView.from(r, deptNames().get(r.getDeptId()),
+                roleMenuMapper.findMenuIdsByRoleId(id), countUsers(id), countPermissions(id));
     }
 
     @Transactional
@@ -56,10 +55,16 @@ public class SysRoleService {
         if (same != null && same > 0) {
             throw BizException.badRequest("角色编码已存在: " + req.getCode());
         }
+        validateDept(req.getDeptId());
         SysRole r = new SysRole();
         r.setCode(req.getCode());
         r.setName(req.getName());
         r.setDescription(req.getDescription());
+        r.setDeptId(req.getDeptId());
+        r.setPostCategory(req.getPostCategory() == null ? "OPER" : req.getPostCategory());
+        r.setIsAssignable(normalizeFlag(req.getIsAssignable(), 1));
+        r.setIsSystem(0);
+        r.setHeadcount(req.getHeadcount() == null ? 0 : req.getHeadcount());
         roleMapper.insert(r);
         return get(r.getId());
     }
@@ -70,8 +75,24 @@ public class SysRoleService {
         if (r == null) {
             throw BizException.notFound("Role not found: " + id);
         }
+        if (!r.getCode().equals(req.getCode())) {
+            if (isSystem(r)) {
+                throw BizException.badRequest("内置角色不允许修改编码: " + r.getCode());
+            }
+            Long same = roleMapper.selectCount(new QueryWrapper<SysRole>()
+                    .eq("code", req.getCode()).ne("id", id));
+            if (same != null && same > 0) {
+                throw BizException.badRequest("角色编码已存在: " + req.getCode());
+            }
+            r.setCode(req.getCode());
+        }
+        validateDept(req.getDeptId());
         r.setName(req.getName());
         r.setDescription(req.getDescription());
+        r.setDeptId(req.getDeptId());
+        if (req.getPostCategory() != null) r.setPostCategory(req.getPostCategory());
+        if (req.getIsAssignable() != null) r.setIsAssignable(normalizeFlag(req.getIsAssignable(), 1));
+        if (req.getHeadcount() != null) r.setHeadcount(req.getHeadcount());
         roleMapper.updateById(r);
         return get(id);
     }
@@ -82,7 +103,7 @@ public class SysRoleService {
         if (r == null) {
             throw BizException.notFound("Role not found: " + id);
         }
-        if (isBuiltin(r.getCode())) {
+        if (isSystem(r)) {
             throw BizException.badRequest("内置角色不允许删除: " + r.getCode());
         }
         int users = countUsers(id);
@@ -154,6 +175,25 @@ public class SysRoleService {
         return permissions(id);
     }
 
+    private Map<Long, String> deptNames() {
+        Map<Long, String> names = new HashMap<>();
+        jdbcTemplate.query("SELECT id, name FROM sys_department WHERE deleted_at IS NULL",
+                rs -> { names.put(rs.getLong("id"), rs.getString("name")); });
+        return names;
+    }
+
+    private void validateDept(Long deptId) {
+        if (deptId == null) return;
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_department WHERE id=? AND deleted_at IS NULL", Integer.class, deptId);
+        if (count == null || count == 0) throw BizException.badRequest("部门不存在: " + deptId);
+    }
+
+    private static int normalizeFlag(Integer value, int defaultValue) {
+        if (value == null) return defaultValue;
+        return value == 0 ? 0 : 1;
+    }
+
     private int countUsers(Long roleId) {
         Integer n = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sys_user_role WHERE role_id=?", Integer.class, roleId);
         return n == null ? 0 : n;
@@ -164,7 +204,7 @@ public class SysRoleService {
         return n == null ? 0 : n;
     }
 
-    private boolean isBuiltin(String code) {
-        return code != null && BUILTIN_ROLE_CODES.contains(code);
+    private static boolean isSystem(SysRole role) {
+        return role.getIsSystem() != null && role.getIsSystem() == 1;
     }
 }

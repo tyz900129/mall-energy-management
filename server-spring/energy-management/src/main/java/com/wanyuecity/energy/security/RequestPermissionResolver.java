@@ -165,7 +165,7 @@ public class RequestPermissionResolver {
         if (path.startsWith("/api/v1/inspections/plans") || path.endsWith("/tasks/generate")) return read ? view("inspection.task.view") : manage("inspection.plan.manage");
         if (path.startsWith("/api/v1/inspections/issues")) return read ? view("inspection.task.view") : new Rule(path.endsWith("/review") ? "inspection.issue.review" : "inspection.issue.manage","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER"));
         if (path.startsWith("/api/v1/inspections/tasks")) return read ? new Rule("inspection.task.view","VIEWER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER")) : new Rule("inspection.task.execute","DEVICE_VERIFIER",Set.of("SUPER_ADMIN","SYSTEM_ADMIN","DEVICE_VERIFIER","VIEWER"));
-        if (path.startsWith("/api/v1/inspections/targets")) return view("inspection.task.view");
+        if (path.startsWith("/api/v1/inspections/targets") || path.startsWith("/api/v1/inspections/owner-options")) return view("inspection.task.view");
         if (path.startsWith("/api/v1/platform/config")) return read ? view("integration.config.view") : manage("integration.config.manage");
         if (path.startsWith("/api/v1/platform/sync-logs")) return view("integration.sync.view");
         if (path.startsWith("/api/v1/platform/sync")) return read ? view("integration.sync.view") : manage("integration.sync.execute");

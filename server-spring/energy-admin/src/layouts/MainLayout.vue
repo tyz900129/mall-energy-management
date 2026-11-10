@@ -7,122 +7,16 @@
         <span v-if="!collapsed">万悦城后勤管理系统</span>
       </div>
       <el-menu class="side-menu" :default-active="route.path" router :collapse="!isMobile && collapsed" background-color="#001529" text-color="#c9d1d9" active-text-color="#409EFF" @select="onMenuSelect">
-        <el-menu-item v-if="can('dashboard.view')" index="/dashboard">
-          <el-icon><Odometer /></el-icon>
-          <template #title>工作台</template>
-        </el-menu-item>
-        <el-sub-menu v-if="hasAny('workflow.view','workflow.create','construction.view','construction.create','construction.inspection.config.view','merchant.query')" index="business-workflow">
-          <template #title><el-icon><Tickets /></el-icon><span>业务流程</span></template>
-          <el-menu-item v-if="can('workflow.view')" index="/workflow">全部流程</el-menu-item>
-          <el-menu-item v-if="can('workflow.create')" index="/workflow/new-merchant">水电费变更</el-menu-item>
-          <el-menu-item v-if="can('construction.view')" index="/construction">商户施工流程</el-menu-item>
-          <el-menu-item v-if="can('construction.create')" index="/construction/new">发起施工申请</el-menu-item>
-          <el-menu-item v-if="can('construction.inspection.config.view')" index="/construction/inspection-config">施工巡检配置</el-menu-item>
-          <el-menu-item v-if="can('merchant.query')" index="/workflow/merchant-query">商户账户查询</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('merchant.menu','stall.menu','metering.menu')" index="business-master-data">
-          <template #title><el-icon><OfficeBuilding /></el-icon><span>经营基础资料</span></template>
-          <el-menu-item v-if="can('merchant.menu')" index="/merchant">商户账户管理</el-menu-item>
-          <el-menu-item v-if="can('stall.menu')" index="/stall">铺位管理</el-menu-item>
-          <el-menu-item v-if="can('metering.menu')" index="/stall-device">计量设备绑定</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('energy.dashboard.view','energy.analysis.view','energy.dimension.view','energy.sync.view','energy.bill.view','energy.arrears.view','energy.anomaly.view','energy.balance-warning.view')" index="energy-management">
-          <template #title><el-icon><DataAnalysis /></el-icon><span>能源管理</span></template>
-          <el-menu-item v-if="can('energy.dashboard.view')" index="/energy/dashboard">数据大屏</el-menu-item>
-          <el-menu-item v-if="can('energy.analysis.view')" index="/energy/analysis">用量分析</el-menu-item>
-          <el-menu-item v-if="can('energy.dimension.view')" index="/energy/devices">设备分析维度</el-menu-item>
-          <el-menu-item v-if="can('energy.sync.view')" index="/energy/sync">历史用量同步</el-menu-item>
-          <el-menu-item v-if="can('energy.bill.view')" index="/energy/bills">水电账单录入</el-menu-item>
-          <el-menu-item v-if="can('energy.arrears.view')" index="/energy/arrears">欠费通知</el-menu-item>
-          <el-menu-item v-if="can('energy.anomaly.view')" index="/energy/account-anomalies">账户异动监控</el-menu-item>
-          <el-menu-item v-if="can('energy.balance-warning.view')" index="/energy/balance-warnings">余额预警通知</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('facility.power.view','facility.water.view','facility.drainage.view','facility.exhaust.view','facility.fresh_air.view')" index="facility-equipment">
-          <template #title><el-icon><Share /></el-icon><span>设施设备</span></template>
-          <el-menu-item v-if="can('facility.power.view')" index="/power/topology">配电拓扑管理</el-menu-item>
-          <el-menu-item v-if="can('facility.water.view')" index="/facility/water-supply">供水拓扑管理</el-menu-item>
-          <el-menu-item v-if="can('facility.drainage.view')" index="/facility/drainage">排水拓扑管理</el-menu-item>
-          <el-menu-item v-if="can('facility.exhaust.view')" index="/facility/oil-exhaust">排油烟拓扑管理</el-menu-item>
-          <el-menu-item v-if="can('facility.fresh_air.view')" index="/facility/fresh-air">补风机拓扑管理</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('exception.view','inspection.dashboard.view','inspection.task.view','inspection.issue.manage','inspection.plan.manage','inspection.equipment.view','inspection.category.manage')" index="operations-management">
-          <template #title><el-icon><Warning /></el-icon><span>运维管理</span></template>
-          <el-menu-item v-if="can('inspection.dashboard.view')" index="/inspection/dashboard">巡检数据大屏</el-menu-item>
-          <el-menu-item v-if="can('inspection.task.view')" index="/inspection/tasks">巡检任务</el-menu-item>
-          <el-menu-item v-if="can('inspection.equipment.view')" index="/inspection/equipment">设施设备台账</el-menu-item>
-          <el-menu-item v-if="can('inspection.category.manage')" index="/inspection/categories">设施设备分类</el-menu-item>
-          <el-menu-item v-if="can('inspection.issue.manage')" index="/inspection/issues">问题与整改</el-menu-item>
-          <el-menu-item v-if="can('inspection.plan.manage')" index="/inspection/config">巡检配置</el-menu-item>
-          <el-menu-item v-if="can('exception.view')" index="/exception">异常中心</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('access.dashboard.view','access.self.view','access.device.view','access.person.view','visitor.view.own','visitor.view.all','visitor.create','visitor.approve','access.event.view.self','access.event.view.all','access.person.review')" index="access-management">
-          <template #title><el-icon><Key /></el-icon><span>门禁与访客</span></template>
-          <el-menu-item v-if="can('access.dashboard.view')" index="/access/dashboard">数据概览</el-menu-item>
-          <el-menu-item v-if="can('access.self.view')" index="/access/self">我的门禁</el-menu-item>
-          <el-menu-item v-if="can('access.device.view')" index="/access/devices">门禁点与设备</el-menu-item>
-          <el-menu-item v-if="can('access.person.view')" index="/access/persons">长期人员</el-menu-item>
-          <el-menu-item v-if="hasAny('visitor.view.own','visitor.view.all','visitor.create','visitor.approve')" index="/access/visitors">访客预约</el-menu-item>
-          <el-menu-item v-if="hasAny('access.event.view.self','access.event.view.all')" index="/access/events">通行记录</el-menu-item>
-          <el-menu-item v-if="can('access.person.review')" index="/access/reviews">人员复核</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('operation.merchant.view','operation.dashboard.view','operation.clearance.submit','operation.clearance.review','operation.property.view','operation.violation.view','operation.accountability.view')" index="operation-business-management">
-          <template #title><el-icon><Management /></el-icon><span>运营管理</span></template>
-          <el-menu-item v-if="can('operation.dashboard.view')" index="/operation/dashboard">运营日清总览</el-menu-item>
-          <el-menu-item v-if="can('operation.merchant.view')" index="/operation/merchant-responsibilities">责任商管管理</el-menu-item>
-          <el-menu-item v-if="can('operation.clearance.view')" index="/operation/clearances">商户日清记录</el-menu-item>
-          <el-menu-item v-if="can('operation.clearance.template.view')" index="/operation/clearance-templates">日清表单模板</el-menu-item>
-          <el-menu-item v-if="can('operation.property.view')" index="/operation/property-inspections">物业清场检查</el-menu-item>
-          <el-menu-item v-if="can('operation.violation.view')" index="/operation/violation-items">违规项目管理</el-menu-item>
-          <el-menu-item v-if="can('operation.accountability.view')" index="/operation/accountability">追责管理</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('qr.inspection.config','qr.inspection.plan.manage','qr.inspection.task.create','qr.inspection.view')" index="qr-inspection-management">
-          <template #title><el-icon><Grid /></el-icon><span>二维码巡检</span></template>
-          <el-menu-item v-if="can('qr.inspection.config')" index="/qr-inspection/templates">巡检模板配置</el-menu-item>
-          <el-menu-item v-if="can('qr.inspection.plan.manage')" index="/qr-inspection/plans">巡检计划管理</el-menu-item>
-          <el-menu-item v-if="can('qr.inspection.task.create') || can('qr.inspection.view')" index="/qr-inspection/joint-tasks">联合巡检</el-menu-item>
-          <el-menu-item v-if="can('qr.inspection.view')" index="/qr-inspection/report">巡检汇总报告</el-menu-item>
-          <el-menu-item v-if="can('qr.inspection.view')" index="/qr-inspection/records">巡检记录管理</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('patrol.point.view','patrol.issue.view')" index="patrol-management">
-          <template #title><el-icon><Tickets /></el-icon><span>巡场管理</span></template>
-          <el-menu-item v-if="can('patrol.submit')" index="/patrol/entry">今日巡场</el-menu-item>
-          <el-menu-item v-if="can('patrol.issue.view')" index="/patrol/issues">巡场问题</el-menu-item>
-          <el-menu-item v-if="can('patrol.issue.view')" index="/patrol/submissions">巡场记录</el-menu-item>
-          <el-menu-item v-if="can('patrol.config')" index="/patrol/points">巡场点位</el-menu-item>
-          <el-menu-item v-if="can('patrol.config')" index="/patrol/departments">整改部门</el-menu-item>
-          <el-menu-item v-if="can('patrol.config')" index="/patrol/duties">值班排班</el-menu-item>
-          <el-menu-item v-if="can('patrol.config')" index="/patrol/categories">分类字典</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('complaint.view','complaint.create','complaint.stats.view')" index="service-management">
-          <template #title><el-icon><ChatDotRound /></el-icon><span>服务管理</span></template>
-          <el-menu-item v-if="can('complaint.view')" index="/complaints">客诉管理</el-menu-item>
-          <el-menu-item v-if="can('complaint.stats.view')" index="/complaints/dashboard">客诉数据报表</el-menu-item>
-          <el-menu-item v-if="can('complaint.staff.manage')" index="/complaints/staff">客诉人员名单</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="can('ops.patrol.report')" index="ops-patrol-management">
-          <template #title><el-icon><Shop /></el-icon><span>营运巡场管理</span></template>
-          <el-menu-item index="/ops-patrol/tasks">任务看板</el-menu-item>
-          <el-menu-item index="/ops-patrol/issues">营运问题</el-menu-item>
-          <el-menu-item index="/ops-patrol/handovers">交接记录</el-menu-item>
-          <el-menu-item index="/ops-patrol/reports">履职报表</el-menu-item>
-          <el-menu-item v-if="can('ops.patrol.config')" index="/ops-patrol/items">检查项库</el-menu-item>
-          <el-menu-item v-if="can('ops.patrol.config')" index="/ops-patrol/duties">干部排班</el-menu-item>
-          <el-menu-item v-if="can('ops.patrol.config')" index="/ops-patrol/slots">时段设置</el-menu-item>
-          <el-menu-item v-if="can('ops.patrol.dept')" index="/ops-patrol/depts">处室与群配置</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('integration.config.view','integration.sync.view')" index="data-integration">
-          <template #title><el-icon><Connection /></el-icon><span>数据与集成</span></template>
-          <el-menu-item v-if="can('integration.config.view')" index="/platform/config">源平台配置</el-menu-item>
-          <el-menu-item v-if="can('integration.sync.view')" index="/platform/sync">数据同步与日志</el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="hasAny('system.user.view','system.dictionary.view','system.webhook.view','system.audit.view','system.migration.manage')" index="system-management">
-          <template #title><el-icon><Setting /></el-icon><span>系统管理</span></template>
-          <el-menu-item v-if="can('system.user.view')" index="/system/user">用户与权限</el-menu-item>
-          <el-menu-item v-if="can('system.dictionary.view')" index="/system/dictionary">基础字典</el-menu-item>
-          <el-menu-item v-if="can('system.webhook.view')" index="/system/webhook">Webhook 通知</el-menu-item>
-          <el-menu-item v-if="can('system.audit.view')" index="/system/audit">操作审计</el-menu-item>
-          <el-menu-item v-if="can('system.migration.manage')" index="/system/migration">数据迁移</el-menu-item>
-        </el-sub-menu>
+        <template v-for="g in menuGroups" :key="g.key">
+          <el-menu-item v-if="g.flat" :index="g.items[0].path">
+            <el-icon><component :is="g.icon" /></el-icon>
+            <template #title>{{ g.items[0].title }}</template>
+          </el-menu-item>
+          <el-sub-menu v-else :index="g.key">
+            <template #title><el-icon><component :is="g.icon" /></el-icon><span>{{ g.title }}</span></template>
+            <el-menu-item v-for="i in g.items" :key="i.path" :index="i.path">{{ i.title }}</el-menu-item>
+          </el-sub-menu>
+        </template>
       </el-menu>
     </el-aside>
     <el-container class="content-container">
@@ -131,7 +25,7 @@
           <component :is="isMobile ? 'Menu' : (collapsed ? 'Expand' : 'Fold')" />
         </el-icon>
         <el-breadcrumb separator="/">
-          <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
+          <el-breadcrumb-item :to="{ path: homePath }">首页</el-breadcrumb-item>
           <el-breadcrumb-item>{{ route.meta?.title || route.name }}</el-breadcrumb-item>
         </el-breadcrumb>
         <div class="spacer" />
@@ -162,13 +56,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import {
-  Lightning, Odometer, Connection, OfficeBuilding, UserFilled, Expand, Fold, Warning, Tickets, DataAnalysis, Share, Setting, Key, Management, Shop, Grid
-} from '@element-plus/icons-vue'
+import { Lightning, UserFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { visibleGroups, firstAccessiblePath } from '@/router/menu'
 import { enumLabel } from '@/utils/format'
 
 const route = useRoute()
@@ -177,8 +70,9 @@ const userStore = useUserStore()
 const collapsed = ref(false)
 const isMobile = ref(window.innerWidth <= 768)
 const mobileMenuOpen = ref(false)
-const can=(code:string)=>userStore.hasPermission(code)
-const hasAny=(...codes:string[])=>codes.some(can)
+const can = (code: string) => userStore.hasPermission(code)
+const menuGroups = computed(() => visibleGroups(can))
+const homePath = computed(() => firstAccessiblePath(can))
 
 onMounted(async () => {
   window.addEventListener('resize', onResize)

@@ -147,12 +147,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { opsPatrolApi } from '@/api/opsPatrol'
 import { useUserStore } from '@/stores/user'
 import { useIsMobile } from '@/composables/useIsMobile'
 
 const isMobile = useIsMobile()
+const route = useRoute()
 
 const user = useUserStore()
 const canManage = computed(() => user.hasPermission('ops.patrol.config'))
@@ -235,7 +237,13 @@ async function removeTask() {
   drawer.value = false
   await load()
 }
-onMounted(load)
+onMounted(async () => {
+  const qd = String(route.query.date || '').slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(qd)) date.value = qd
+  await load()
+  const taskId = Number(route.query.taskId || 0)
+  if (taskId) await openDetail({ id: taskId })
+})
 </script>
 
 <style scoped>

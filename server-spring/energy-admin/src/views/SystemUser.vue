@@ -59,12 +59,12 @@
         <el-form-item label="用户名" prop="username"><el-input v-model="form.username" :disabled="!!form.id" /></el-form-item><el-form-item label="姓名"><el-input v-model="form.displayName" /></el-form-item>
         <el-form-item label="手机"><el-input v-model="form.phone" /></el-form-item><el-form-item label="邮箱" prop="email"><el-input v-model="form.email" /></el-form-item>
         <el-form-item v-if="!form.id" label="初始密码" prop="password"><el-input v-model="form.password" type="password" show-password /></el-form-item>
-        <el-form-item v-if="!form.id" label="角色" prop="roleId"><el-select v-model="form.roleId" placeholder="请选择角色" style="width:100%"><el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" /></el-select></el-form-item>
+        <el-form-item v-if="!form.id" label="角色" prop="roleId"><el-select v-model="form.roleId" placeholder="请选择角色" style="width:100%"><el-option v-for="r in assignableRoles" :key="r.id" :label="r.name" :value="r.id" /></el-select></el-form-item>
         <el-form-item label="部门"><el-select v-model="form.departmentId" placeholder="未设置" clearable style="width:100%"><el-option v-for="d in departments" :key="d.id" :label="d.name" :value="d.id" /></el-select></el-form-item>
         <el-form-item label="状态"><el-switch v-model="form.status" :active-value="1" :inactive-value="0" /></el-form-item>
       </el-form><template #footer><el-button @click="editVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template>
     </el-dialog>
-    <el-dialog v-model="rolesVisible" title="设置角色" width="460px"><div style="margin-bottom:14px">用户：{{ current?.username }}</div><el-radio-group v-model="selectedRoleId" class="role-list"><el-radio v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</el-radio></el-radio-group><template #footer><el-button @click="rolesVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="saveRoles">保存</el-button></template></el-dialog>
+    <el-dialog v-model="rolesVisible" title="设置角色" width="460px"><div style="margin-bottom:14px">用户：{{ current?.username }}（部门：{{ deptName(current?.departmentId) }}）</div><el-radio-group v-model="selectedRoleId" class="role-list"><el-radio v-for="r in assignableRoles" :key="r.id" :value="r.id">{{ r.name }}<span v-if="r.deptName" class="role-dept">{{ r.deptName }}</span></el-radio></el-radio-group><template #footer><el-button @click="rolesVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="saveRoles">保存</el-button></template></el-dialog>
     <el-dialog v-model="passwordVisible" title="重置密码" width="440px"><el-alert type="warning" :closable="false" :title="`正在重置用户 ${current?.username} 的密码`" /><el-form style="margin-top:18px" label-width="90px"><el-form-item label="临时密码"><el-input v-model="newPassword" type="password" show-password placeholder="至少 6 位" /></el-form-item></el-form><template #footer><el-button @click="passwordVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="savePassword">确认重置</el-button></template></el-dialog>
     <el-dialog v-model="permissionVisible" title="个人权限配置" width="min(860px, 94vw)" top="5vh" destroy-on-close>
       <el-alert type="info" :closable="false" show-icon>
@@ -104,6 +104,7 @@ const userStore=useUserStore()
 const canUserManage=userStore.hasPermission('system.user.manage')
 const canPermissionManage=userStore.hasPermission('system.user.permission.manage')
 const canManageRoles=computed(()=>((userStore.user as any)?.roles||[]).includes('SUPER_ADMIN'))
+const assignableRoles=computed(()=>roles.value.filter((r:any)=>r.isAssignable!==0))
 const roleDrawerVisible=ref(false)
 async function reloadRoles(){roles.value=await systemRoleApi.list() as any}
 const rows=ref<SystemUser[]>([]),roles=ref<SystemRole[]>([]),departments=ref<SystemDepartment[]>([]),total=ref(0),loading=ref(false),saving=ref(false)
@@ -124,7 +125,7 @@ function search(){page.pageNum=1;load()} function sizeChanged(){page.pageNum=1;l
 function reset(){Object.assign(form,{id:0,username:'',displayName:'',phone:'',email:'',password:'',status:1,roleId:undefined,departmentId:undefined});formRef.value?.clearValidate()}
 function openCreate(){reset();editVisible.value=true} function openEdit(row:any){reset();Object.assign(form,{...row,password:''});editVisible.value=true}
 async function save(){if(!await formRef.value?.validate().catch(()=>false))return;saving.value=true;try{const payload={username:form.username,displayName:form.displayName||undefined,phone:form.phone||undefined,email:form.email||undefined,status:form.status,password:form.id?undefined:form.password,roleIds:form.id?undefined:[form.roleId],departmentId:form.departmentId||undefined};if(form.id)await systemUserApi.update(form.id,payload);else await systemUserApi.create(payload);ElMessage.success('保存成功');editVisible.value=false;await load()}finally{saving.value=false}}
-function openRoles(row:any){current.value=row;selectedRoleId.value=row.roleIds?.[0];rolesVisible.value=true} async function saveRoles(){if(!current.value)return;if(!selectedRoleId.value){ElMessage.warning('请选择角色');return}saving.value=true;try{await systemUserApi.assignRoles(current.value.id,[selectedRoleId.value]);ElMessage.success('角色已更新');rolesVisible.value=false;await load()}finally{saving.value=false}}
+function openRoles(row:any){current.value=row;selectedRoleId.value=row.roleIds?.[0];rolesVisible.value=true} async function saveRoles(){if(!current.value)return;if(!selectedRoleId.value){ElMessage.warning('请选择角色');return}saving.value=true;try{await systemUserApi.assignRoles(current.value.id,[selectedRoleId.value]);const role=roles.value.find(r=>r.id===selectedRoleId.value);const userDept=current.value.departmentId;if(role?.deptId&&userDept&&role.deptId!==userDept)ElMessage.warning(`岗位「${role.name}」属于「${role.deptName||''}」，与用户当前部门「${deptName(userDept)}」不一致，请确认`);else ElMessage.success('角色已更新');rolesVisible.value=false;await load()}finally{saving.value=false}}
 function openPassword(row:any){current.value=row;newPassword.value='';passwordVisible.value=true} async function savePassword(){if(!current.value)return;if(newPassword.value.length<6||newPassword.value.length>64){ElMessage.warning('密码长度必须为6-64位');return}saving.value=true;try{await systemUserApi.resetPassword(current.value.id,newPassword.value);ElMessage.success('密码重置成功');passwordVisible.value=false}finally{saving.value=false}}
 async function remove(row:any){await systemUserApi.remove(row.id);ElMessage.success('用户已删除');if(rows.value.length===1&&page.pageNum>1)page.pageNum--;await load()}
 async function openPermissions(row:any){current.value=row as SystemUser;permissionVisible.value=true;permissionLoading.value=true;permissionProfile.value=undefined;Object.keys(permissionEffects).forEach(k=>delete permissionEffects[k]);try{const profile:any=await systemUserApi.permissions(row.id);permissionProfile.value=profile;activeModules.value=profile.modules.map((m:any)=>m.code);for(const m of profile.modules)for(const p of m.permissions)permissionEffects[p.code]='INHERIT';for(const o of profile.overrides)permissionEffects[o.permissionCode]=o.effect}finally{permissionLoading.value=false}}
@@ -137,6 +138,7 @@ onMounted(async()=>{roles.value=await systemRoleApi.list() as any;departments.va
 
 <style scoped>
 .role-list{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.role-dept{margin-left:6px;font-size:12px;color:#909399}
 .mobile-cards{display:none}
 .permission-user{display:flex;gap:24px;align-items:center;margin:16px 0 10px}.permission-user span{color:#606266}.permission-row{display:grid;grid-template-columns:minmax(230px,1fr) 70px 128px 80px;gap:12px;align-items:center;padding:8px 4px;border-bottom:1px solid #ebeef5}.permission-name{display:flex;flex-direction:column;gap:3px}.permission-name small{color:#909399}.effective{font-size:12px;color:#909399}.effective.on{color:#67c23a}
 @media(max-width:700px){

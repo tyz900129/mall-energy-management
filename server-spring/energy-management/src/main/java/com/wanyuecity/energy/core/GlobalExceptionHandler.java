@@ -8,10 +8,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -69,12 +71,45 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(ApiResponse.CODE_FORBIDDEN, "Access denied"));
     }
 
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResponseStatus(ResponseStatusException ex, HttpServletRequest req) {
+        // Keep the status the caller actually raised (400/404/...); only real 5xx should reach the unknown bucket.
+        return buildStatusResponse(HttpStatus.resolve(ex.getStatusCode().value()), ex.getReason(), req, ex);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest req) {
+        // Spring 6.1+ turns an unmatched path into NoResourceFoundException; that is a 404, not a server fault.
+        return buildStatusResponse(HttpStatus.NOT_FOUND, null, req, ex);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnknown(Exception ex, HttpServletRequest req) {
         // Log full stack only for the unknown bucket; BizException / validation are logged at warn above.
         log.error("unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(ApiResponse.CODE_SERVER_ERROR, "Internal server error"));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> buildStatusResponse(HttpStatus status, String reason, HttpServletRequest req, Exception ex) {
+        HttpStatus httpStatus = status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status;
+        int code = switch (httpStatus) {
+            case UNAUTHORIZED -> ApiResponse.CODE_UNAUTHORIZED;
+            case FORBIDDEN -> ApiResponse.CODE_FORBIDDEN;
+            case NOT_FOUND -> ApiResponse.CODE_NOT_FOUND;
+            case BAD_REQUEST -> ApiResponse.CODE_BAD_REQUEST;
+            default -> httpStatus.is4xxClientError() ? ApiResponse.CODE_BAD_REQUEST : ApiResponse.CODE_SERVER_ERROR;
+        };
+        String message = httpStatus.is5xxServerError()
+                ? "Internal server error"
+                : ((reason == null || reason.isBlank()) ? "Request rejected" : reason);
+        if (httpStatus.is5xxServerError()) {
+            log.error("{} {} failed with {}: {}", req.getMethod(), req.getRequestURI(), httpStatus.value(), reason, ex);
+        } else {
+            // 4xx is caller error: one warn line, no stack trace, no "unhandled" wording.
+            log.warn("{} {} -> {}: {}", req.getMethod(), req.getRequestURI(), httpStatus.value(), message);
+        }
+        return ResponseEntity.status(httpStatus).body(ApiResponse.fail(code, message));
     }
 
     private String formatFieldError(FieldError fe) {

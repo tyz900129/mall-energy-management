@@ -13,21 +13,10 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { firstAccessiblePath } from '@/router/menu'
 
 const router = useRouter()
 const userStore = useUserStore()
-
-const ACCESS_CANDIDATES: Array<[string, string]> = [
-  ['/dashboard', 'dashboard.view'],
-  ['/inspection/tasks', 'inspection.task.view'],
-  ['/ops-patrol/tasks', 'ops.patrol.report'],
-  ['/access/dashboard', 'access.dashboard.view'],
-  ['/access/self', 'access.self.view'],
-  ['/operation/merchant-responsibilities', 'operation.merchant.view'],
-  ['/workflow', 'workflow.view'],
-  ['/construction', 'construction.view'],
-  ['/workflow/merchant-query', 'merchant.query'],
-]
 
 const subtitle = computed(() => {
   const user = userStore.user
@@ -37,8 +26,8 @@ const subtitle = computed(() => {
 })
 
 function goBack() {
-  const target = ACCESS_CANDIDATES.find(([, code]) => userStore.hasPermission(code))?.[0]
-  if (target) router.replace(target)
+  const target = firstAccessiblePath(c => userStore.hasPermission(c))
+  if (target && target !== '/no-permission') router.replace(target)
   else switchAccount()
 }
 

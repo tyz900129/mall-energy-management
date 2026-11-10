@@ -1,6 +1,16 @@
 import http from './http'
 
-export interface SystemRole { id: number; code: string; name: string; description?: string; menuIds?: number[]; userCount?: number; permissionCount?: number }
+export type PostCategory = 'MANAGE'|'TECH'|'OPER'|'ADMIN'
+export interface SystemRole {
+  id: number; code: string; name: string; description?: string
+  deptId?: number|null; deptName?: string; postCategory?: PostCategory
+  isAssignable?: number; isSystem?: number; headcount?: number
+  menuIds?: number[]; userCount?: number; permissionCount?: number
+}
+export interface RolePayload {
+  code: string; name: string; description?: string
+  deptId?: number|null; postCategory?: PostCategory; isAssignable?: number; headcount?: number
+}
 export interface SystemUser {
   id: number; username: string; displayName?: string; email?: string; phone?: string; status: number
   roles: string[]; roleIds: number[]; departmentId?: number; lastLoginAt?: string; createdAt?: string; updatedAt?: string
@@ -8,7 +18,14 @@ export interface SystemUser {
 export interface SystemUserPayload {
   username: string; displayName?: string; email?: string; phone?: string; status: number; password?: string; roleIds?: number[]; departmentId?: number
 }
-export interface SystemDepartment { id: number; code: string; name: string; deptGroup: string }
+export type DepartmentGroup = 'OPERATION'|'SERVICE'|'PROPERTY'
+export type DepartmentLevel = 'GROUP'|'SECTION'|'TEAM'
+export type DepartmentStatus = 'ACTIVE'|'DISABLED'
+export interface SystemDepartment {
+  id: number; code: string; name: string; deptGroup: DepartmentGroup
+  parentId: number|null; ancestors?: string; sortOrder: number; depth: number; deptLevel: DepartmentLevel
+  status: DepartmentStatus; enabled: number; codeLocked: number; userCount: number; children?: SystemDepartment[]
+}
 export interface PermissionItem { id:number; code:string; name:string; actionType:'VIEW'|'EDIT'|'MANAGE'|'DANGER'; description?:string }
 export interface PermissionModule { code:string; name:string; permissions:PermissionItem[] }
 export interface UserPermissionOverride { permissionCode:string; effect:'ALLOW'|'DENY'; expiresAt?:string; reason?:string }
@@ -30,13 +47,25 @@ export const systemUserApi = {
 export interface RolePermissionProfile { roleId:number; roleCode:string; roleName:string; modules:PermissionModule[]; permissionCodes:string[] }
 export const systemRoleApi = {
   list: () => http.get<SystemRole[]>('/api/v1/roles'),
-  create: (data: { code: string; name: string; description?: string }) => http.post<SystemRole>('/api/v1/roles', data),
-  update: (id: number, data: { code: string; name: string; description?: string }) => http.put<SystemRole>(`/api/v1/roles/${id}`, data),
+  create: (data: RolePayload) => http.post<SystemRole>('/api/v1/roles', data),
+  update: (id: number, data: RolePayload) => http.put<SystemRole>(`/api/v1/roles/${id}`, data),
   remove: (id: number) => http.delete(`/api/v1/roles/${id}`),
   permissions: (id: number) => http.get<RolePermissionProfile>(`/api/v1/roles/${id}/permissions`),
   savePermissions: (id: number, permissionCodes: string[]) => http.put<RolePermissionProfile>(`/api/v1/roles/${id}/permissions`, { permissionCodes })
 }
-export const systemDepartmentApi = { list: () => http.get<SystemDepartment[]>('/api/v1/departments') }
+export interface DepartmentPayload { code: string; name: string; parentId?: number|null; deptGroup?: DepartmentGroup; sortOrder?: number }
+export interface DepartmentDeleteResult { id: number; softDeleted: boolean }
+// http.ts 的响应拦截器已把 {code,message,data} 解包为 data，这里还原真实返回类型
+function unwrap<T>(request: Promise<unknown>): Promise<T> { return request as unknown as Promise<T> }
+export const systemDepartmentApi = {
+  list: () => unwrap<SystemDepartment[]>(http.get('/api/v1/departments')),
+  tree: () => unwrap<SystemDepartment[]>(http.get('/api/v1/departments/tree')),
+  create: (data: DepartmentPayload) => unwrap<SystemDepartment>(http.post('/api/v1/departments', data)),
+  update: (id: number, data: DepartmentPayload) => unwrap<SystemDepartment>(http.put(`/api/v1/departments/${id}`, data)),
+  move: (id: number, parentId: number|null) => unwrap<SystemDepartment>(http.put(`/api/v1/departments/${id}/move`, { parentId })),
+  changeStatus: (id: number, status: DepartmentStatus) => unwrap<SystemDepartment>(http.put(`/api/v1/departments/${id}/status`, { status })),
+  remove: (id: number) => unwrap<DepartmentDeleteResult>(http.delete(`/api/v1/departments/${id}`))
+}
 
 export type DictionaryType = 'FLOOR'|'AREA'|'BUSINESS_TYPE'|'BUSINESS_CATEGORY'|'METER_LOCATION'|'WATER_METER_CALIBER'|'DRAINAGE_PIPE_CALIBER'|'EXHAUST_FAN'|'FRESH_AIR_UNIT'|'AIR_CONDITIONER_SPEC'|'NATURAL_GAS_CALIBER'|'GAS_SHUTOFF_LOCATION'|'POWER_NODE_TYPE'|'WATER_SUPPLY_NODE_TYPE'|'DRAINAGE_NODE_TYPE'|'OIL_EXHAUST_NODE_TYPE'|'FRESH_AIR_NODE_TYPE'|'WATER_SUPPLY_PIPE_SPEC'|'AIR_DUCT_SPEC'|'DRAINAGE_MEDIUM'|'PATROL_ISSUE_CATEGORY'|'PATROL_POINT_TYPE'
 export interface DictionaryItem { id:number; dictType:DictionaryType; itemValue:string; itemLabel:string; sortOrder:number; status:number; remark?:string; updatedAt?:string }

@@ -9,12 +9,14 @@ import com.wanyuecity.energy.system.service.dto.UserPermissionProfile;
 import com.wanyuecity.energy.system.service.dto.UserPermissionUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,44 +27,11 @@ import java.util.function.Predicate;
 @Service
 @RequiredArgsConstructor
 public class PermissionService {
-    /** 门禁认领白名单（self/mine 分支）：对所有物业课开放。
-     *  门禁管理端（dashboard、persons、devices、visitors 管理端、sync 写入等）不在此列。
-     *  后期如需为特定使用人开放门禁管理权限，走 sys_user_permission 的 ALLOW 例外（见 effectivePermissionCodes），
-     *  例外会叠加回最终集合并绕开部门裁剪。 */
-    private static final Predicate<String> ACCESS_CLAIM_ONLY = code ->
-            "access.self.view".equals(code)
-                    || "access.self.manage".equals(code)
-                    || "access.event.view.self".equals(code)
-                    || "visitor.view.own".equals(code);
-
-    /** 巡场管理基础权限：填报、问题处理、记录查看等全部 patrol.*，
-     *  但排除 patrol.config（点位/整改部门/值班排班/分类字典 的新增、编辑、删除保存码）。 */
-    private static final Predicate<String> PATROL_BASE = code ->
-            code.startsWith("patrol.") && !"patrol.config".equals(code);
-
-    /** 物业各课通用：施工申请所需的铺位/施工权限（角色已有才保留，不会新增）。 */
-    private static final Predicate<String> PROP_CONSTRUCTION_ACCESS = code ->
-            "stall.view".equals(code) || "construction.create".equals(code) || "construction.view".equals(code);
-
-    /** 部门级权限裁剪：物业各课只保留其职责领域的权限码。
-     *  裁剪仅过滤"角色已授权的码"，不会新增角色未授权的码；商管处与客服课不在此列。 */
-    private static final Map<String, Predicate<String>> DEPARTMENT_PERMISSION_RULES = Map.of(
-            "PROP_EQ", code -> code.startsWith("inspection.") || code.startsWith("energy.")
-                    || PATROL_BASE.test(code) || ACCESS_CLAIM_ONLY.test(code)
-                    || PROP_CONSTRUCTION_ACCESS.test(code),
-            "PROP_SEC", code -> ACCESS_CLAIM_ONLY.test(code) || PATROL_BASE.test(code)
-                    || "operation.clearance.review".equals(code) || "operation.property.view".equals(code)
-                    || PROP_CONSTRUCTION_ACCESS.test(code),
-            "PROP_CLN", code -> "operation.merchant.view".equals(code)
-                    || PATROL_BASE.test(code) || ACCESS_CLAIM_ONLY.test(code)
-                    || PROP_CONSTRUCTION_ACCESS.test(code)
-    );
-
     private final JdbcTemplate jdbcTemplate;
     private final SysUserMapper userMapper;
     private final ObjectMapper objectMapper;
 
-    public record DepartmentInfo(Long id, String code, String name) {}
+    public record DepartmentInfo(Long id, String code, String name, String ancestors) {}
 
     public Set<String> effectivePermissionCodes(Long userId) {
         if (userId == null) return Set.of();
@@ -87,21 +56,40 @@ public class PermissionService {
             codes.addAll(rolePermissionCodes(userId));
         }
         DepartmentInfo department = department(userId);
-        // 超级管理员/系统管理员已是全量权限，不受"物业课"部门裁剪影响
+        // 超级管理员/系统管理员已是全量权限，不受部门裁剪影响
         if (roles.contains("SUPER_ADMIN") || roles.contains("SYSTEM_ADMIN")) return codes;
         if (department != null) {
-            Predicate<String> rule = DEPARTMENT_PERMISSION_RULES.get(department.code());
-            if (rule != null) codes.removeIf(code -> !rule.test(code));
+            // 裁剪策略来自 sys_dept_permission_policy，沿 ancestors 取最近策略；无策略则不裁剪
+            Predicate<String> matcher = DeptPermissionPolicy.matcher(deptPermissionRules(department));
+            if (matcher != null) codes.removeIf(code -> !matcher.test(code));
         }
         return codes;
+    }
+
+    /** 加载该部门最近一组启用策略（部门自身优先，其次逐级向上）。 */
+    private List<DeptPermissionPolicy.Rule> deptPermissionRules(DepartmentInfo department) {
+        List<Long> chain = DeptPermissionPolicy.selfFirstChain(department.id(), department.ancestors());
+        if (chain.isEmpty()) return List.of();
+        String placeholders = String.join(",", Collections.nCopies(chain.size(), "?"));
+        Map<Long, List<DeptPermissionPolicy.Rule>> byDept = new LinkedHashMap<>();
+        jdbcTemplate.query("SELECT department_id, mode, include_pattern, exclude_pattern " +
+                        "FROM sys_dept_permission_policy WHERE enabled = 1 AND department_id IN (" + placeholders + ") ORDER BY id",
+                (RowCallbackHandler) rs -> byDept.computeIfAbsent(rs.getLong("department_id"), ignored -> new ArrayList<>())
+                        .add(new DeptPermissionPolicy.Rule(
+                                "PREFIX".equalsIgnoreCase(rs.getString("mode"))
+                                        ? DeptPermissionPolicy.Mode.PREFIX : DeptPermissionPolicy.Mode.EXACT,
+                                rs.getString("include_pattern"), rs.getString("exclude_pattern"))),
+                chain.toArray());
+        return DeptPermissionPolicy.nearestRules(chain, byDept);
     }
 
     public DepartmentInfo department(Long userId) {
         if (userId == null) return null;
         List<DepartmentInfo> rows = jdbcTemplate.query(
-                "SELECT d.id, d.code, d.name FROM sys_user u JOIN sys_department d ON d.id = u.department_id " +
+                "SELECT d.id, d.code, d.name, d.ancestors FROM sys_user u JOIN sys_department d ON d.id = u.department_id " +
                         "WHERE u.id = ? AND d.enabled = 1",
-                (rs, rowNum) -> new DepartmentInfo(rs.getLong("id"), rs.getString("code"), rs.getString("name")),
+                (rs, rowNum) -> new DepartmentInfo(rs.getLong("id"), rs.getString("code"), rs.getString("name"),
+                        rs.getString("ancestors")),
                 userId);
         return rows.isEmpty() ? null : rows.get(0);
     }

@@ -7,10 +7,14 @@
           <el-button size="small" type="primary" @click="openCreateRole">新增角色</el-button>
         </div>
         <div class="role-list">
-          <div v-for="r in roles" :key="r.id" class="role-item" :class="{ active: r.id === currentId }" @click="selectRole(r)">
-            <div class="role-name">{{ r.name }}</div>
-            <div class="role-meta">{{ r.code }} · {{ r.userCount || 0 }}人 · {{ r.permissionCount || 0 }}项</div>
+          <div v-for="g in roleGroups" :key="g.key" class="role-group">
+            <div class="group-title">{{ g.label }}<span>{{ g.roles.length }}</span></div>
+            <div v-for="r in g.roles" :key="r.id" class="role-item" :class="{ active: r.id === currentId }" @click="selectRole(r)">
+              <div class="role-name">{{ r.name }}</div>
+              <div class="role-meta">{{ r.code }} · {{ r.userCount || 0 }}人 · {{ r.permissionCount || 0 }}项</div>
+            </div>
           </div>
+          <el-empty v-if="!roles.length" description="暂无角色" :image-size="60" />
         </div>
       </div>
 
@@ -21,12 +25,15 @@
               <div class="perm-title">
                 {{ currentRole.name }}
                 <el-tag size="small" style="margin-left:8px">{{ currentRole.code }}</el-tag>
+                <el-tag v-if="currentRole.deptName" size="small" type="success" style="margin-left:4px">{{ currentRole.deptName }}</el-tag>
+                <el-tag size="small" type="info" style="margin-left:4px">{{ postCategoryName(currentRole.postCategory) }}</el-tag>
+                <el-tag v-if="currentRole.isSystem" size="small" type="warning" style="margin-left:4px">内置</el-tag>
               </div>
               <div class="perm-sub">角色默认权限：保存后对该角色下所有用户生效，个人权限中的额外允许/禁止仍然优先</div>
             </div>
             <div class="perm-actions">
               <el-button size="small" @click="openEditRole">编辑角色</el-button>
-              <el-popconfirm v-if="!isBuiltinRole" :title="`确定删除角色「${currentRole.name}」？`" @confirm="removeRole">
+              <el-popconfirm v-if="!currentRole.isSystem" :title="`确定删除角色「${currentRole.name}」？`" @confirm="removeRole">
                 <template #reference><el-button size="small" type="danger">删除</el-button></template>
               </el-popconfirm>
               <el-button size="small" type="primary" :disabled="readonly" :loading="saving" @click="savePermissions">保存权限</el-button>
@@ -65,13 +72,31 @@
       </div>
     </div>
 
-    <el-dialog v-model="roleFormVisible" :title="roleForm.id ? '编辑角色' : '新增角色'" width="440px" append-to-body>
-      <el-form :model="roleForm" label-width="84px">
+    <el-dialog v-model="roleFormVisible" :title="roleForm.id ? '编辑角色' : '新增角色'" width="520px" append-to-body>
+      <el-form :model="roleForm" label-width="96px">
         <el-form-item label="角色编码" required>
-          <el-input v-model="roleForm.code" :disabled="!!roleForm.id" placeholder="大写字母/数字/下划线，如 CS_AGENT" />
+          <el-input v-model="roleForm.code" :disabled="roleForm.isSystem === 1" placeholder="大写字母/数字/下划线，如 POST_CS" />
         </el-form-item>
         <el-form-item label="角色名称" required>
-          <el-input v-model="roleForm.name" placeholder="如 客服员" />
+          <el-input v-model="roleForm.name" placeholder="如 客服岗" />
+        </el-form-item>
+        <el-form-item label="所属部门">
+          <el-tree-select v-model="roleForm.deptId" :data="departmentTree" node-key="id"
+                          :props="{ label: 'name', children: 'children' }" check-strictly clearable
+                          placeholder="留空表示全局岗位" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="岗位类别">
+          <el-select v-model="roleForm.postCategory" style="width:100%">
+            <el-option v-for="c in POST_CATEGORIES" :key="c.value" :label="c.label" :value="c.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="可被分配">
+          <el-switch v-model="roleForm.isAssignable" :active-value="1" :inactive-value="0" />
+          <span class="form-hint">关闭后不在用户角色分配中出现</span>
+        </el-form-item>
+        <el-form-item label="编制数">
+          <el-input-number v-model="roleForm.headcount" :min="0" :max="9999" />
+          <span class="form-hint">0 表示不限</span>
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="roleForm.description" type="textarea" :rows="2" />
@@ -88,12 +113,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { systemRoleApi, type SystemRole, type PermissionModule } from '@/api/system'
+import { systemDepartmentApi, systemRoleApi, type PostCategory, type PermissionModule, type SystemDepartment, type SystemRole } from '@/api/system'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void; (e: 'changed'): void }>()
 
-const BUILTIN_ROLE_CODES = new Set(['SUPER_ADMIN', 'SYSTEM_ADMIN', 'DEVICE_VERIFIER', 'APPLICANT', 'VIEWER', 'PROPERTY_MANAGER', 'OPS_PATROL_MANAGER'])
+const POST_CATEGORIES: { value: PostCategory; label: string }[] = [
+  { value: 'MANAGE', label: '管理岗' },
+  { value: 'TECH', label: '技术岗' },
+  { value: 'OPER', label: '操作岗' },
+  { value: 'ADMIN', label: '行政岗' }
+]
 
 const visible = computed({
   get: () => props.modelValue,
@@ -101,6 +131,7 @@ const visible = computed({
 })
 
 const roles = ref<SystemRole[]>([])
+const departmentTree = ref<SystemDepartment[]>([])
 const currentId = ref<number | null>(null)
 const modules = ref<PermissionModule[]>([])
 const checked = ref<string[]>([])
@@ -109,11 +140,43 @@ const filter = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const roleFormVisible = ref(false)
-const roleForm = ref<any>({ id: 0, code: '', name: '', description: '' })
+const roleForm = ref<any>({ id: 0, code: '', name: '', description: '', deptId: null, postCategory: 'OPER', isAssignable: 1, isSystem: 0, headcount: 0 })
 
 const currentRole = computed(() => roles.value.find(r => r.id === currentId.value) || null)
-const isBuiltinRole = computed(() => !!currentRole.value && BUILTIN_ROLE_CODES.has(currentRole.value.code))
 const readonly = computed(() => currentRole.value?.code === 'SUPER_ADMIN')
+
+const deptIndex = computed(() => {
+  const map = new Map<number, { label: string; order: number }>()
+  let order = 0
+  const walk = (nodes: SystemDepartment[], prefix: string) => {
+    for (const n of nodes) {
+      map.set(n.id, { label: prefix + n.name, order: order++ })
+      walk(n.children || [], prefix + n.name + ' / ')
+    }
+  }
+  walk(departmentTree.value, '')
+  return map
+})
+
+const roleGroups = computed(() => {
+  const groups = new Map<string, { key: string; label: string; order: number; roles: SystemRole[] }>()
+  for (const r of roles.value) {
+    const key = r.deptId ? `d${r.deptId}` : 'none'
+    let group = groups.get(key)
+    if (!group) {
+      const info = r.deptId ? deptIndex.value.get(r.deptId) : undefined
+      group = {
+        key,
+        label: info?.label || r.deptName || '未归属部门',
+        order: info?.order ?? Number.MAX_SAFE_INTEGER,
+        roles: []
+      }
+      groups.set(key, group)
+    }
+    group.roles.push(r)
+  }
+  return [...groups.values()].sort((a, b) => a.order - b.order)
+})
 const totalPermissions = computed(() => modules.value.reduce((n, m) => n + m.permissions.length, 0))
 const filteredModules = computed(() => {
   const kw = filter.value.trim().toLowerCase()
@@ -126,6 +189,9 @@ const filteredModules = computed(() => {
 watch(() => props.modelValue, v => { if (v) init() })
 
 async function init() {
+  if (!departmentTree.value.length) {
+    departmentTree.value = (await systemDepartmentApi.tree()) as any
+  }
   await loadRoles()
   if (currentId.value) await loadPermissions(currentId.value)
 }
@@ -188,13 +254,27 @@ async function savePermissions() {
   }
 }
 
+function postCategoryName(category?: string) {
+  return POST_CATEGORIES.find(c => c.value === category)?.label || '未分类'
+}
+
 function openCreateRole() {
-  roleForm.value = { id: 0, code: '', name: '', description: '' }
+  roleForm.value = { id: 0, code: '', name: '', description: '', deptId: null, postCategory: 'OPER', isAssignable: 1, isSystem: 0, headcount: 0 }
   roleFormVisible.value = true
 }
 function openEditRole() {
   if (!currentRole.value) return
-  roleForm.value = { id: currentRole.value.id, code: currentRole.value.code, name: currentRole.value.name, description: currentRole.value.description || '' }
+  roleForm.value = {
+    id: currentRole.value.id,
+    code: currentRole.value.code,
+    name: currentRole.value.name,
+    description: currentRole.value.description || '',
+    deptId: currentRole.value.deptId ?? null,
+    postCategory: currentRole.value.postCategory || 'OPER',
+    isAssignable: currentRole.value.isAssignable ?? 1,
+    isSystem: currentRole.value.isSystem ?? 0,
+    headcount: currentRole.value.headcount ?? 0
+  }
   roleFormVisible.value = true
 }
 
@@ -206,11 +286,20 @@ async function saveRole() {
   if (!name) { ElMessage.warning('请输入角色名称'); return }
   saving.value = true
   try {
+    const payload = {
+      code,
+      name,
+      description: roleForm.value.description || undefined,
+      deptId: roleForm.value.deptId ?? null,
+      postCategory: roleForm.value.postCategory || 'OPER',
+      isAssignable: roleForm.value.isAssignable ?? 1,
+      headcount: roleForm.value.headcount ?? 0
+    }
     let saved: any
     if (roleForm.value.id) {
-      saved = await systemRoleApi.update(roleForm.value.id, { code, name, description: roleForm.value.description || undefined })
+      saved = await systemRoleApi.update(roleForm.value.id, payload)
     } else {
-      saved = await systemRoleApi.create({ code, name, description: roleForm.value.description || undefined })
+      saved = await systemRoleApi.create(payload)
     }
     ElMessage.success('角色已保存')
     roleFormVisible.value = false
@@ -245,6 +334,9 @@ async function removeRole() {
 .role-panel { width: 240px; flex-shrink: 0; border-right: 1px solid #ebeef5; padding-right: 12px; display: flex; flex-direction: column; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 13px; color: #606266; }
 .role-list { overflow-y: auto; flex: 1; }
+.role-group { margin-bottom: 10px; }
+.group-title { display: flex; justify-content: space-between; padding: 4px 2px; font-size: 12px; color: #909399; font-weight: 600; }
+.form-hint { margin-left: 10px; font-size: 12px; color: #909399; }
 .role-item { padding: 10px; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 8px; cursor: pointer; }
 .role-item.active { border-color: #409eff; background: #ecf5ff; }
 .role-name { font-weight: 600; font-size: 14px; color: #303133; }

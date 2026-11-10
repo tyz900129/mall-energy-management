@@ -19,15 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class SysUserService {
-
-    private static final Set<String> ASSIGNABLE_ROLE_CODES = Set.of(
-            "SUPER_ADMIN", "SYSTEM_ADMIN", "DEVICE_VERIFIER", "APPLICANT", "VIEWER",
-            "PROPERTY_MANAGER", "OPS_PATROL_MANAGER", "CS_AGENT", "CS_MANAGER");
 
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
@@ -194,8 +189,8 @@ public class SysUserService {
             throw BizException.badRequest("每个用户必须且只能选择一个角色");
         }
         SysRole role = roleMapper.selectById(roleIds.get(0));
-        if (role == null || !ASSIGNABLE_ROLE_CODES.contains(role.getCode())) {
-            throw BizException.badRequest("请选择系统预设的有效角色");
+        if (role == null || !Integer.valueOf(1).equals(role.getIsAssignable())) {
+            throw BizException.badRequest("请选择允许分配的岗位/角色");
         }
         return role;
     }
