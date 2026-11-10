@@ -1,16 +1,36 @@
 /*
  * ============================================================================
- * 銆愬弽缂栬瘧杩樺師 路 浠呬緵 diff 鍙傝€?路 璇峰嬁鍩轰簬鏈枃浠舵敼浠ｇ爜涓婄嚎銆? *
- * 鏈枃浠剁敱绾夸笂杩愯浜х墿鍙嶇紪璇戣繕鍘燂紝涓嶆槸鍘熷婧愮爜锛? *   鏉ユ簮 war   : /home/admin/energy-deploy/energy-management.war
- *   war sha256 : cca2127f7007f817ff5e3e9d6af3056ad7d18f9278a2d3471d53ae1fc1b37722
- *   鏉ユ簮 class : WEB-INF/classes/com/wanyuecity/energy/inspection/InspectionService.class
- *   鍙嶇紪璇戝伐鍏?: CFR 0.152锛?-extraclasspath 鍚悓绫诲唴閮ㄧ被锛? *   杩樺師鏃堕棿   : 2026-11-10
+ * 【反编译还原 · 仅供 diff 参考 · 请勿基于本文件改代码上线】
  *
- * 宸茬煡灞€闄愶紙濡傚疄璁板綍锛屽嬁褰撲綔缂洪櫡娓呭崟鍘讳慨锛夛細
- *   1. 娉涘瀷琚摝闄わ紝鍑虹幇澶ч噺瑁哥被鍨嬶紙List / Map锛夛紝涓庡師瀹炵幇婧愮爜涓嶅悓銆? *   2. 閮ㄥ垎鏋勯€犺 CFR 鍚堝苟閲嶆帓锛岃涔夊彲鑳戒笌绾夸笂瀹炵幇涓嶄竴鑷达紝渚嬪
- *      d.put("path", ((d = new LinkedHashMap<>(...))... 杩欑鑰﹀悎鍐欐硶銆? *   3. 灞€閮ㄥ彉閲忓悕銆佹敞閲娿€佺┖琛屻€佹敞瑙ｄ功鍐欏舰寮忥紙濡?value={"/x"}锛夊潎宸插け鐪熴€? *   4. 鏈仛浜哄伐澶嶆牳锛屼笉淇濊瘉鍙紪璇戙€佷笉淇濊瘉璇箟姝ｇ‘銆? *
- * 鐢ㄩ€旓細baseline/deployed-20261109 鐨勫鐓ч敋鐐癸紝鐢ㄤ簬鍥炵瓟鈥滅嚎涓?2026-11-09 鐨? *      鏋勫缓鍒板簳鍖呭惈鍝簺浠ｇ爜鈥濄€傚彲鐢ㄤ簬 diff锛屼笉鍙洿鎺ユ彁浜や慨澶嶆垨閮ㄧ讲銆? * ============================================================================
+ * 本文件由线上运行产物反编译还原，不是原始源码：
+ *   来源 war   : /home/admin/energy-deploy/energy-management.war
+ *   war sha256 : cca2127f7007f817ff5e3e9d6af3056ad7d18f9278a2d3471d53ae1fc1b37722
+ *   来源 class : WEB-INF/classes/com/wanyuecity/energy/inspection/InspectionService.class
+ *   反编译工具 : CFR 0.152（-extraclasspath 含同类内部类）
+ *   还原时间   : 2026-11-10
+ *
+ * 复核状态（2026-11-10；本次仅做"让基线可编译"的最小修正，不是功能变更）：
+ *   [已复核·已修正] 泛型擦除：plans() / generate() / sendReminders() 里 4 处裸 List 声明
+ *     补回 List<Map<String, Object>>。只是类型标注，擦除后字节码等价，不改变运行时语义。
+ *   [已复核·已修正] deptSnapshot() 中 CFR 的合并写法：按 javap 字节码（53: astore_3 之后
+ *     54: aload_3 才作为 put 的 receiver）拆回"先构造并赋值给局部变量、再 put"两条语句。
+ *     判断依据与仍不确定的点写在该方法内的注释里。
+ *   [已复核·未改动] Owner record 的字段顺序与线上
+ *     <init>(String,Long,String,Long,String,String,Long,String,String,String) 一致；
+ *     class 结构、方法签名均未调整。
+ *   [仍未确认] 局部变量名、注释、注解书写形态（如 value={"/x"}）等源码形态；泛型参数在
+ *     字节码中已被擦除，只能保证可观察行为等价，不能保证与原始源码逐字一致。
+ *   [仍未确认] 是否还有其它"CFR 合并后语义被改变"的位置。已抽查 resolveOwner / deptOwner /
+ *     deptSnapshot / one / userRow 等拼接点，未发现第二处；未做全文件逐条字节码比对。
+ *
+ * 编译状态   : mvn -B -DskipTests compile 通过；mvn -B test 68/68 通过（2026-11-10，JDK 17）。
+ *              javap 成员列表与线上 class 一致；deptSnapshot 字节码与线上逐指令一致。
+ *
+ * 用途：baseline/deployed-20261109 的对照锚点，用于回答"线上 2026-11-09 的构建到底包含
+ *      哪些代码"。可用于 diff；这不是原始源码，改动前请先确认真实源码位置。
+ * ============================================================================
  *//*
+
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
@@ -124,7 +144,7 @@ public class InspectionService {
     }
 
     public List<Map<String, Object>> plans() {
-        List rows = this.jdbc.queryForList("SELECT p.id,p.name,p.inspection_type_id inspectionTypeId,y.name inspectionTypeName,p.template_id templateId,t.name templateName,p.frequency_type frequencyType,p.frequency_value frequencyValue,p.schedule_config_json scheduleConfigJson,p.start_date startDate,p.end_date endDate,p.execute_time executeTime,p.overdue_minutes overdueMinutes,p.assignee_user_id assigneeUserId,p.assignee_name assigneeName,p.owner_type ownerType,p.owner_id ownerId,p.target_mode targetMode,p.claim_mode claimMode,p.webhook_config_ids webhookConfigIds,p.enabled,p.last_generated_at lastGeneratedAt,p.updated_at updatedAt,(SELECT COUNT(*) FROM inspection_plan_target x WHERE x.plan_id=p.id AND x.enabled=1) targetCount FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id JOIN inspection_template t ON t.id=p.template_id ORDER BY p.enabled DESC,p.id DESC");
+        List<Map<String, Object>> rows = this.jdbc.queryForList("SELECT p.id,p.name,p.inspection_type_id inspectionTypeId,y.name inspectionTypeName,p.template_id templateId,t.name templateName,p.frequency_type frequencyType,p.frequency_value frequencyValue,p.schedule_config_json scheduleConfigJson,p.start_date startDate,p.end_date endDate,p.execute_time executeTime,p.overdue_minutes overdueMinutes,p.assignee_user_id assigneeUserId,p.assignee_name assigneeName,p.owner_type ownerType,p.owner_id ownerId,p.target_mode targetMode,p.claim_mode claimMode,p.webhook_config_ids webhookConfigIds,p.enabled,p.last_generated_at lastGeneratedAt,p.updated_at updatedAt,(SELECT COUNT(*) FROM inspection_plan_target x WHERE x.plan_id=p.id AND x.enabled=1) targetCount FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id JOIN inspection_template t ON t.id=p.template_id ORDER BY p.enabled DESC,p.id DESC");
         for (Map row : rows) {
             row.put("targets", this.jdbc.queryForList("SELECT id,target_type targetType,target_id targetId,target_code targetCode,target_name targetName,location_text locationText,enabled FROM inspection_plan_target WHERE plan_id=? ORDER BY id", new Object[]{row.get("id")}));
         }
@@ -234,7 +254,7 @@ public class InspectionService {
         String claimMode = InspectionService.defaultText(p, "claim_mode", "NONE");
         int count = 0;
         if ("DEPT".equals(ownerType) && "PER_CHILD".equals(targetMode)) {
-            List children = this.jdbc.queryForList("SELECT id,code,name FROM sys_department WHERE parent_id=? AND deleted_at IS NULL AND status='ACTIVE' ORDER BY sort_order,id", new Object[]{ownerId});
+            List<Map<String, Object>> children = this.jdbc.queryForList("SELECT id,code,name FROM sys_department WHERE parent_id=? AND deleted_at IS NULL AND status='ACTIVE' ORDER BY sort_order,id", new Object[]{ownerId});
             if (children.isEmpty()) {
                 children = this.jdbc.queryForList("SELECT id,code,name FROM sys_department WHERE id=? AND deleted_at IS NULL", new Object[]{ownerId});
             }
@@ -523,7 +543,6 @@ public class InspectionService {
     }
 
     private Map<String, Object> deptSnapshot(Long id) {
-        LinkedHashMap<String, Object> d;
         if (id == null) {
             return null;
         }
@@ -531,7 +550,26 @@ public class InspectionService {
         if (l.isEmpty()) {
             return null;
         }
-        d.put("path", ((d = new LinkedHashMap<String, Object>((Map)l.get(0))).get("ancestors") == null ? "/" : String.valueOf(d.get("ancestors"))) + id + "/");
+        /*
+         * 复核记录（2026-11-10，依据 javap -p -c 线上 class 的字节码）：
+         * CFR 原样输出把下面两条语句合并成了一个表达式：
+         *   d.put("path", ((d = new LinkedHashMap<>(...(Map)l.get(0))).get("ancestors") == null ? "/" : ...) + id + "/")
+         * 但线上字节码的控制流是：
+         *   36 new LinkedHashMap -> 50 invokespecial <init>(Map) -> 53 astore_3
+         *   54 aload_3（put 的 receiver）-> 55 ldc "path" -> 58 aload_3 / 62 Map.get("ancestors")
+         *   67 ifnonnull -> 85 String.valueOf -> 89 makeConcatWithConstants(String,Long) -> 94 Map.put -> 100 aload_3 / 101 areturn
+         * 即原始源码一定是"先把 new LinkedHashMap 赋给局部变量 d（astore_3 已落栈），再 d.put(...)"两条独立语句；
+         * CFR 的合并写法在合并表达式内先以 d 作 receiver，此时 d 尚未赋值（null），真机上会 NPE，与线上行为不等价。故按字节码拆回。
+         *
+         * 已复核（有字节码依据）：语句顺序、put 的 receiver 就是新建的 LinkedHashMap 实例、value 拼接形态
+         *   （ancestors 为 null 取 "/"，否则 String.valueOf(ancestors)，再拼 id 与 "/"）、返回的是同一个实例 d。
+         * 仍未确认（字节码无法区分）：局部变量 d 的声明位置与变量名（d 为 CFR 推测）。
+         *   已可确认静态类型是 Map 而非 LinkedHashMap：线上字节码用 invokeinterface Map.get / Map.put，
+         *   若声明为 LinkedHashMap 则 javac 会发 invokevirtual（本文件曾因此与线上不一致，已改回 Map）。
+         *   泛型参数仍被擦除，无法从字节码确认。
+         */
+        Map<String, Object> d = new LinkedHashMap<String, Object>((Map)l.get(0));
+        d.put("path", (d.get("ancestors") == null ? "/" : String.valueOf(d.get("ancestors"))) + id + "/");
         return d;
     }
 
@@ -546,11 +584,11 @@ public class InspectionService {
     }
 
     private void sendReminders() {
-        List due = this.jdbc.queryForList("SELECT k.id,p.webhook_config_ids webhookIds FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id WHERE k.status IN ('PENDING','IN_PROGRESS') AND k.due_at BETWEEN NOW(3) AND DATE_ADD(NOW(3),INTERVAL 2 HOUR)");
+        List<Map<String, Object>> due = this.jdbc.queryForList("SELECT k.id,p.webhook_config_ids webhookIds FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id WHERE k.status IN ('PENDING','IN_PROGRESS') AND k.due_at BETWEEN NOW(3) AND DATE_ADD(NOW(3),INTERVAL 2 HOUR)");
         for (Map x : due) {
             this.notifyOnce(InspectionService.longValue(x.get("id")), "INSPECTION_TASK_DUE", String.valueOf(x.getOrDefault("webhookIds", "[]")));
         }
-        List overdue = this.jdbc.queryForList("SELECT k.id,p.webhook_config_ids webhookIds FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id WHERE k.status='OVERDUE' AND k.due_at>=DATE_SUB(NOW(3),INTERVAL 1 DAY)");
+        List<Map<String, Object>> overdue = this.jdbc.queryForList("SELECT k.id,p.webhook_config_ids webhookIds FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id WHERE k.status='OVERDUE' AND k.due_at>=DATE_SUB(NOW(3),INTERVAL 1 DAY)");
         for (Map x : overdue) {
             this.notifyOnce(InspectionService.longValue(x.get("id")), "INSPECTION_TASK_OVERDUE", String.valueOf(x.getOrDefault("webhookIds", "[]")));
         }

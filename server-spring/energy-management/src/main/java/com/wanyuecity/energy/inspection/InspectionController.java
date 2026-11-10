@@ -1,16 +1,27 @@
 /*
  * ============================================================================
- * 銆愬弽缂栬瘧杩樺師 路 浠呬緵 diff 鍙傝€?路 璇峰嬁鍩轰簬鏈枃浠舵敼浠ｇ爜涓婄嚎銆? *
- * 鏈枃浠剁敱绾夸笂杩愯浜х墿鍙嶇紪璇戣繕鍘燂紝涓嶆槸鍘熷婧愮爜锛? *   鏉ユ簮 war   : /home/admin/energy-deploy/energy-management.war
- *   war sha256 : cca2127f7007f817ff5e3e9d6af3056ad7d18f9278a2d3471d53ae1fc1b37722
- *   鏉ユ簮 class : WEB-INF/classes/com/wanyuecity/energy/inspection/InspectionController.class
- *   鍙嶇紪璇戝伐鍏?: CFR 0.152锛?-extraclasspath 鍚悓绫诲唴閮ㄧ被锛? *   杩樺師鏃堕棿   : 2026-11-10
+ * 【反编译还原 · 仅供 diff 参考 · 请勿基于本文件改代码上线】
  *
- * 宸茬煡灞€闄愶紙濡傚疄璁板綍锛屽嬁褰撲綔缂洪櫡娓呭崟鍘讳慨锛夛細
- *   1. 娉涘瀷琚摝闄わ紝鍑虹幇澶ч噺瑁哥被鍨嬶紙List / Map锛夛紝涓庡師瀹炵幇婧愮爜涓嶅悓銆? *   2. 閮ㄥ垎鏋勯€犺 CFR 鍚堝苟閲嶆帓锛岃涔夊彲鑳戒笌绾夸笂瀹炵幇涓嶄竴鑷达紝渚嬪
- *      d.put("path", ((d = new LinkedHashMap<>(...))... 杩欑鑰﹀悎鍐欐硶銆? *   3. 灞€閮ㄥ彉閲忓悕銆佹敞閲娿€佺┖琛屻€佹敞瑙ｄ功鍐欏舰寮忥紙濡?value={"/x"}锛夊潎宸插け鐪熴€? *   4. 鏈仛浜哄伐澶嶆牳锛屼笉淇濊瘉鍙紪璇戙€佷笉淇濊瘉璇箟姝ｇ‘銆? *
- * 鐢ㄩ€旓細baseline/deployed-20261109 鐨勫鐓ч敋鐐癸紝鐢ㄤ簬鍥炵瓟鈥滅嚎涓?2026-11-09 鐨? *      鏋勫缓鍒板簳鍖呭惈鍝簺浠ｇ爜鈥濄€傚彲鐢ㄤ簬 diff锛屼笉鍙洿鎺ユ彁浜や慨澶嶆垨閮ㄧ讲銆? * ============================================================================
+ * 本文件由线上运行产物反编译还原，不是原始源码：
+ *   来源 war   : /home/admin/energy-deploy/energy-management.war
+ *   war sha256 : cca2127f7007f817ff5e3e9d6af3056ad7d18f9278a2d3471d53ae1fc1b37722
+ *   来源 class : WEB-INF/classes/com/wanyuecity/energy/inspection/InspectionController.class
+ *   反编译工具 : CFR 0.152（-extraclasspath 含同类内部类）
+ *   还原时间   : 2026-11-10
+ *
+ * 复核状态（2026-11-10；本次仅做"让基线可编译"的最小修正，不是功能变更）：
+ *   [已复核·未改动] 本文件无需修正即可编译；方法列表（含线上独有的 claim / ownerOptions /
+ *     reassign）已用 javap -p 与线上 class 逐项核对一致，未做任何结构调整。
+ *   [仍未确认] 注解书写形态（如 value={"/x"}）、局部变量名、注释等源码形态；字节码无法区分。
+ *
+ * 编译状态   : mvn -B -DskipTests compile 通过；mvn -B test 68/68 通过（2026-11-10，JDK 17）。
+ *              javap 成员列表与线上 class 一致。
+ *
+ * 用途：baseline/deployed-20261109 的对照锚点，用于回答"线上 2026-11-09 的构建到底包含
+ *      哪些代码"。可用于 diff；这不是原始源码，改动前请先确认真实源码位置。
+ * ============================================================================
  *//*
+
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
