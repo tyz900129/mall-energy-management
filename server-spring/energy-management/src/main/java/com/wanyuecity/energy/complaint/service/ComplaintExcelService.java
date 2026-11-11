@@ -251,7 +251,9 @@ public class ComplaintExcelService {
         if (file == null || file.isEmpty()) throw BizException.badRequest("请选择 Excel 文件");
         List<Map<String, Object>> errors = new ArrayList<>();
         List<Map<String, Object>> preview = new ArrayList<>();
-        int total = 0, matched = 0, unmatched = 0, changed = 0, unchanged = 0, success = 0;
+        int total = 0, matched = 0, unmatched = 0, changed = 0, unchanged = 0, success = 0, blocked = 0;
+        int merchantChangedRows = 0, companyChangedRows = 0, noCostChangedRows = 0;
+        BigDecimal merchantDelta = BigDecimal.ZERO, companyDelta = BigDecimal.ZERO;
         try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = wb.getSheetAt(0);
             DataFormatter fmt = new DataFormatter();
@@ -279,11 +281,26 @@ public class ComplaintExcelService {
                         addError(errors, i + 1, complaintNo, brand, plan.reason());
                     } else if (plan.blockedReason() != null) {
                         matched++;
+                        blocked++;
                         addError(errors, i + 1, complaintNo, brand, plan.blockedReason());
                     } else if (plan.changed()) {
                         matched++;
                         changed++;
                         success++;
+                        for (Map<String, Object> change : plan.changes()) {
+                            String field = String.valueOf(change.get("field"));
+                            if ("merchantCost".equals(field)) {
+                                merchantChangedRows++;
+                                merchantDelta = merchantDelta.add(((BigDecimal) change.get("to"))
+                                        .subtract((BigDecimal) change.get("from")));
+                            } else if ("companyCost".equals(field)) {
+                                companyChangedRows++;
+                                companyDelta = companyDelta.add(((BigDecimal) change.get("to"))
+                                        .subtract((BigDecimal) change.get("from")));
+                            } else if ("noCost".equals(field)) {
+                                noCostChangedRows++;
+                            }
+                        }
                         if (preview.size() < UPDATE_PREVIEW_LIMIT) preview.add(previewRow(i + 1, plan));
                     } else {
                         matched++;
@@ -305,6 +322,12 @@ public class ComplaintExcelService {
         result.setUnmatchedCount(unmatched);
         result.setChangedCount(changed);
         result.setUnchangedCount(unchanged);
+        result.setBlockedCount(blocked);
+        result.setMerchantCostChangedCount(merchantChangedRows);
+        result.setMerchantCostDelta(merchantDelta);
+        result.setCompanyCostChangedCount(companyChangedRows);
+        result.setCompanyCostDelta(companyDelta);
+        result.setNoCostChangedCount(noCostChangedRows);
         result.setSuccessCount(dryRun ? 0 : success);
         result.setFailCount(errors.size());
         result.setErrors(errors.size() > 100 ? errors.subList(0, 100) : errors);

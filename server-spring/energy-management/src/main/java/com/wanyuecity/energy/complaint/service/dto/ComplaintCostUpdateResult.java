@@ -2,6 +2,7 @@ package com.wanyuecity.energy.complaint.service.dto;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +24,18 @@ public class ComplaintCostUpdateResult {
     private int changedCount;
     /** 命中但费用无变化的行数。 */
     private int unchangedCount;
+    /** 因状态保护被拒绝的行数；仅 allowClosed=false 时可能出现。 */
+    private int blockedCount;
+    /** 商户承担费用发生变化的行数。 */
+    private int merchantCostChangedCount;
+    /** 商户承担费用净增合计（新值 - 旧值）。 */
+    private BigDecimal merchantCostDelta;
+    /** 公司承担费用发生变化的行数。 */
+    private int companyCostChangedCount;
+    /** 公司承担费用净增合计（新值 - 旧值）。 */
+    private BigDecimal companyCostDelta;
+    /** 无需承担费用标记发生变化的行数。 */
+    private int noCostChangedCount;
     /** 正式执行成功行数；干跑恒为 0。 */
     private int successCount;
     /** 失败行数（未命中、状态保护、格式错误等）。 */

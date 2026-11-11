@@ -165,6 +165,11 @@
       <div v-if="updateImportPreview" class="import-result">
         <el-alert :type="updateImportPreview.failCount ? 'warning' : 'info'" :closable="false" show-icon
                   :title="`预演：共 ${updateImportPreview.totalRows} 行，命中 ${updateImportPreview.matchedCount} 行，未命中 ${updateImportPreview.unmatchedCount} 行，将变更 ${updateImportPreview.changedCount} 行，无变化 ${updateImportPreview.unchangedCount} 行，失败 ${updateImportPreview.failCount} 行${updateImportPreview.allowClosed ? '（已包含已解决/已关闭单据）' : ''}`" />
+        <div class="preview-summary">
+          商户承担费用变更 {{ updateImportPreview.merchantCostChangedCount }} 行（净增 {{ formatMoney(updateImportPreview.merchantCostDelta) }} 元）；
+          公司承担费用变更 {{ updateImportPreview.companyCostChangedCount }} 行（净增 {{ formatMoney(updateImportPreview.companyCostDelta) }} 元）；
+          无需承担费用变更 {{ updateImportPreview.noCostChangedCount }} 行
+        </div>
         <div v-if="updateImportPreview.preview?.length" class="preview-block">
           <div class="preview-title">变更预览（最多展示 200 行）</div>
           <el-table :data="updateImportPreview.preview" size="small" border max-height="260">
@@ -390,6 +395,11 @@ function openUpdateImport() {
   updateImportVisible.value = true
 }
 
+function formatMoney(value: number | string | null | undefined) {
+  const n = Number(value || 0)
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // 切换「允许修正已关闭单据」后，旧预演结果不再适用，需重新预览。
 function onAllowClosedChange() {
   updateImportPreview.value = null
@@ -472,6 +482,7 @@ function statusType(status: string): any {
 .muted { color: #909399; margin: 0 4px; }
 .pager { margin-top: 12px; justify-content: flex-end; }
 .allow-closed-block { margin-top: 10px; }
+.preview-summary { margin-top: 10px; font-size: 13px; color: #606266; }
 .allow-closed-block .el-alert { margin-top: 6px; }
 .import-result { margin-top: 14px; }
 .error-list { max-height: 180px; overflow: auto; background: #fafafa; padding: 8px; margin-top: 8px; font-size: 12px; }
