@@ -11,6 +11,8 @@ public class ComplaintCostUpdateResult {
 
     /** true 表示仅预演，未写入任何数据。 */
     private boolean dryRun;
+    /** true 表示本次放开已解决/已关闭单据的费用修正（仅费用三列）。 */
+    private boolean allowClosed;
     /** 有效数据行数（已跳过整行空白）。 */
     private int totalRows;
     /** 命中单据的行数，含被状态保护的失败行。 */

@@ -218,15 +218,16 @@ public class ComplaintService {
     // ================= 更新导入（费用修正） =================
 
     /** 更新导入预演：只读计算改前改后，不写库。 */
-    public CostUpdatePlan previewCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost, Boolean noCost) {
-        return planCostUpdate(complaintNo, companyCost, merchantCost, noCost);
+    public CostUpdatePlan previewCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost,
+                                            Boolean noCost, boolean allowClosed) {
+        return planCostUpdate(complaintNo, companyCost, merchantCost, noCost, allowClosed);
     }
 
     /** 更新导入执行：单行独立事务，仅更新费用三列并写审计日志。 */
     @Transactional
     public CostUpdatePlan applyCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost,
-                                          Boolean noCost, SysUser operator) {
-        CostUpdatePlan plan = planCostUpdate(complaintNo, companyCost, merchantCost, noCost);
+                                          Boolean noCost, boolean allowClosed, SysUser operator) {
+        CostUpdatePlan plan = planCostUpdate(complaintNo, companyCost, merchantCost, noCost, allowClosed);
         if (!plan.matched() || plan.blockedReason() != null || !plan.changed()) return plan;
         CsComplaint update = new CsComplaint();
         update.setId(plan.id());
@@ -240,9 +241,11 @@ public class ComplaintService {
 
     /**
      * 单行差异计算：空值表示不修改；无需承担费用=是时两项费用按规则归零；
-     * 已解决/已关闭单据仅返回拒绝原因，不改动任何数据。
+     * 已解决/已关闭单据默认仅返回拒绝原因；allowClosed=true 时跳过状态保护，
+     * 但仍只写费用三列（状态、关闭时间、处理天数、参与人均不参与更新）。
      */
-    private CostUpdatePlan planCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost, Boolean noCost) {
+    private CostUpdatePlan planCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost,
+                                          Boolean noCost, boolean allowClosed) {
         String no = complaintNo == null ? "" : complaintNo.trim();
         if (no.isEmpty()) return CostUpdatePlan.unmatched("客诉编号不能为空");
         List<CsComplaint> found = complaintMapper.selectList(new LambdaQueryWrapper<CsComplaint>()
@@ -274,8 +277,9 @@ public class ComplaintService {
         }
         boolean changed = !changes.isEmpty();
         String blocked = null;
-        if ("resolved".equals(c.getStatus()) || "closed".equals(c.getStatus())) {
-            blocked = "客诉「" + no + "」当前状态为「" + statusLabel(c.getStatus()) + "」，已解决/已关闭单据不允许更新费用";
+        if (!allowClosed && ("resolved".equals(c.getStatus()) || "closed".equals(c.getStatus()))) {
+            blocked = "客诉「" + no + "」当前状态为「" + statusLabel(c.getStatus()) + "」，已解决/已关闭单据不允许更新费用"
+                    + "（如需修正请获取「客诉导入-已关闭单据修正」权限并显式开启 allowClosed）";
         }
         return new CostUpdatePlan(true, null, c.getId(), c.getComplaintNo(), c.getBrandName(), c.getStatus(),
                 statusLabel(c.getStatus()), blocked, changed, newCompany, newMerchant, newNoCost,

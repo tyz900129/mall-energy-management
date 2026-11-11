@@ -148,7 +148,14 @@
 
     <el-dialog v-model="updateImportVisible" title="更新导入（费用修正）" width="760px" append-to-body>
       <el-alert type="warning" :closable="false" show-icon
-                title="仅更新「公司承担费用 / 商户承担费用 / 无需承担费用」三列，按表头名识别列；空单元格表示不修改；已解决/已关闭单据不支持更新，未命中编号的行不会新增。" />
+                title="仅更新「公司承担费用 / 商户承担费用 / 无需承担费用」三列，按表头名识别列；空单元格表示不修改；默认不支持已解决/已关闭单据，未命中编号的行不会新增。" />
+      <div v-if="can('complaint.import.force')" class="allow-closed-block">
+        <el-checkbox v-model="updateImportAllowClosed" @change="onAllowClosedChange">
+          允许修正已关闭单据（仅费用）
+        </el-checkbox>
+        <el-alert v-if="updateImportAllowClosed" type="error" :closable="false" show-icon
+                  title="已开启：将覆盖「已解决/已关闭」单据的费用三列。状态、关闭时间、处理天数、参与人、品牌与创建时间均不会改动；执行前需再次输入确认文字。" />
+      </div>
       <el-upload drag :auto-upload="false" :limit="1" accept=".xlsx,.xls" :on-change="onUpdateImportFile"
                  :on-exceed="onImportExceed" style="margin-top:12px">
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -157,7 +164,7 @@
 
       <div v-if="updateImportPreview" class="import-result">
         <el-alert :type="updateImportPreview.failCount ? 'warning' : 'info'" :closable="false" show-icon
-                  :title="`预演：共 ${updateImportPreview.totalRows} 行，命中 ${updateImportPreview.matchedCount} 行，未命中 ${updateImportPreview.unmatchedCount} 行，将变更 ${updateImportPreview.changedCount} 行，无变化 ${updateImportPreview.unchangedCount} 行，失败 ${updateImportPreview.failCount} 行`" />
+                  :title="`预演：共 ${updateImportPreview.totalRows} 行，命中 ${updateImportPreview.matchedCount} 行，未命中 ${updateImportPreview.unmatchedCount} 行，将变更 ${updateImportPreview.changedCount} 行，无变化 ${updateImportPreview.unchangedCount} 行，失败 ${updateImportPreview.failCount} 行${updateImportPreview.allowClosed ? '（已包含已解决/已关闭单据）' : ''}`" />
         <div v-if="updateImportPreview.preview?.length" class="preview-block">
           <div class="preview-title">变更预览（最多展示 200 行）</div>
           <el-table :data="updateImportPreview.preview" size="small" border max-height="260">
@@ -251,6 +258,7 @@ const updateImporting = ref(false)
 const updateImportFileRaw = ref<File | null>(null)
 const updateImportPreview = ref<any>(null)
 const updateImportResult = ref<any>(null)
+const updateImportAllowClosed = ref(false)
 
 onMounted(async () => {
   await loadOptions()
@@ -378,7 +386,14 @@ function openUpdateImport() {
   updateImportFileRaw.value = null
   updateImportPreview.value = null
   updateImportResult.value = null
+  updateImportAllowClosed.value = false
   updateImportVisible.value = true
+}
+
+// 切换「允许修正已关闭单据」后，旧预演结果不再适用，需重新预览。
+function onAllowClosedChange() {
+  updateImportPreview.value = null
+  updateImportResult.value = null
 }
 
 function onUpdateImportFile(file: any) {
@@ -391,7 +406,7 @@ async function runUpdateImport(dryRun: boolean) {
   if (!updateImportFileRaw.value) return
   updateImporting.value = true
   try {
-    const data: any = await complaintApi.updateImportExcel(updateImportFileRaw.value, dryRun)
+    const data: any = await complaintApi.updateImportExcel(updateImportFileRaw.value, dryRun, updateImportAllowClosed.value)
     if (dryRun) {
       updateImportPreview.value = data
       ElMessage.success(`预演完成：将变更 ${data.changedCount} 行`)
@@ -406,10 +421,29 @@ async function runUpdateImport(dryRun: boolean) {
 }
 
 async function confirmUpdateImport() {
-  try {
-    await ElMessageBox.confirm(`确认按预演结果更新 ${updateImportPreview.value?.changedCount || 0} 条客诉的费用？`, '确认更新', { type: 'warning' })
-  } catch {
-    return
+  const count = updateImportPreview.value?.changedCount || 0
+  if (updateImportAllowClosed.value) {
+    try {
+      await ElMessageBox.prompt(
+        `本次将修正「已解决/已关闭」单据的费用，共 ${count} 条；状态、关闭时间、处理天数与参与人不会改动。请输入「确认修正已关闭单据」继续。`,
+        '高风险操作确认',
+        {
+          type: 'warning',
+          confirmButtonText: '确认执行',
+          cancelButtonText: '取消',
+          inputPlaceholder: '确认修正已关闭单据',
+          inputValidator: (value: string) => value === '确认修正已关闭单据' || '确认文字不匹配，请完整输入「确认修正已关闭单据」'
+        }
+      )
+    } catch {
+      return
+    }
+  } else {
+    try {
+      await ElMessageBox.confirm(`确认按预演结果更新 ${count} 条客诉的费用？`, '确认更新', { type: 'warning' })
+    } catch {
+      return
+    }
   }
   await runUpdateImport(false)
 }
@@ -437,6 +471,8 @@ function statusType(status: string): any {
 .toolbar { display: flex; gap: 8px; margin: 4px 0 12px; flex-wrap: wrap; }
 .muted { color: #909399; margin: 0 4px; }
 .pager { margin-top: 12px; justify-content: flex-end; }
+.allow-closed-block { margin-top: 10px; }
+.allow-closed-block .el-alert { margin-top: 6px; }
 .import-result { margin-top: 14px; }
 .error-list { max-height: 180px; overflow: auto; background: #fafafa; padding: 8px; margin-top: 8px; font-size: 12px; }
 .error-item { color: #f56c6c; line-height: 1.8; }

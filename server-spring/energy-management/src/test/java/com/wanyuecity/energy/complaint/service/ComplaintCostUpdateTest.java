@@ -54,7 +54,7 @@ class ComplaintCostUpdateTest {
                 complaint("CS-202601-001", "pending", "100.00", "200.00", false)));
         stubStatus("pending", "待处理");
 
-        ComplaintService.CostUpdatePlan plan = service.previewCostUpdate("CS-202601-001", null, null, null);
+        ComplaintService.CostUpdatePlan plan = service.previewCostUpdate("CS-202601-001", null, null, null, false);
 
         assertTrue(plan.matched());
         assertFalse(plan.changed());
@@ -68,7 +68,7 @@ class ComplaintCostUpdateTest {
                 complaint("CS-202601-002", "processing", "80.00", "20.00", false)));
         stubStatus("processing", "处理中");
 
-        ComplaintService.CostUpdatePlan plan = service.previewCostUpdate("CS-202601-002", new BigDecimal("50"), null, true);
+        ComplaintService.CostUpdatePlan plan = service.previewCostUpdate("CS-202601-002", new BigDecimal("50"), null, true, false);
 
         assertTrue(plan.changed());
         assertTrue(plan.forcedZero());
@@ -83,12 +83,32 @@ class ComplaintCostUpdateTest {
                 complaint("CS-202601-003", "closed", "10.00", "0.00", false)));
         stubStatus("closed", "已关闭");
 
-        ComplaintService.CostUpdatePlan plan = service.applyCostUpdate("CS-202601-003", new BigDecimal("99"), null, null, null);
+        ComplaintService.CostUpdatePlan plan = service.applyCostUpdate("CS-202601-003", new BigDecimal("99"), null, null, false, null);
 
         assertTrue(plan.matched());
         assertNotNull(plan.blockedReason());
         verify(complaintMapper, never()).updateById(any(CsComplaint.class));
         verify(logMapper, never()).insert(any(CsComplaintLog.class));
+    }
+
+    @Test
+    void closedComplaintIsWritableWhenAllowClosedIsOn() {
+        when(complaintMapper.selectList(any())).thenReturn(List.of(
+                complaint("CS-202601-005", "closed", "10.00", "0.00", false)));
+        stubStatus("closed", "已关闭");
+
+        ComplaintService.CostUpdatePlan plan = service.applyCostUpdate(
+                "CS-202601-005", null, new BigDecimal("9.90"), null, true, null);
+
+        assertTrue(plan.changed());
+        assertTrue(plan.blockedReason() == null);
+        ArgumentCaptor<CsComplaint> captor = ArgumentCaptor.forClass(CsComplaint.class);
+        verify(complaintMapper).updateById(captor.capture());
+        CsComplaint written = captor.getValue();
+        assertEquals(0, written.getMerchantCost().compareTo(new BigDecimal("9.90")));
+        assertEquals(null, written.getStatus());
+        assertEquals(null, written.getClosedAt());
+        assertEquals(null, written.getHandleDays());
     }
 
     @Test
@@ -102,7 +122,7 @@ class ComplaintCostUpdateTest {
         operator.setDisplayName("测试员");
 
         ComplaintService.CostUpdatePlan plan = service.applyCostUpdate(
-                "CS-202601-004", new BigDecimal("30.00"), null, null, operator);
+                "CS-202601-004", new BigDecimal("30.00"), null, null, false, operator);
 
         assertTrue(plan.changed());
         ArgumentCaptor<CsComplaint> captor = ArgumentCaptor.forClass(CsComplaint.class);
@@ -119,7 +139,7 @@ class ComplaintCostUpdateTest {
     void unknownComplaintNoIsNeverCreated() {
         when(complaintMapper.selectList(any())).thenReturn(List.of());
 
-        ComplaintService.CostUpdatePlan plan = service.previewCostUpdate("CS-404", new BigDecimal("1"), null, null);
+        ComplaintService.CostUpdatePlan plan = service.previewCostUpdate("CS-404", new BigDecimal("1"), null, null, false);
 
         assertFalse(plan.matched());
         assertTrue(plan.reason().contains("未找到"));

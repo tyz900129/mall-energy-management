@@ -37,11 +37,11 @@ export const complaintApi = {
     data.append('file', file)
     return http.post(`${base}/import`, data, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 180000 })
   },
-  updateImportExcel: (file: File, dryRun: boolean) => {
+  updateImportExcel: (file: File, dryRun: boolean, allowClosed = false) => {
     const data = new FormData()
     data.append('file', file)
     return http.post(`${base}/import/update`, data, {
-      params: { dryRun },
+      params: { dryRun, allowClosed },
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 180000
     })

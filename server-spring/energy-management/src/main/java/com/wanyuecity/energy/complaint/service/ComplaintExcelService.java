@@ -246,7 +246,8 @@ public class ComplaintExcelService {
      * 按表头名解析费用并更新原单据，不新增记录。
      * 空单元格表示不修改；未命中编号、已解决/已关闭、格式错误均按行失败处理。
      */
-    public ComplaintCostUpdateResult updateImport(MultipartFile file, SysUser operator, boolean dryRun) {
+    public ComplaintCostUpdateResult updateImport(MultipartFile file, SysUser operator, boolean dryRun,
+                                                  boolean allowClosed) {
         if (file == null || file.isEmpty()) throw BizException.badRequest("请选择 Excel 文件");
         List<Map<String, Object>> errors = new ArrayList<>();
         List<Map<String, Object>> preview = new ArrayList<>();
@@ -271,8 +272,8 @@ public class ComplaintExcelService {
                     BigDecimal merchantCost = updateMoney(merchantRaw, "商户承担费用");
                     Boolean noCost = updateFlag(noCostRaw);
                     ComplaintService.CostUpdatePlan plan = dryRun
-                            ? complaintService.previewCostUpdate(complaintNo, companyCost, merchantCost, noCost)
-                            : complaintService.applyCostUpdate(complaintNo, companyCost, merchantCost, noCost, operator);
+                            ? complaintService.previewCostUpdate(complaintNo, companyCost, merchantCost, noCost, allowClosed)
+                            : complaintService.applyCostUpdate(complaintNo, companyCost, merchantCost, noCost, allowClosed, operator);
                     if (!plan.matched()) {
                         unmatched++;
                         addError(errors, i + 1, complaintNo, brand, plan.reason());
@@ -298,6 +299,7 @@ public class ComplaintExcelService {
         }
         ComplaintCostUpdateResult result = new ComplaintCostUpdateResult();
         result.setDryRun(dryRun);
+        result.setAllowClosed(allowClosed);
         result.setTotalRows(total);
         result.setMatchedCount(matched);
         result.setUnmatchedCount(unmatched);

@@ -9,6 +9,7 @@ import com.wanyuecity.energy.complaint.service.dto.ComplaintQuery;
 import com.wanyuecity.energy.complaint.service.dto.ComplaintRequest;
 import com.wanyuecity.energy.complaint.service.dto.ComplaintStatsQuery;
 import com.wanyuecity.energy.core.ApiResponse;
+import com.wanyuecity.energy.core.BizException;
 import com.wanyuecity.energy.system.entity.SysUser;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -283,13 +284,25 @@ public class ComplaintController {
     /**
      * 更新导入（费用修正）：按客诉编号更新公司承担费用/商户承担费用/无需承担费用。
      * 默认 dryRun=true，仅预演不写库；正式执行需显式传 dryRun=false。
+     * allowClosed=true 允许修正已解决/已关闭单据，但仅费用三列，且需额外具备
+     * complaint.import.force 权限（仅有 complaint.import 时返回 403）。
      */
     @PostMapping("/import/update")
     @PreAuthorize("hasAuthority('complaint.import')")
     public ApiResponse<?> updateImport(@RequestParam("file") MultipartFile file,
                                        @RequestParam(value = "dryRun", defaultValue = "true") boolean dryRun,
+                                       @RequestParam(value = "allowClosed", defaultValue = "false") boolean allowClosed,
                                        Authentication auth) {
-        return ApiResponse.ok(excelService.updateImport(file, service.currentUser(auth.getName()), dryRun));
+        if (allowClosed && !hasAuthority(auth, "complaint.import.force")) {
+            throw BizException.forbidden("缺少「客诉导入-已关闭单据修正」权限（complaint.import.force），"
+                    + "无法修正已解决/已关闭单据的费用");
+        }
+        return ApiResponse.ok(excelService.updateImport(file, service.currentUser(auth.getName()), dryRun, allowClosed));
+    }
+
+    private boolean hasAuthority(Authentication auth, String code) {
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> code.equals(a.getAuthority()));
     }
 
     @GetMapping("/import/errors/{token}")
