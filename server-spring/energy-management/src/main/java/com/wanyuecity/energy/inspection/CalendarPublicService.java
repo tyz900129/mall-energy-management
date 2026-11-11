@@ -88,7 +88,7 @@ public class CalendarPublicService {
                         "assignee_status='ASSIGNED' WHERE id=? AND status NOT IN ('COMPLETED','CLOSED','CANCELLED')",
                 issues.isEmpty() ? "COMPLETED" : "PENDING_RECTIFICATION",
                 jsonText(body.get("result")), limit(text(body, "summary"), 1000), name,
-                name, name, blankToNull(phone), cleanLimit(ip, 64), cleanLimit(userAgent, 255), lateMinutes, id);
+                name, name, name, blankToNull(phone), cleanLimit(ip, 64), cleanLimit(userAgent, 255), lateMinutes, id);
         if (updated == 0) {
             Map<String,Object> latest = requireTask(token);
             if (latest.get("submitted_at") != null) return view(latest);
