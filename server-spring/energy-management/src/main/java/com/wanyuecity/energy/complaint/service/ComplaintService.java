@@ -215,6 +215,118 @@ public class ComplaintService {
         return detail(id);
     }
 
+    // ================= 更新导入（费用修正） =================
+
+    /** 更新导入预演：只读计算改前改后，不写库。 */
+    public CostUpdatePlan previewCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost, Boolean noCost) {
+        return planCostUpdate(complaintNo, companyCost, merchantCost, noCost);
+    }
+
+    /** 更新导入执行：单行独立事务，仅更新费用三列并写审计日志。 */
+    @Transactional
+    public CostUpdatePlan applyCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost,
+                                          Boolean noCost, SysUser operator) {
+        CostUpdatePlan plan = planCostUpdate(complaintNo, companyCost, merchantCost, noCost);
+        if (!plan.matched() || plan.blockedReason() != null || !plan.changed()) return plan;
+        CsComplaint update = new CsComplaint();
+        update.setId(plan.id());
+        update.setCompanyCost(plan.newCompanyCost());
+        update.setMerchantCost(plan.newMerchantCost());
+        update.setNoCost(plan.newNoCost());
+        complaintMapper.updateById(update);
+        log(plan.id(), "import_update", plan.status(), plan.status(), operator, truncate(plan.note(), 500));
+        return plan;
+    }
+
+    /**
+     * 单行差异计算：空值表示不修改；无需承担费用=是时两项费用按规则归零；
+     * 已解决/已关闭单据仅返回拒绝原因，不改动任何数据。
+     */
+    private CostUpdatePlan planCostUpdate(String complaintNo, BigDecimal companyCost, BigDecimal merchantCost, Boolean noCost) {
+        String no = complaintNo == null ? "" : complaintNo.trim();
+        if (no.isEmpty()) return CostUpdatePlan.unmatched("客诉编号不能为空");
+        List<CsComplaint> found = complaintMapper.selectList(new LambdaQueryWrapper<CsComplaint>()
+                .eq(CsComplaint::getComplaintNo, no));
+        if (found.isEmpty()) return CostUpdatePlan.unmatched("未找到客诉编号：" + no);
+        if (found.size() > 1) return CostUpdatePlan.unmatched("客诉编号不唯一：" + no);
+        CsComplaint c = found.get(0);
+
+        BigDecimal oldCompany = nz(c.getCompanyCost());
+        BigDecimal oldMerchant = nz(c.getMerchantCost());
+        Boolean oldNoCost = Boolean.TRUE.equals(c.getNoCost());
+        BigDecimal newCompany = companyCost == null ? oldCompany : companyCost;
+        BigDecimal newMerchant = merchantCost == null ? oldMerchant : merchantCost;
+        Boolean newNoCost = noCost == null ? oldNoCost : noCost;
+        if (Boolean.TRUE.equals(newNoCost)) {
+            newCompany = BigDecimal.ZERO;
+            newMerchant = BigDecimal.ZERO;
+        }
+
+        List<Map<String, Object>> changes = new ArrayList<>();
+        if (!oldNoCost.equals(newNoCost)) {
+            changes.add(change("noCost", "无需承担费用", oldNoCost ? "是" : "否", newNoCost ? "是" : "否"));
+        }
+        if (!sameMoney(oldCompany, newCompany)) {
+            changes.add(change("companyCost", "公司承担费用", oldCompany, newCompany));
+        }
+        if (!sameMoney(oldMerchant, newMerchant)) {
+            changes.add(change("merchantCost", "商户承担费用", oldMerchant, newMerchant));
+        }
+        boolean changed = !changes.isEmpty();
+        String blocked = null;
+        if ("resolved".equals(c.getStatus()) || "closed".equals(c.getStatus())) {
+            blocked = "客诉「" + no + "」当前状态为「" + statusLabel(c.getStatus()) + "」，已解决/已关闭单据不允许更新费用";
+        }
+        return new CostUpdatePlan(true, null, c.getId(), c.getComplaintNo(), c.getBrandName(), c.getStatus(),
+                statusLabel(c.getStatus()), blocked, changed, newCompany, newMerchant, newNoCost,
+                Boolean.TRUE.equals(newNoCost), changes, changed ? buildCostUpdateNote(changes, newNoCost) : null);
+    }
+
+    private String buildCostUpdateNote(List<Map<String, Object>> changes, Boolean newNoCost) {
+        StringBuilder note = new StringBuilder("更新导入");
+        if (Boolean.TRUE.equals(newNoCost)) note.append("（无需承担费用=是，公司/商户费用按规则归零）");
+        note.append("：");
+        for (Map<String, Object> change : changes) {
+            note.append(change.get("label")).append(' ').append(change.get("from")).append('→')
+                    .append(change.get("to")).append('；');
+        }
+        return note.toString();
+    }
+
+    private Map<String, Object> change(String field, String label, Object from, Object to) {
+        Map<String, Object> change = new LinkedHashMap<>();
+        change.put("field", field);
+        change.put("label", label);
+        change.put("from", from);
+        change.put("to", to);
+        return change;
+    }
+
+    private static BigDecimal nz(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static boolean sameMoney(BigDecimal left, BigDecimal right) {
+        return nz(left).compareTo(nz(right)) == 0;
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null || value.length() <= max) return value;
+        return value.substring(0, max);
+    }
+
+    /** 更新导入单行计划：matched=false 表示编号未命中；blockedReason 非空表示状态保护拒绝。 */
+    public record CostUpdatePlan(boolean matched, String reason, Long id, String complaintNo, String brandName,
+                                 String status, String statusLabel, String blockedReason, boolean changed,
+                                 BigDecimal newCompanyCost, BigDecimal newMerchantCost, Boolean newNoCost,
+                                 boolean forcedZero, List<Map<String, Object>> changes, String note) {
+
+        static CostUpdatePlan unmatched(String reason) {
+            return new CostUpdatePlan(false, reason, null, null, null, null, null, null, false,
+                    null, null, null, false, List.of(), null);
+        }
+    }
+
     @Transactional
     public Map<String, Object> changeStatus(Long id, String target, String note, SysUser operator, Long scopeUserId) {
         requireVisible(id, scopeUserId);

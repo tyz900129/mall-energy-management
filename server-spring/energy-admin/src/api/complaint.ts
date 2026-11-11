@@ -37,6 +37,15 @@ export const complaintApi = {
     data.append('file', file)
     return http.post(`${base}/import`, data, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 180000 })
   },
+  updateImportExcel: (file: File, dryRun: boolean) => {
+    const data = new FormData()
+    data.append('file', file)
+    return http.post(`${base}/import/update`, data, {
+      params: { dryRun },
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 180000
+    })
+  },
   importErrors: (token: string) => http.get(`${base}/import/errors/${token}`, { responseType: 'blob' }),
   export: (params: Record<string, any>) => http.get(`${base}/export`, { params, responseType: 'blob' }),
   statsOverview: (params: Record<string, any>) => http.get(`${base}/stats/overview`, { params }),

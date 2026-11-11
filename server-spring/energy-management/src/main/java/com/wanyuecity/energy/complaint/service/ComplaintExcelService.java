@@ -1,6 +1,7 @@
 package com.wanyuecity.energy.complaint.service;
 
 import com.wanyuecity.energy.complaint.entity.CsStaff;
+import com.wanyuecity.energy.complaint.service.dto.ComplaintCostUpdateResult;
 import com.wanyuecity.energy.complaint.service.dto.ComplaintImportResult;
 import com.wanyuecity.energy.complaint.service.dto.ComplaintQuery;
 import com.wanyuecity.energy.complaint.service.dto.ComplaintRequest;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -38,6 +40,16 @@ public class ComplaintExcelService {
             "渠道", "案例内容", "解决方案", "公司承担费用", "商户承担费用", "无需承担费用(是/否)", "现场解决(是/否)",
             "经办人", "责任商管", "满意度", "状态"};
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    /** 更新导入必需列：缺少任一列整批拒绝。 */
+    private static final List<String> UPDATE_REQUIRED_COLUMNS = List.of("complaintNo", "companyCost", "merchantCost", "noCost");
+    private static final Map<String, String> UPDATE_HEADER_LABELS = Map.of(
+            "complaintNo", "客诉编号", "companyCost", "公司承担费用",
+            "merchantCost", "商户承担费用", "noCost", "无需承担费用");
+    /** 规范化表头名 -> 列键，兼容「导出明细」与「导入模板」两套表头。 */
+    private static final Map<String, String> UPDATE_HEADER_ALIASES = updateHeaderAliases();
+    private static final int UPDATE_HEADER_SCAN_ROWS = 10;
+    private static final int UPDATE_PREVIEW_LIMIT = 200;
 
     private final JdbcTemplate jdbc;
     private final ComplaintService complaintService;
@@ -225,6 +237,200 @@ public class ComplaintExcelService {
                 set(row, 2, String.valueOf(error.get("reason")));
             }
             download(wb, response, "客诉导入错误明细.xlsx");
+        }
+    }
+
+    // ================= 更新导入（仅费用三列） =================
+
+    /**
+     * 按表头名解析费用并更新原单据，不新增记录。
+     * 空单元格表示不修改；未命中编号、已解决/已关闭、格式错误均按行失败处理。
+     */
+    public ComplaintCostUpdateResult updateImport(MultipartFile file, SysUser operator, boolean dryRun) {
+        if (file == null || file.isEmpty()) throw BizException.badRequest("请选择 Excel 文件");
+        List<Map<String, Object>> errors = new ArrayList<>();
+        List<Map<String, Object>> preview = new ArrayList<>();
+        int total = 0, matched = 0, unmatched = 0, changed = 0, unchanged = 0, success = 0;
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+            UpdateLayout layout = locateUpdateHeaders(sheet, fmt);
+            for (int i = layout.headerRow() + 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+                String complaintNo = cellText(row, layout.column("complaintNo"), fmt);
+                String companyRaw = cellText(row, layout.column("companyCost"), fmt);
+                String merchantRaw = cellText(row, layout.column("merchantCost"), fmt);
+                String noCostRaw = cellText(row, layout.column("noCost"), fmt);
+                if (complaintNo.isBlank() && companyRaw.isBlank() && merchantRaw.isBlank() && noCostRaw.isBlank()) continue;
+                total++;
+                String brand = cellText(row, layout.column("brand"), fmt);
+                try {
+                    if (complaintNo.isBlank()) throw BizException.badRequest("客诉编号不能为空");
+                    BigDecimal companyCost = updateMoney(companyRaw, "公司承担费用");
+                    BigDecimal merchantCost = updateMoney(merchantRaw, "商户承担费用");
+                    Boolean noCost = updateFlag(noCostRaw);
+                    ComplaintService.CostUpdatePlan plan = dryRun
+                            ? complaintService.previewCostUpdate(complaintNo, companyCost, merchantCost, noCost)
+                            : complaintService.applyCostUpdate(complaintNo, companyCost, merchantCost, noCost, operator);
+                    if (!plan.matched()) {
+                        unmatched++;
+                        addError(errors, i + 1, complaintNo, brand, plan.reason());
+                    } else if (plan.blockedReason() != null) {
+                        matched++;
+                        addError(errors, i + 1, complaintNo, brand, plan.blockedReason());
+                    } else if (plan.changed()) {
+                        matched++;
+                        changed++;
+                        success++;
+                        if (preview.size() < UPDATE_PREVIEW_LIMIT) preview.add(previewRow(i + 1, plan));
+                    } else {
+                        matched++;
+                        unchanged++;
+                        success++;
+                    }
+                } catch (Exception ex) {
+                    addError(errors, i + 1, complaintNo, brand, rootMessage(ex));
+                }
+            }
+        } catch (IOException ex) {
+            throw BizException.badRequest("Excel 读取失败：" + rootMessage(ex));
+        }
+        ComplaintCostUpdateResult result = new ComplaintCostUpdateResult();
+        result.setDryRun(dryRun);
+        result.setTotalRows(total);
+        result.setMatchedCount(matched);
+        result.setUnmatchedCount(unmatched);
+        result.setChangedCount(changed);
+        result.setUnchangedCount(unchanged);
+        result.setSuccessCount(dryRun ? 0 : success);
+        result.setFailCount(errors.size());
+        result.setErrors(errors.size() > 100 ? errors.subList(0, 100) : errors);
+        result.setPreview(preview);
+        if (!errors.isEmpty()) result.setErrorToken(cacheErrors(errors));
+        return result;
+    }
+
+    /** 在前 10 行内定位表头：取必需列命中最多的一行。 */
+    private UpdateLayout locateUpdateHeaders(Sheet sheet, DataFormatter fmt) {
+        int lastRow = Math.min(sheet.getLastRowNum(), UPDATE_HEADER_SCAN_ROWS - 1);
+        UpdateLayout best = null;
+        int bestScore = 0;
+        for (int r = 0; r <= lastRow; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            Map<String, Integer> columns = new LinkedHashMap<>();
+            int score = 0;
+            for (int c = 0; c < row.getLastCellNum(); c++) {
+                String canonical = UPDATE_HEADER_ALIASES.get(headerKey(cellText(row, c, fmt)));
+                if (canonical == null || columns.containsKey(canonical)) continue;
+                columns.put(canonical, c);
+                if (UPDATE_REQUIRED_COLUMNS.contains(canonical)) score++;
+            }
+            if (score > bestScore) {
+                best = new UpdateLayout(r, columns);
+                bestScore = score;
+                if (score == UPDATE_REQUIRED_COLUMNS.size()) break;
+            }
+        }
+        if (best == null || bestScore == 0) {
+            throw BizException.badRequest("未能识别表头：请使用系统「导出明细」文件，或按「下载导入模板」的表头填写");
+        }
+        List<String> missing = new ArrayList<>();
+        for (String key : UPDATE_REQUIRED_COLUMNS) {
+            if (best.column(key) < 0) missing.add(UPDATE_HEADER_LABELS.get(key));
+        }
+        if (!missing.isEmpty()) {
+            throw BizException.badRequest("表头缺少必需列：" + String.join("、", missing)
+                    + "。可用表头：客诉编号、公司承担费用、商户承担费用、无需承担费用");
+        }
+        return best;
+    }
+
+    private Map<String, Object> previewRow(int excelRow, ComplaintService.CostUpdatePlan plan) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("row", excelRow);
+        row.put("complaintNo", plan.complaintNo());
+        row.put("brandName", plan.brandName());
+        row.put("statusLabel", plan.statusLabel());
+        row.put("forcedZero", plan.forcedZero());
+        row.put("changes", plan.changes());
+        return row;
+    }
+
+    private void addError(List<Map<String, Object>> errors, int row, String complaintNo, String brand, String reason) {
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("row", row);
+        error.put("complaintNo", complaintNo);
+        error.put("brand", brand == null || brand.isBlank() ? complaintNo : brand);
+        error.put("reason", reason);
+        errors.add(error);
+    }
+
+    private String cacheErrors(List<Map<String, Object>> errors) {
+        String token = UUID.randomUUID().toString().replace("-", "");
+        errorCache.put(token, errors);
+        if (errorCache.size() > 50) {
+            Iterator<String> keys = errorCache.keySet().iterator();
+            if (keys.hasNext()) errorCache.remove(keys.next());
+        }
+        return token;
+    }
+
+    /** 费用列严格解析：空白返回 null 表示不修改；负数与非数字直接报错。 */
+    private BigDecimal updateMoney(String raw, String label) {
+        String value = raw == null ? "" : raw.trim().replace(",", "").replace("，", "")
+                .replace("￥", "").replace("¥", "").replace("元", "");
+        if (value.isBlank()) return null;
+        BigDecimal amount;
+        try {
+            amount = new BigDecimal(value);
+        } catch (NumberFormatException ex) {
+            throw BizException.badRequest(label + "格式不正确: " + raw);
+        }
+        if (amount.signum() < 0) throw BizException.badRequest(label + "不能为负数: " + raw);
+        return amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** 无需承担费用为三态：空白=不修改，是/否=写入。 */
+    private Boolean updateFlag(String raw) {
+        String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        if (value.isEmpty()) return null;
+        if (List.of("是", "1", "true", "y", "yes", "√").contains(value)) return true;
+        if (List.of("否", "0", "false", "n", "no", "×").contains(value)) return false;
+        throw BizException.badRequest("无需承担费用仅支持填写 是/否（留空表示不修改）: " + raw);
+    }
+
+    private static Map<String, String> updateHeaderAliases() {
+        Map<String, String> aliases = new LinkedHashMap<>();
+        putAliases(aliases, "complaintNo", "客诉编号", "客诉编号(可选)", "客诉单号", "编号", "单号", "complaint_no", "complaintNo");
+        putAliases(aliases, "companyCost", "公司承担费用", "公司承担", "公司费用", "公司承担金额", "company_cost", "companyCost");
+        putAliases(aliases, "merchantCost", "商户承担费用", "商户承担", "商户费用", "商户承担金额", "merchant_cost", "merchantCost");
+        putAliases(aliases, "noCost", "无需承担费用", "无需承担费用(是/否)", "无需承担", "无费用", "no_cost", "noCost");
+        putAliases(aliases, "brand", "品牌", "品牌/铺位名称", "品牌/铺位", "品牌名称");
+        return Collections.unmodifiableMap(aliases);
+    }
+
+    private static void putAliases(Map<String, String> aliases, String canonical, String... names) {
+        for (String name : names) aliases.put(headerKey(name), canonical);
+    }
+
+    /** 表头规范化：去空格、去括号说明、忽略大小写与分隔符。 */
+    private static String headerKey(String raw) {
+        if (raw == null) return "";
+        String value = raw.replace('\u3000', ' ').trim().toLowerCase(Locale.ROOT);
+        value = value.replaceAll("[（(][^）)]*[)）]", "");
+        return value.replaceAll("[\\s_\\-:：/、]", "");
+    }
+
+    private static String cellText(Row row, int index, DataFormatter fmt) {
+        return index < 0 ? "" : text(row, index, fmt);
+    }
+
+    private record UpdateLayout(int headerRow, Map<String, Integer> columns) {
+        int column(String key) {
+            Integer index = columns.get(key);
+            return index == null ? -1 : index;
         }
     }
 

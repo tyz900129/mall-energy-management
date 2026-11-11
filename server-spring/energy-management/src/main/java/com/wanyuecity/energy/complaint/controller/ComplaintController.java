@@ -280,6 +280,18 @@ public class ComplaintController {
         return ApiResponse.ok(excelService.importFile(file, service.currentUser(auth.getName())));
     }
 
+    /**
+     * 更新导入（费用修正）：按客诉编号更新公司承担费用/商户承担费用/无需承担费用。
+     * 默认 dryRun=true，仅预演不写库；正式执行需显式传 dryRun=false。
+     */
+    @PostMapping("/import/update")
+    @PreAuthorize("hasAuthority('complaint.import')")
+    public ApiResponse<?> updateImport(@RequestParam("file") MultipartFile file,
+                                       @RequestParam(value = "dryRun", defaultValue = "true") boolean dryRun,
+                                       Authentication auth) {
+        return ApiResponse.ok(excelService.updateImport(file, service.currentUser(auth.getName()), dryRun));
+    }
+
     @GetMapping("/import/errors/{token}")
     @PreAuthorize("hasAuthority('complaint.import')")
     public void errors(@PathVariable String token, HttpServletResponse response) throws IOException {

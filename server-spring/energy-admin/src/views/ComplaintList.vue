@@ -65,6 +65,7 @@
         <el-button v-if="can('complaint.create')" @click="copyQuickLink">复制移动登记链接</el-button>
         <el-button v-if="can('complaint.import')" @click="importVisible = true">导入历史数据</el-button>
         <el-button v-if="can('complaint.import')" @click="downloadTemplate">下载导入模板</el-button>
+        <el-button v-if="can('complaint.import')" @click="openUpdateImport">更新导入</el-button>
         <el-button v-if="can('complaint.export')" @click="exportList">导出明细</el-button>
       </div>
 
@@ -144,6 +145,64 @@
         <el-button type="primary" :loading="importing" :disabled="!importFileRaw" @click="doImport">开始导入</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="updateImportVisible" title="更新导入（费用修正）" width="760px" append-to-body>
+      <el-alert type="warning" :closable="false" show-icon
+                title="仅更新「公司承担费用 / 商户承担费用 / 无需承担费用」三列，按表头名识别列；空单元格表示不修改；已解决/已关闭单据不支持更新，未命中编号的行不会新增。" />
+      <el-upload drag :auto-upload="false" :limit="1" accept=".xlsx,.xls" :on-change="onUpdateImportFile"
+                 :on-exceed="onImportExceed" style="margin-top:12px">
+        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+        <div class="el-upload__text">拖拽 Excel 到此处，或<em>点击选择</em></div>
+      </el-upload>
+
+      <div v-if="updateImportPreview" class="import-result">
+        <el-alert :type="updateImportPreview.failCount ? 'warning' : 'info'" :closable="false" show-icon
+                  :title="`预演：共 ${updateImportPreview.totalRows} 行，命中 ${updateImportPreview.matchedCount} 行，未命中 ${updateImportPreview.unmatchedCount} 行，将变更 ${updateImportPreview.changedCount} 行，无变化 ${updateImportPreview.unchangedCount} 行，失败 ${updateImportPreview.failCount} 行`" />
+        <div v-if="updateImportPreview.preview?.length" class="preview-block">
+          <div class="preview-title">变更预览（最多展示 200 行）</div>
+          <el-table :data="updateImportPreview.preview" size="small" border max-height="260">
+            <el-table-column prop="row" label="Excel行" width="80" />
+            <el-table-column prop="complaintNo" label="编号" width="140" />
+            <el-table-column prop="brandName" label="品牌" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="statusLabel" label="状态" width="90" />
+            <el-table-column label="改前 → 改后" min-width="240">
+              <template #default="{ row }">
+                <div v-for="item in row.changes" :key="item.field" class="change-item">
+                  {{ item.label }}：{{ item.from }} → {{ item.to }}
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <div v-if="updateImportPreview.errors?.length" class="error-list">
+          <div v-for="item in updateImportPreview.errors" :key="item.row" class="error-item">
+            第 {{ item.row }} 行（{{ item.complaintNo || item.brand || '-' }}）：{{ item.reason }}
+          </div>
+        </div>
+        <el-button v-if="updateImportPreview.errorToken" type="warning" plain style="margin-top:8px"
+                   @click="downloadUpdateErrors">下载错误行明细</el-button>
+      </div>
+
+      <div v-if="updateImportResult" class="import-result">
+        <el-alert :type="updateImportResult.failCount ? 'warning' : 'success'" :closable="false" show-icon
+                  :title="`更新完成：成功 ${updateImportResult.successCount} 行，失败 ${updateImportResult.failCount} 行，其中费用变更 ${updateImportResult.changedCount} 行`" />
+        <div v-if="updateImportResult.errors?.length" class="error-list">
+          <div v-for="item in updateImportResult.errors" :key="item.row" class="error-item">
+            第 {{ item.row }} 行（{{ item.complaintNo || item.brand || '-' }}）：{{ item.reason }}
+          </div>
+        </div>
+        <el-button v-if="updateImportResult.errorToken" type="warning" plain style="margin-top:8px"
+                   @click="downloadUpdateErrors">下载错误行明细</el-button>
+      </div>
+
+      <template #footer>
+        <el-button @click="updateImportVisible = false">关闭</el-button>
+        <el-button :loading="updateImporting" :disabled="!updateImportFileRaw" @click="runUpdateImport(true)">预览变更</el-button>
+        <el-button type="primary" :loading="updateImporting"
+                   :disabled="!updateImportFileRaw || !updateImportPreview || updateImportPreview.changedCount === 0 || !!updateImportResult"
+                   @click="confirmUpdateImport">确认执行</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -186,6 +245,12 @@ const importVisible = ref(false)
 const importing = ref(false)
 const importFileRaw = ref<File | null>(null)
 const importResult = ref<any>(null)
+
+const updateImportVisible = ref(false)
+const updateImporting = ref(false)
+const updateImportFileRaw = ref<File | null>(null)
+const updateImportPreview = ref<any>(null)
+const updateImportResult = ref<any>(null)
 
 onMounted(async () => {
   await loadOptions()
@@ -309,6 +374,53 @@ async function downloadErrors() {
   saveBlob(blob, '客诉导入错误明细.xlsx')
 }
 
+function openUpdateImport() {
+  updateImportFileRaw.value = null
+  updateImportPreview.value = null
+  updateImportResult.value = null
+  updateImportVisible.value = true
+}
+
+function onUpdateImportFile(file: any) {
+  updateImportFileRaw.value = file.raw
+  updateImportPreview.value = null
+  updateImportResult.value = null
+}
+
+async function runUpdateImport(dryRun: boolean) {
+  if (!updateImportFileRaw.value) return
+  updateImporting.value = true
+  try {
+    const data: any = await complaintApi.updateImportExcel(updateImportFileRaw.value, dryRun)
+    if (dryRun) {
+      updateImportPreview.value = data
+      ElMessage.success(`预演完成：将变更 ${data.changedCount} 行`)
+    } else {
+      updateImportResult.value = data
+      ElMessage.success(`更新完成：成功 ${data.successCount} 行，失败 ${data.failCount} 行`)
+      load()
+    }
+  } finally {
+    updateImporting.value = false
+  }
+}
+
+async function confirmUpdateImport() {
+  try {
+    await ElMessageBox.confirm(`确认按预演结果更新 ${updateImportPreview.value?.changedCount || 0} 条客诉的费用？`, '确认更新', { type: 'warning' })
+  } catch {
+    return
+  }
+  await runUpdateImport(false)
+}
+
+async function downloadUpdateErrors() {
+  const token = updateImportResult.value?.errorToken || updateImportPreview.value?.errorToken
+  if (!token) return
+  const blob: any = await complaintApi.importErrors(token)
+  saveBlob(blob, '客诉更新导入错误明细.xlsx')
+}
+
 function money(value: any) {
   return Number(value || 0).toFixed(2)
 }
@@ -328,6 +440,9 @@ function statusType(status: string): any {
 .import-result { margin-top: 14px; }
 .error-list { max-height: 180px; overflow: auto; background: #fafafa; padding: 8px; margin-top: 8px; font-size: 12px; }
 .error-item { color: #f56c6c; line-height: 1.8; }
+.preview-block { margin-top: 10px; }
+.preview-title { font-size: 12px; color: #606266; margin: 6px 0; }
+.change-item { font-size: 12px; line-height: 1.7; }
 
 @media (max-width: 768px) {
   .page { padding: 0; }
