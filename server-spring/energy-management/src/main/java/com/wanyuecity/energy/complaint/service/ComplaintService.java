@@ -70,6 +70,9 @@ public class ComplaintService {
         int pageSize = q.getPageSize() == null || q.getPageSize() < 1 ? 20 : Math.min(q.getPageSize(), 500);
         Filter filter = filter(q, scopeUserId);
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM cs_complaint c " + filter.where(), Long.class, filter.args().toArray());
+        BigDecimal totalCost = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(CASE WHEN c.no_cost=1 THEN 0 ELSE c.company_cost+c.merchant_cost END),0) FROM cs_complaint c " + filter.where(),
+                BigDecimal.class, filter.args().toArray());
         List<Object> args = new ArrayList<>(filter.args());
         args.add(pageSize);
         args.add((pageNum - 1) * pageSize);
@@ -78,6 +81,7 @@ public class ComplaintService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("records", rows);
         result.put("total", total == null ? 0 : total);
+        result.put("totalCost", totalCost == null ? BigDecimal.ZERO : totalCost);
         result.put("current", pageNum);
         result.put("size", pageSize);
         return result;

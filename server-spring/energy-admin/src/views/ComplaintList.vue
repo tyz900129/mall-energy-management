@@ -100,9 +100,12 @@
         </el-table-column>
       </el-table>
 
-      <el-pagination class="pager" background layout="total, sizes, prev, pager, next" :total="total"
-                     :page-sizes="[10, 20, 50, 100]" v-model:current-page="pageNum" v-model:page-size="pageSize"
-                     @current-change="load" @size-change="load" />
+      <div class="pager-bar">
+        <span class="cost-total">筛选合计：<b>{{ money(totalCost) }}</b> 元</span>
+        <el-pagination class="pager" background layout="total, sizes, prev, pager, next" :total="total"
+                       :page-sizes="[10, 20, 50, 100]" v-model:current-page="pageNum" v-model:page-size="pageSize"
+                       @current-change="load" @size-change="load" />
+      </div>
     </el-card>
 
     <ComplaintFormDrawer v-model="drawerVisible" :complaint-id="editingId" @saved="load" />
@@ -232,6 +235,7 @@ const can = (code: string) => userStore.hasPermission(code)
 const loading = ref(false)
 const rows = ref<any[]>([])
 const total = ref(0)
+const totalCost = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(20)
 const dateRange = ref<string[]>([])
@@ -303,6 +307,7 @@ async function load() {
     const data: any = await complaintApi.page(params())
     rows.value = data.records || []
     total.value = data.total || 0
+    totalCost.value = Number(data.totalCost || 0)
   } finally { loading.value = false }
 }
 
@@ -480,7 +485,10 @@ function statusType(status: string): any {
 .filter-form { margin-bottom: 4px; }
 .toolbar { display: flex; gap: 8px; margin: 4px 0 12px; flex-wrap: wrap; }
 .muted { color: #909399; margin: 0 4px; }
-.pager { margin-top: 12px; justify-content: flex-end; }
+.pager { margin-top: 0; justify-content: flex-end; }
+.pager-bar { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 12px; }
+.cost-total { font-size: 13px; color: #606266; white-space: nowrap; }
+.cost-total b { font-size: 15px; color: #303133; }
 .allow-closed-block { margin-top: 10px; }
 .preview-summary { margin-top: 10px; font-size: 13px; color: #606266; }
 .allow-closed-block .el-alert { margin-top: 6px; }
@@ -500,6 +508,7 @@ function statusType(status: string): any {
   .filter-form :deep(.el-date-editor),
   .filter-form :deep(.el-input-number) { width: 100% !important; }
   .toolbar .el-button { margin-left: 0; }
+  .pager-bar { justify-content: center; flex-wrap: wrap; }
   .pager { justify-content: center; }
 }
 </style>
