@@ -92,7 +92,7 @@ const router=useRouter()
 const total = ref(0)
 const loading = ref(false)
 const submitting = ref(false)
-const exporting=ref(false),importing=ref(false),fileInput=ref<HTMLInputElement>();const userStore=useUserStore();const isAdmin=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(r)));const isSuperAdmin=computed(()=>userStore.user?.roles?.includes('SUPER_ADMIN'));const canExport=computed(()=>isAdmin.value||userStore.user?.roles?.includes('VIEWER'))
+const exporting=ref(false),importing=ref(false),fileInput=ref<HTMLInputElement>();const userStore=useUserStore();const isAdmin=computed(()=>userStore.hasPermission('stall.import_export'));const isSuperAdmin=computed(()=>userStore.hasPermission('stall.delete'));const canExport=computed(()=>userStore.hasPermission('stall.import_export'))
 type StallDictionaryType='FLOOR'|'BUSINESS_TYPE';const dictionaries=reactive<Record<StallDictionaryType,DictionaryItem[]>>({FLOOR:[],BUSINESS_TYPE:[]})
 function dictLabel(type:StallDictionaryType,value:string){return dictionaries[type].find(d=>d.itemValue===value)?.itemLabel||value||'-'}
 const page = reactive({ pageNum: 1, pageSize: 20 })

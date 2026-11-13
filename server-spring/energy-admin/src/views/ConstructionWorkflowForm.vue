@@ -87,8 +87,10 @@ const typeOptions = [
   { value: 'MERCHANT_CONSTRUCTION_ENTRY', label: '施工入场申请' },
   { value: 'MERCHANT_CONSTRUCTION_EXIT', label: '撤场施工申请' }
 ]
-const isPropertyRole = computed(() => !!userStore.user?.roles?.some((role: string) => ['PROPERTY_MANAGER', 'DEVICE_VERIFIER'].includes(role)))
-const isCommercialRole = computed(() => !!userStore.user?.roles?.some((role: string) => ['APPLICANT', 'OPS_PATROL_MANAGER'].includes(role)))
+const canInspect = computed(() => ['construction.inspect.engineering', 'construction.inspect.security', 'construction.inspect.cleaning'].some(p => userStore.hasPermission(p)))
+const canAssign = computed(() => userStore.hasPermission('ops.patrol.assign'))
+const isPropertyRole = computed(() => canInspect.value && !canAssign.value)
+const isCommercialRole = computed(() => canAssign.value && !canInspect.value)
 const selectedPropertyId = ref<number>()
 const selectedCommercialId = ref<number>()
 const propertyContacts = ref<any[]>([])

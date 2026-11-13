@@ -169,7 +169,7 @@ const isMobile = useIsMobile()
 const user = useUserStore()
 const canAssign = computed(() => user.hasPermission('ops.patrol.assign'))
 const canReview = computed(() => user.hasPermission('ops.patrol.review'))
-const isSuperAdmin = computed(() => !!user.user?.roles?.includes('SUPER_ADMIN'))
+const isSuperAdmin = computed(() => user.hasPermission('ops.patrol.assign'))
 
 const depts = ref<any[]>([])
 const floors = ref<any[]>([])

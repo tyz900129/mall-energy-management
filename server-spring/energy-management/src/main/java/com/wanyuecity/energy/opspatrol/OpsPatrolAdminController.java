@@ -1,7 +1,6 @@
 package com.wanyuecity.energy.opspatrol;
 
 import com.wanyuecity.energy.core.ApiResponse;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -108,7 +107,6 @@ public class OpsPatrolAdminController {
         return ApiResponse.ok(null);
     }
 
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @DeleteMapping("/tasks/{id}")
     public ApiResponse<Void> deleteTask(@PathVariable Long id) {
         service.deleteTask(id);
@@ -155,7 +153,6 @@ public class OpsPatrolAdminController {
         return ApiResponse.ok(service.reviewIssue(id, pass, body.get("note") == null ? null : body.get("note").toString(), authentication.getName()));
     }
 
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @DeleteMapping("/issues/{id}")
     public ApiResponse<Void> deleteIssue(@PathVariable Long id) {
         service.deleteIssue(id);

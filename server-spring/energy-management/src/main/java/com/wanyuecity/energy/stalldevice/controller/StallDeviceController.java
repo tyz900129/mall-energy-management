@@ -6,7 +6,6 @@ import com.wanyuecity.energy.stalldevice.service.dto.StallDeviceBindRequest;
 import com.wanyuecity.energy.stalldevice.service.dto.StallDeviceView;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +25,6 @@ public class StallDeviceController {
     private final StallDeviceService service;
 
     @PostMapping("/stalls/{stallId}/devices")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<StallDeviceView> bind(@PathVariable Long stallId,
                                              @Valid @RequestBody StallDeviceBindRequest req,
                                              Authentication auth) {
@@ -36,7 +34,6 @@ public class StallDeviceController {
     }
 
     @DeleteMapping("/stalls/{stallId}/devices/{deviceId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<StallDeviceView> unbind(@PathVariable Long stallId,
                                                @PathVariable String deviceId,
                                                Authentication auth) {
@@ -44,13 +41,11 @@ public class StallDeviceController {
     }
 
     @GetMapping("/stalls/{stallId}/devices")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','AUDITOR','VIEWER')")
     public ApiResponse<List<StallDeviceView>> listByStall(@PathVariable Long stallId) {
         return ApiResponse.ok(service.listByStall(stallId));
     }
 
     @GetMapping("/devices/{deviceId}/stall")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','AUDITOR','VIEWER')")
     public ApiResponse<List<StallDeviceView>> listByDevice(@PathVariable String deviceId) {
         return ApiResponse.ok(service.listByDevice(deviceId));
     }
@@ -59,7 +54,6 @@ public class StallDeviceController {
      * spec §17：设备的铺位绑定历史轨迹（含已解绑记录）。
      */
     @GetMapping("/devices/{deviceId}/history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','AUDITOR','VIEWER')")
     public ApiResponse<List<StallDeviceView>> historyByDevice(@PathVariable String deviceId) {
         return ApiResponse.ok(service.historyByDevice(deviceId));
     }

@@ -57,9 +57,9 @@ public class OperationPropertyInspectionService {
 
     public Map<String,Object> form(String token, String username) {
         Map<String,Object> stall = one("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName,s.status stallStatus,s.business_type businessType," +
-                "COALESCE(NULLIF(m.merchant_code,''),'') merchantCode,COALESCE(NULLIF(m.merchant_name,''),s.stall_name) merchantName," +
-                "COALESCE(NULLIF(m.contact_name,''),'') merchantContactName,COALESCE(NULLIF(m.contact_phone,''),'') merchantContactPhone " +
-                "FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id WHERE s.operation_qr_token=?", token);
+                "s.stall_code merchantCode,COALESCE(NULLIF(s.stall_name,''),s.stall_code) merchantName," +
+                "'' merchantContactName,'' merchantContactPhone " +
+                "FROM stall s WHERE s.operation_qr_token=?", token);
         if (!"OCCUPIED".equals(stall.get("stallStatus")) || "CK".equalsIgnoreCase(Objects.toString(stall.get("businessType"), "")))
             throw bad("该铺位不在物业日清检查范围");
         Map<String,Object> user = one("SELECT id,COALESCE(NULLIF(display_name,''),username) inspectorName,COALESCE(phone,'') inspectorPhone FROM sys_user WHERE username=?", username);
@@ -106,8 +106,8 @@ public class OperationPropertyInspectionService {
     @Transactional
     public Map<String, Object> submit(String token, Map<String, Object> body, String username) {
         Map<String, Object> stall = one("SELECT s.id,s.stall_code stallCode,s.floor_name floorName,s.status,s.business_type businessType," +
-                "COALESCE(NULLIF(m.merchant_code,''),'') merchantCode,COALESCE(NULLIF(m.merchant_name,''),s.stall_name) merchantName,COALESCE(NULLIF(m.contact_phone,''),'') merchantPhone " +
-                "FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id WHERE s.operation_qr_token=?", token);
+                "s.stall_code merchantCode,COALESCE(NULLIF(s.stall_name,''),s.stall_code) merchantName,'' merchantPhone " +
+                "FROM stall s WHERE s.operation_qr_token=?", token);
         if (!"OCCUPIED".equals(stall.get("status")) || "CK".equalsIgnoreCase(Objects.toString(stall.get("businessType"), "")))
             throw bad("该铺位不在物业日清检查范围");
         String status = Objects.toString(body.get("status"), "").trim().toUpperCase(Locale.ROOT);

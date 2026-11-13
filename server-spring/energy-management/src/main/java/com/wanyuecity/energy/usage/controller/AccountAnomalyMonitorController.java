@@ -4,7 +4,6 @@ import com.wanyuecity.energy.core.ApiResponse;
 import com.wanyuecity.energy.usage.service.AccountAnomalyMonitorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -14,7 +13,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/energy/account-anomalies")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
 public class AccountAnomalyMonitorController {
     private final AccountAnomalyMonitorService service;
     @GetMapping("/overview") public ApiResponse<Map<String,Object>> overview(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return ApiResponse.ok(service.overview(date));}

@@ -17,7 +17,6 @@ public class OperationFormImageController {
     private final OperationFormImageService service;
     public OperationFormImageController(OperationFormImageService service) { this.service = service; }
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER')")
     public ApiResponse<Map<String,Object>> upload(@RequestParam String qrToken, @RequestParam String formType,
                                                    @RequestParam String fieldCode, @RequestPart("file") MultipartFile file) {
         return ApiResponse.ok(service.upload(qrToken, formType, fieldCode, file));

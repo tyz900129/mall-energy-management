@@ -33,8 +33,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SysDepartmentController {
 
-    private static final String READ_ROLES = "hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')";
-    private static final String MANAGE_ROLES = "hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')";
+    private static final String READ_ROLES = "hasAuthority('system.dept.view')";
+    private static final String MANAGE_ROLES = "hasAuthority('system.dept.manage')";
 
     private final SysDepartmentMapper departmentMapper;
     private final SysDepartmentService departmentService;

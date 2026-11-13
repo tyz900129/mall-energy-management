@@ -580,13 +580,13 @@ public class ComplaintService {
         return userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username).last("LIMIT 1"));
     }
 
-    /** 商管角色（且不具备客服/管理员角色）只能查看自己作为责任商管的单据。 */
+    /** 客诉数据范围：持 complaint.view.all 为全局；APPLICANT（商管课长）默认仅本人责任单据。 */
     public Long scopeUserId(java.util.Collection<? extends org.springframework.security.core.GrantedAuthority> authorities) {
         if (authorities == null) return null;
         boolean manager = false;
         for (var authority : authorities) {
             String code = authority.getAuthority();
-            if (List.of("ROLE_CS_AGENT", "ROLE_CS_MANAGER", "ROLE_SUPER_ADMIN", "ROLE_SYSTEM_ADMIN").contains(code)) return null;
+            if ("complaint.view.all".equals(code)) return null;
             if ("ROLE_APPLICANT".equals(code)) manager = true;
         }
         if (!manager) return null;

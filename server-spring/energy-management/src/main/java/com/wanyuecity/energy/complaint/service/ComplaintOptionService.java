@@ -30,8 +30,8 @@ public class ComplaintOptionService {
         StringBuilder sql = new StringBuilder(STALL_BRAND_SELECT + " WHERE s.status<>'DECOMMISSIONED'");
         if (keyword != null && !keyword.isBlank()) {
             String like = "%" + keyword.trim() + "%";
-            sql.append(" AND (s.stall_name LIKE ? OR s.stall_code LIKE ? OR m.merchant_name LIKE ? OR s.business_category LIKE ?)");
-            for (int i = 0; i < 4; i++) args.add(like);
+            sql.append(" AND (s.stall_name LIKE ? OR s.stall_code LIKE ? OR s.business_category LIKE ?)");
+            for (int i = 0; i < 3; i++) args.add(like);
         }
         if (businessType != null && !businessType.isBlank()) {
             sql.append(" AND s.business_type=?"); args.add(businessType);
@@ -177,8 +177,8 @@ public class ComplaintOptionService {
 
     private static final String STALL_BRAND_SELECT = """
             SELECT s.id stallId, NULL brandId,
-                   COALESCE(NULLIF(m.merchant_name,''), NULLIF(s.stall_name,''), s.stall_code) brandName,
-                   s.stall_code stallCode, s.current_merchant_id merchantId, m.merchant_name merchantName,
+                   COALESCE(NULLIF(s.stall_name,''), s.stall_code) brandName,
+                   s.stall_code stallCode, s.current_merchant_id merchantId, s.stall_name merchantName,
                    s.business_type businessType, COALESCE(d.item_label, s.business_type) businessTypeLabel,
                    s.business_category businessCategory, s.floor_code floorCode,
                    COALESCE(f.item_label, s.floor_code) floorLabel,
@@ -188,7 +188,6 @@ public class ComplaintOptionService {
                      JOIN sys_user u ON u.id=r.responsible_user_id
                      WHERE r.stall_id=s.id AND r.status='ACTIVE' ORDER BY r.id LIMIT 1) responsibleUserName
             FROM stall s
-            LEFT JOIN merchant m ON m.id=s.current_merchant_id
             LEFT JOIN business_dictionary d ON d.dict_type='BUSINESS_TYPE' AND d.item_value=s.business_type
             LEFT JOIN business_dictionary f ON f.dict_type='FLOOR' AND f.item_value=s.floor_code
             """;

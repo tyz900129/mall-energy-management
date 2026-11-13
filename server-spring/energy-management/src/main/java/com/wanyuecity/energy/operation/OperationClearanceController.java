@@ -4,7 +4,6 @@ import com.wanyuecity.energy.core.ApiResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,38 +30,32 @@ public class OperationClearanceController {
     }
 
     @GetMapping("/period")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER')")
     public ApiResponse<Map<String, Object>> period() {
         return ApiResponse.ok(service.currentPeriod());
     }
 
     @GetMapping("/schedule")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER')")
     public ApiResponse<Map<String, Object>> schedule() {
         return ApiResponse.ok(service.settings());
     }
 
     @GetMapping("/settings")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Map<String, Object>> settings() {
         return ApiResponse.ok(service.settings());
     }
 
     @PutMapping("/settings")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Map<String, Object>> updateSettings(@RequestBody Map<String, Object> body, Authentication authentication) {
         return ApiResponse.ok(service.updateSettings(body, authentication.getName()));
     }
 
     @PostMapping("/stall/{token}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','VIEWER')")
     public ApiResponse<Map<String, Object>> submit(@PathVariable String token, @RequestBody Map<String, Object> body,
                                                     Authentication authentication) {
         return ApiResponse.ok(service.submit(token, body, authentication.getName()));
     }
 
     @GetMapping("/stall/{token}/today")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT')")
     public ApiResponse<Map<String, Object>> today(@PathVariable String token, Authentication authentication) {
         boolean unrestricted = authentication.getAuthorities().stream().anyMatch(authority ->
                 authority.getAuthority().equals("ROLE_SUPER_ADMIN") || authority.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
@@ -70,7 +63,6 @@ public class OperationClearanceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','OPS_PATROL_MANAGER','CS_AGENT','CS_MANAGER','AUDITOR')")
     public ApiResponse<Map<String, Object>> page(@RequestParam(defaultValue = "") String keyword,
                                                   @RequestParam(defaultValue = "") String periodDate,
                                                   @RequestParam(defaultValue = "1") int pageNum,
@@ -81,7 +73,6 @@ public class OperationClearanceController {
     }
 
     @GetMapping("/export")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','OPS_PATROL_MANAGER','CS_MANAGER','AUDITOR')")
     public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "") String keyword,
                                          @RequestParam(defaultValue = "") String periodDate,
                                          Authentication authentication) {
@@ -95,9 +86,7 @@ public class OperationClearanceController {
     }
 
     private boolean allScope(Authentication authentication) {
-        Set<String> roles = Set.of("ROLE_SUPER_ADMIN", "ROLE_SYSTEM_ADMIN", "ROLE_DEVICE_VERIFIER",
-                "ROLE_OPS_PATROL_MANAGER", "ROLE_CS_AGENT", "ROLE_CS_MANAGER", "ROLE_AUDITOR");
         return authentication.getAuthorities().stream()
-                .anyMatch(authority -> roles.contains(authority.getAuthority()));
+                .anyMatch(authority -> "operation.clearance.view.all".equals(authority.getAuthority()));
     }
 }

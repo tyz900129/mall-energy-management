@@ -12,7 +12,6 @@ import com.wanyuecity.energy.system.service.dto.UserPermissionProfile;
 import com.wanyuecity.energy.system.service.dto.UserPermissionUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,7 +35,6 @@ public class SysUserAdminController {
     private final PermissionService permissionService;
 
     @GetMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Page<SysUserView>> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer status,
@@ -46,51 +44,43 @@ public class SysUserAdminController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysUserView> get(@PathVariable Long id) {
         return ApiResponse.ok(userService.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysUserView> create(@Valid @RequestBody SysUserUpsertRequest req) {
         return ApiResponse.ok(userService.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysUserView> update(@PathVariable Long id, @Valid @RequestBody SysUserUpsertRequest req) {
         return ApiResponse.ok(userService.update(id, req));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         userService.delete(id);
         return ApiResponse.ok();
     }
 
     @PutMapping("/{id}/password")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> changePassword(@PathVariable Long id, @Valid @RequestBody SysUserPasswordRequest req) {
         userService.changePassword(id, req);
         return ApiResponse.ok();
     }
 
     @PutMapping("/{id}/roles")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysUserView> assignRoles(@PathVariable Long id, @Valid @RequestBody SysUserRoleAssignRequest req) {
         return ApiResponse.ok(userService.assignRoles(id, req.getRoleIds()));
     }
 
     @GetMapping("/{id}/permissions")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<UserPermissionProfile> permissions(@PathVariable Long id) {
         return ApiResponse.ok(permissionService.profile(id));
     }
 
     @PutMapping("/{id}/permissions")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<UserPermissionProfile> updatePermissions(@PathVariable Long id,
                                                                  @Valid @RequestBody UserPermissionUpdateRequest req,
                                                                  Authentication authentication) {

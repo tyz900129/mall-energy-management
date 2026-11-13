@@ -55,7 +55,7 @@ import { energyApi } from '@/api/energy'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime } from '@/utils/format'
 
-const userStore=useUserStore(),canEdit=computed(()=>userStore.user?.roles?.some(role=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(role)))
+const userStore=useUserStore(),canEdit=computed(()=>userStore.hasPermission('energy.bill.manage'))
 const rows=ref<any[]>([]),loading=ref(false),saving=ref(false),dialogVisible=ref(false),editingId=ref<number|null>(null),monthRange=ref<string[]|null>(defaultRange())
 const form=reactive<any>({billMonth:'',electricAmount:null,electricUsage:null,waterAmount:null,waterUsage:null})
 

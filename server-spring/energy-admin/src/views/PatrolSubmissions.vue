@@ -47,7 +47,7 @@ import { ElMessage,ElMessageBox } from 'element-plus'
 import { patrolApi } from '@/api/patrol'
 import { useUserStore } from '@/stores/user'
 const user = useUserStore()
-const isSuperAdmin = computed(() => !!user.user?.roles?.includes('SUPER_ADMIN'))
+const isSuperAdmin = computed(() => user.hasPermission('patrol.delete'))
 const date = ref('')
 const rows = ref<any[]>([])
 const total = ref(0)

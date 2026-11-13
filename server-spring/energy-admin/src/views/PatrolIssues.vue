@@ -134,7 +134,7 @@ const user = useUserStore()
 const route = useRoute()
 const canAssign = computed(() => user.hasPermission('patrol.issue.assign'))
 const canReview = computed(() => user.hasPermission('patrol.issue.review'))
-const isSuperAdmin = computed(() => !!user.user?.roles?.includes('SUPER_ADMIN'))
+const isSuperAdmin = computed(() => user.hasPermission('patrol.delete'))
 const statusOptions = [
   {value:'UNASSIGNED',label:'待分派'},{value:'ASSIGNED',label:'待整改'},{value:'REVIEWING',label:'待复核'},{value:'CLOSED',label:'已闭环'}
 ]

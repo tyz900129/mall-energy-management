@@ -145,7 +145,7 @@ const config = computed(() => configs[systemType.value])
 const tree = ref<FacilityNode[]>([]), nodeTypes = ref<DictionaryItem[]>([]), lineSpecs = ref<DictionaryItem[]>([]), equipmentSpecs = ref<DictionaryItem[]>([]), mediums = ref<DictionaryItem[]>([]), stalls = ref<any[]>([])
 const tab = ref('manage'), visible = ref(false), detailVisible = ref(false), qrVisible = ref(false), qrUrl = ref(''), saving = ref(false), selected = ref<FacilityNode>(), graphScroller = ref<HTMLElement>(), formRef = ref<FormInstance>()
 const form = reactive<any>({})
-const canEdit = computed(() => userStore.user?.roles?.some(role => ['SUPER_ADMIN','SYSTEM_ADMIN'].includes(role)))
+const canEdit = computed(() => ['water','drainage','exhaust','fresh_air'].some(t => userStore.hasPermission(`facility.${t}.manage`)))
 const operatingStatuses = [{value:'NORMAL',label:'正常'},{value:'STOPPED',label:'停用'},{value:'FAULT',label:'故障'},{value:'MAINTENANCE',label:'检修'}]
 const rules = {nodeCode:[{required:true,message:'请输入节点编码'}],nodeName:[{required:true,message:'请输入节点名称'}],nodeType:[{required:true,message:'请选择节点类型'}]}
 

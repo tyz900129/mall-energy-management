@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,32 +35,27 @@ public class FacilityTopologyController {
     @Value("${energy.public-base-url:https://auto.apperload.com}") private String publicBaseUrl;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')")
     public ApiResponse<List<FacilityTopologyNodeView>> tree(@PathVariable String systemType) {
         return ApiResponse.ok(service.tree(systemType));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<FacilityTopologyNodeView> create(@PathVariable String systemType, @Valid @RequestBody FacilityTopologyNodeRequest request) {
         return ApiResponse.ok(service.create(systemType, request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<FacilityTopologyNodeView> update(@PathVariable String systemType, @PathVariable Long id, @Valid @RequestBody FacilityTopologyNodeRequest request) {
         return ApiResponse.ok(service.update(systemType, id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable String systemType, @PathVariable Long id) {
         service.delete(systemType, id);
         return ApiResponse.ok();
     }
 
     @GetMapping(value = "/{id}/qr", produces = MediaType.IMAGE_PNG_VALUE)
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')")
     public ResponseEntity<byte[]> qr(@PathVariable String systemType, @PathVariable Long id) throws Exception {
         service.require(systemType, id);
         String url = publicBaseUrl.replaceAll("/+$", "") + "/facility/" + service.routeSegment(systemType) + "?focus=" + id;

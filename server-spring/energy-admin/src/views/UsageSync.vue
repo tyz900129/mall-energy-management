@@ -124,7 +124,7 @@ import { enumLabel, formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const canEdit = computed(() => userStore.user?.roles?.some(role => ['SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(role)))
+const canEdit = computed(() => userStore.hasPermission('energy.sync.execute'))
 const groups = ref<any[]>([])
 const batches = ref<any[]>([])
 const exclusions = ref<any[]>([])

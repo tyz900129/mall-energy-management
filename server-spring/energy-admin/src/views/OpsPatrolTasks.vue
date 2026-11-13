@@ -158,7 +158,7 @@ const route = useRoute()
 
 const user = useUserStore()
 const canManage = computed(() => user.hasPermission('ops.patrol.config'))
-const isSuperAdmin = computed(() => !!user.user?.roles?.includes('SUPER_ADMIN'))
+const isSuperAdmin = computed(() => user.hasPermission('ops.patrol.delete'))
 const date = ref(localDate())
 const depts = ref<any[]>([])
 const slots = ref<any[]>([])

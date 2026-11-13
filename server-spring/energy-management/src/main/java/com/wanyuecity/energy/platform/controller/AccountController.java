@@ -16,7 +16,6 @@ import com.wanyuecity.energy.stalldevice.mapper.StallDeviceMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashSet;
@@ -35,7 +34,6 @@ public class AccountController {
     private final JdbcTemplate jdbc;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','PLATFORM_OPERATOR','AUDITOR','VIEWER')")
     public ApiResponse<Page<PlatformAccountView>> list(@RequestParam(required=false) String keyword,
             @RequestParam(defaultValue="false") boolean showDisabled,
             @RequestParam(defaultValue="1") int pageNum,@RequestParam(defaultValue="20") int pageSize) {
@@ -51,7 +49,6 @@ public class AccountController {
 
     /** 申请人按完整六位商户代码查询账户基础信息；不提供模糊检索或编辑能力。 */
     @GetMapping("/merchant-code/{merchantCode}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER')")
     public ApiResponse<List<PlatformAccountView>> findByMerchantCode(@PathVariable String merchantCode) {
         String code = merchantCode == null ? "" : merchantCode.trim();
         if (!code.matches("\\d{6}")) throw BizException.badRequest("商户代码必须是连续六位数字");
@@ -64,7 +61,6 @@ public class AccountController {
     }
 
     @PutMapping("/{accountNumber}/merchant-code")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> saveMerchantCode(@PathVariable String accountNumber,@RequestBody MerchantCodeRequest req,Authentication auth){
         String code=req.getMerchantCode()==null?null:req.getMerchantCode().trim();
         if(code!=null&&code.isEmpty())code=null;

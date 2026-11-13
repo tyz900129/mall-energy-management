@@ -91,8 +91,7 @@ const inspectionSummary = ref<Record<string, number>>({})
 const accessSummary = ref<Record<string, number>>({})
 const lastUpdated = ref('')
 const can = (permission: string) => userStore.hasPermission(permission)
-const roles = computed(() => userStore.user?.roles || [])
-const canReadBaseStats = computed(() => roles.value.some(role => ['SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(role)))
+const canReadBaseStats = computed(() => userStore.hasPermission('dashboard.stats.base.view'))
 const hasModuleIndicators = computed(() => can('workflow.view') || can('inspection.dashboard.view') || can('access.dashboard.view'))
 const businessTimeZone = 'Asia/Shanghai'
 function formatBeijingDateTime(date: Date) {
