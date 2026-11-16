@@ -6,7 +6,6 @@ import com.wanyuecity.energy.system.entity.AuditLog;
 import com.wanyuecity.energy.system.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,7 +21,6 @@ public class AuditLogController {
     private final AuditLogService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
     public ApiResponse<Page<AuditLog>> page(
             @RequestParam(required = false) String operator,
             @RequestParam(required = false) String businessType,

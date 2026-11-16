@@ -5,7 +5,6 @@ import com.wanyuecity.energy.platform.service.PlatformSyncService;
 import com.wanyuecity.energy.platform.service.dto.SyncBatchView;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +20,6 @@ public class PlatformSyncController {
     private final PlatformSyncService service;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<SyncBatchView> run(Authentication auth) {
         Long userId = null;
         if (auth != null && auth.getName() != null) {
@@ -37,7 +35,6 @@ public class PlatformSyncController {
     }
 
     @GetMapping("/batches")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
     public ApiResponse<Page<SyncBatchView>> listBatches(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize) {
@@ -45,7 +42,6 @@ public class PlatformSyncController {
     }
 
     @GetMapping("/latest")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
     public ApiResponse<SyncBatchView> latest() {
         return ApiResponse.ok(service.latestBatch());
     }

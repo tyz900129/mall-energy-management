@@ -8,7 +8,6 @@ import com.wanyuecity.energy.merchant.service.dto.MerchantView;
 import com.wanyuecity.energy.platform.service.MerchantCodeExtractor;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,7 +25,6 @@ public class MerchantController {
     private final MerchantService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER')")
     public ApiResponse<Page<MerchantView>> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
@@ -36,25 +34,21 @@ public class MerchantController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','VIEWER')")
     public ApiResponse<MerchantView> get(@PathVariable Long id) {
         return ApiResponse.ok(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<MerchantView> create(@Valid @RequestBody MerchantUpsertRequest req) {
         return ApiResponse.ok(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<MerchantView> update(@PathVariable Long id, @Valid @RequestBody MerchantUpsertRequest req) {
         return ApiResponse.ok(service.update(id, req));
     }
 
     @GetMapping("/code-preview")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT')")
     public ApiResponse<MerchantCodeExtractor.Match> preview(@RequestParam("name") String name) {
         return ApiResponse.ok(service.previewCode(name));
     }
@@ -64,7 +58,6 @@ public class MerchantController {
      * 包含已绑定的本地铺位、关联的源平台账户列表。
      */
     @GetMapping("/code/{code}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','AUDITOR','VIEWER')")
     public ApiResponse<MerchantView> getByCode(@PathVariable("code") String code) {
         return ApiResponse.ok(service.getByCode(code));
     }

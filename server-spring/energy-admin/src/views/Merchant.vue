@@ -30,7 +30,7 @@ import {accountApi} from '@/api/merchant'
 import {formatDateTime} from '@/utils/format'
 import {ElMessage} from 'element-plus'
 import {useUserStore} from '@/stores/user'
-const userStore=useUserStore(),isAdmin=computed(()=>userStore.user?.roles?.some(r=>['SUPER_ADMIN','SYSTEM_ADMIN'].includes(r)))
+const userStore=useUserStore(),isAdmin=computed(()=>userStore.hasPermission('merchant.manage'))
 const rows=ref<any[]>([]),total=ref(0),loading=ref(false),hideDisabled=ref(true)
 const codeDialog=ref(false),saving=ref(false),editing=ref<any>(null),merchantCode=ref('')
 const page=reactive({pageNum:1,pageSize:20}),query=reactive({keyword:''})

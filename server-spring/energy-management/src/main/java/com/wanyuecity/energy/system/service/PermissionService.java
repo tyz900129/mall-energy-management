@@ -9,20 +9,17 @@ import com.wanyuecity.energy.system.service.dto.UserPermissionProfile;
 import com.wanyuecity.energy.system.service.dto.UserPermissionUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -43,44 +40,13 @@ public class PermissionService {
         return result;
     }
 
-    /** 角色默认权限（含超级管理员短路）再按所属部门裁剪。 */
+    /**
+     * 角色默认权限：角色授权（sys_role_permission）是唯一权威来源。
+     * V107 起取消部门裁剪，V108 起超级管理员/系统管理员也通过角色授权显式持有权限，
+     * 不再有任何代码内特判来源，满足「有效权限 = 角色权限 ∪ 用户 ALLOW − 用户 DENY」。
+     */
     private Set<String> basePermissionCodes(Long userId) {
-        List<String> roles = roleCodes(userId);
-        Set<String> codes = new LinkedHashSet<>();
-        if (roles.contains("SUPER_ADMIN")) {
-            codes.addAll(allEnabledPermissionCodes());
-        } else if (roles.contains("SYSTEM_ADMIN")) {
-            codes.addAll(allEnabledPermissionCodes());
-            codes.removeIf(code -> code.startsWith("system.user.") || "construction.delete".equals(code));
-        } else {
-            codes.addAll(rolePermissionCodes(userId));
-        }
-        DepartmentInfo department = department(userId);
-        // 超级管理员/系统管理员已是全量权限，不受部门裁剪影响
-        if (roles.contains("SUPER_ADMIN") || roles.contains("SYSTEM_ADMIN")) return codes;
-        if (department != null) {
-            // 裁剪策略来自 sys_dept_permission_policy，沿 ancestors 取最近策略；无策略则不裁剪
-            Predicate<String> matcher = DeptPermissionPolicy.matcher(deptPermissionRules(department));
-            if (matcher != null) codes.removeIf(code -> !matcher.test(code));
-        }
-        return codes;
-    }
-
-    /** 加载该部门最近一组启用策略（部门自身优先，其次逐级向上）。 */
-    private List<DeptPermissionPolicy.Rule> deptPermissionRules(DepartmentInfo department) {
-        List<Long> chain = DeptPermissionPolicy.selfFirstChain(department.id(), department.ancestors());
-        if (chain.isEmpty()) return List.of();
-        String placeholders = String.join(",", Collections.nCopies(chain.size(), "?"));
-        Map<Long, List<DeptPermissionPolicy.Rule>> byDept = new LinkedHashMap<>();
-        jdbcTemplate.query("SELECT department_id, mode, include_pattern, exclude_pattern " +
-                        "FROM sys_dept_permission_policy WHERE enabled = 1 AND department_id IN (" + placeholders + ") ORDER BY id",
-                (RowCallbackHandler) rs -> byDept.computeIfAbsent(rs.getLong("department_id"), ignored -> new ArrayList<>())
-                        .add(new DeptPermissionPolicy.Rule(
-                                "PREFIX".equalsIgnoreCase(rs.getString("mode"))
-                                        ? DeptPermissionPolicy.Mode.PREFIX : DeptPermissionPolicy.Mode.EXACT,
-                                rs.getString("include_pattern"), rs.getString("exclude_pattern"))),
-                chain.toArray());
-        return DeptPermissionPolicy.nearestRules(chain, byDept);
+        return new LinkedHashSet<>(rolePermissionCodes(userId));
     }
 
     public DepartmentInfo department(Long userId) {
@@ -92,15 +58,6 @@ public class PermissionService {
                         rs.getString("ancestors")),
                 userId);
         return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    private List<String> roleCodes(Long userId) {
-        return jdbcTemplate.queryForList("SELECT DISTINCT r.code FROM sys_role r " +
-                "JOIN sys_user_role ur ON ur.role_id = r.id WHERE ur.user_id = ?", String.class, userId);
-    }
-
-    private List<String> allEnabledPermissionCodes() {
-        return jdbcTemplate.queryForList("SELECT code FROM sys_permission WHERE enabled = 1", String.class);
     }
 
     /** 全量权限目录（按模块分组），供个人权限与角色默认权限共用。 */

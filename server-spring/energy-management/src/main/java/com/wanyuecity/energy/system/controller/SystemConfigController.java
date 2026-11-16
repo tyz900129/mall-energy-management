@@ -6,7 +6,6 @@ import com.wanyuecity.energy.system.service.SystemConfigService;
 import com.wanyuecity.energy.system.service.dto.SystemConfigUpsertRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,19 +25,16 @@ public class SystemConfigController {
     private final SystemConfigService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<List<SystemConfig>> list(@RequestParam(required = false) String keyword) {
         return ApiResponse.ok(service.list(keyword));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<SystemConfig> upsert(@Valid @RequestBody SystemConfigUpsertRequest req) {
         return ApiResponse.ok(service.upsert(req));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ApiResponse.ok();

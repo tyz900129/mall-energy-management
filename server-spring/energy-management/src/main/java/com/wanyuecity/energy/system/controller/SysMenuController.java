@@ -6,7 +6,6 @@ import com.wanyuecity.energy.system.service.dto.SysMenuNode;
 import com.wanyuecity.energy.system.service.dto.SysMenuUpsertRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,25 +25,21 @@ public class SysMenuController {
     private final SysMenuService menuService;
 
     @GetMapping("/tree")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<List<SysMenuNode>> tree() {
         return ApiResponse.ok(menuService.tree());
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<SysMenuNode> create(@Valid @RequestBody SysMenuUpsertRequest req) {
         return ApiResponse.ok(menuService.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<SysMenuNode> update(@PathVariable Long id, @Valid @RequestBody SysMenuUpsertRequest req) {
         return ApiResponse.ok(menuService.update(id, req));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         menuService.delete(id);
         return ApiResponse.ok();

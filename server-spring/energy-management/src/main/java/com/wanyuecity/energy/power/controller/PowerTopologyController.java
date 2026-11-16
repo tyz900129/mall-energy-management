@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -24,11 +23,11 @@ import java.util.List;
 public class PowerTopologyController {
  private final PowerTopologyService service;
  @Value("${energy.public-base-url:https://auto.apperload.com}") private String publicBaseUrl;
- @GetMapping @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')") public ApiResponse<List<PowerTopologyNodeView>> tree(){return ApiResponse.ok(service.tree());}
- @PostMapping @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<PowerTopologyNodeView> create(@Valid @RequestBody PowerTopologyNodeRequest r){return ApiResponse.ok(service.create(r));}
- @PutMapping("/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<PowerTopologyNodeView> update(@PathVariable Long id,@Valid @RequestBody PowerTopologyNodeRequest r){return ApiResponse.ok(service.update(id,r));}
- @DeleteMapping("/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')") public ApiResponse<Void> delete(@PathVariable Long id){service.delete(id);return ApiResponse.ok(null);}
- @GetMapping(value="/{id}/qr",produces=MediaType.IMAGE_PNG_VALUE) @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','DEVICE_VERIFIER','VIEWER')")
+ @GetMapping public ApiResponse<List<PowerTopologyNodeView>> tree(){return ApiResponse.ok(service.tree());}
+ @PostMapping public ApiResponse<PowerTopologyNodeView> create(@Valid @RequestBody PowerTopologyNodeRequest r){return ApiResponse.ok(service.create(r));}
+ @PutMapping("/{id}") public ApiResponse<PowerTopologyNodeView> update(@PathVariable Long id,@Valid @RequestBody PowerTopologyNodeRequest r){return ApiResponse.ok(service.update(id,r));}
+ @DeleteMapping("/{id}") public ApiResponse<Void> delete(@PathVariable Long id){service.delete(id);return ApiResponse.ok(null);}
+ @GetMapping(value="/{id}/qr",produces=MediaType.IMAGE_PNG_VALUE) 
  public ResponseEntity<byte[]> qr(@PathVariable Long id) throws Exception {
   service.require(id);
   String url=publicBaseUrl.replaceAll("/+$","")+"/power/topology?focus="+id;

@@ -17,7 +17,7 @@ class WorkflowControllerAccessTest {
 
     @Test
     void systemAdministratorCanAccessAllWorkflows() {
-        assertFalse(WorkflowController.ownOnly(auth("ROLE_SYSTEM_ADMIN", "workflow.view", "workflow.create")));
+        assertFalse(WorkflowController.ownOnly(auth("ROLE_SYSTEM_ADMIN", "workflow.view.all", "workflow.view", "workflow.create")));
     }
 
     @Test

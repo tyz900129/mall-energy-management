@@ -9,7 +9,6 @@ import com.wanyuecity.energy.system.service.dto.SysRoleUpsertRequest;
 import com.wanyuecity.energy.system.service.dto.SysRoleView;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,50 +28,42 @@ public class SysRoleController {
     private final SysRoleService roleService;
 
     @GetMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<List<SysRoleView>> list() {
         return ApiResponse.ok(roleService.list());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRoleView> get(@PathVariable Long id) {
         return ApiResponse.ok(roleService.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRoleView> create(@Valid @RequestBody SysRoleUpsertRequest req) {
         return ApiResponse.ok(roleService.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRoleView> update(@PathVariable Long id, @Valid @RequestBody SysRoleUpsertRequest req) {
         return ApiResponse.ok(roleService.update(id, req));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         roleService.delete(id);
         return ApiResponse.ok();
     }
 
     @PutMapping("/{id}/menus")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRoleView> assignMenus(@PathVariable Long id, @Valid @RequestBody SysRoleMenuAssignRequest req) {
         return ApiResponse.ok(roleService.assignMenus(id, req.getMenuIds()));
     }
 
     @GetMapping("/{id}/permissions")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRolePermissionView> permissions(@PathVariable Long id) {
         return ApiResponse.ok(roleService.permissions(id));
     }
 
     @PutMapping("/{id}/permissions")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<SysRolePermissionView> assignPermissions(
             @PathVariable Long id, @RequestBody SysRolePermissionAssignRequest req) {
         return ApiResponse.ok(roleService.assignPermissions(id, req));

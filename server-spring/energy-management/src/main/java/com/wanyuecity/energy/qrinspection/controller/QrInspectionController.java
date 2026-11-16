@@ -21,8 +21,9 @@ public class QrInspectionController {
 
     private final QrInspectionService service;
 
+    /** 提交类接口：持任一巡检查看/联合巡检提交/物业提交/整改权限即可（覆盖 WY、QD、RD 前缀的岗位角色）。 */
     private static final String SUBMIT_ROLES =
-            "hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','OPS_PATROL_MANAGER','PROPERTY_MANAGER','DEVICE_VERIFIER')";
+            "hasAnyAuthority('qr.inspection.view','qr.inspection.submit.joint','qr.inspection.submit.warehouse','qr.rectify')";
 
     // ======= 扫码入口（H5） =======
 
@@ -76,8 +77,6 @@ public class QrInspectionController {
     }
 
     @GetMapping("/departments")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','OPS_PATROL_MANAGER','PROPERTY_MANAGER','DEVICE_VERIFIER') "
-            + "or hasAuthority('qr.inspection.config') or hasAuthority('qr.inspection.plan.manage') or hasAuthority('qr.inspection.view')")
     public ApiResponse<List<Map<String, Object>>> departments() {
         return ApiResponse.ok(service.listDepartments());
     }
@@ -85,13 +84,13 @@ public class QrInspectionController {
     // ======= 模板配置（PC 后台，直接修改不升版本） =======
 
     @GetMapping("/templates")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('qr.inspection.config')")
+    @PreAuthorize("hasAuthority('qr.inspection.config')")
     public ApiResponse<List<QrInspectionTemplate>> templates(@RequestParam(required = false) String scene) {
         return ApiResponse.ok(service.listTemplates(scene));
     }
 
     @PostMapping("/templates")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('qr.inspection.config')")
+    @PreAuthorize("hasAuthority('qr.inspection.config')")
     public ApiResponse<QrInspectionTemplate> saveTemplate(
             @RequestBody QrInspectionTemplate t, Authentication auth) {
         return ApiResponse.ok(service.saveTemplate(t, auth.getName()));
@@ -106,7 +105,7 @@ public class QrInspectionController {
     }
 
     @PostMapping("/plans")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('qr.inspection.plan.manage')")
+    @PreAuthorize("hasAuthority('qr.inspection.plan.manage')")
     public ApiResponse<QrInspectionPlan> savePlan(@RequestBody QrInspectionPlan p) {
         return ApiResponse.ok(service.savePlan(p));
     }
@@ -132,7 +131,7 @@ public class QrInspectionController {
     }
 
     @PostMapping("/joint/create")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('qr.inspection.task.create')")
+    @PreAuthorize("hasAuthority('qr.inspection.task.create')")
     public ApiResponse<QrInspectionTask> createJoint(
             @RequestBody Map<String, Object> body, Authentication auth) {
         QrInspectionTask t = new QrInspectionTask();
@@ -148,7 +147,7 @@ public class QrInspectionController {
     }
 
     @PostMapping("/tasks/{id}/close")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('qr.inspection.task.create')")
+    @PreAuthorize("hasAuthority('qr.inspection.task.create')")
     public ApiResponse<Void> closeTask(@PathVariable Long id, Authentication auth) {
         service.closeJoint(id, auth.getName());
         return ApiResponse.ok(null);
@@ -175,6 +174,8 @@ public class QrInspectionController {
     }
 
     // ======= 巡检记录查询（仅超级管理员 / 系统管理员） =======
+    // 说明：现有权限目录没有「巡检记录台账」专属权限码，为避免把全量巡检记录放开给所有 qr.inspection.view
+    // 持有者，这里暂时保留角色判断；路径级映射已收敛为 qr.inspection.view，待后续新增台账权限码后替换。
 
     @GetMapping("/records")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")

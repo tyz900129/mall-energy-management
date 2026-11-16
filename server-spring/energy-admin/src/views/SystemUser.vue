@@ -103,7 +103,7 @@ import { useUserStore } from '@/stores/user'
 const userStore=useUserStore()
 const canUserManage=userStore.hasPermission('system.user.manage')
 const canPermissionManage=userStore.hasPermission('system.user.permission.manage')
-const canManageRoles=computed(()=>((userStore.user as any)?.roles||[]).includes('SUPER_ADMIN'))
+const canManageRoles=computed(()=>userStore.hasPermission('system.user.permission.manage'))
 const assignableRoles=computed(()=>roles.value.filter((r:any)=>r.isAssignable!==0))
 const roleDrawerVisible=ref(false)
 async function reloadRoles(){roles.value=await systemRoleApi.list() as any}

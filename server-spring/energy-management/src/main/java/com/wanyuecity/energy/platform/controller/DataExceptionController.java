@@ -7,7 +7,6 @@ import com.wanyuecity.energy.platform.service.DataExceptionService;
 import com.wanyuecity.energy.platform.service.dto.DataExceptionHandleRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,7 +17,6 @@ public class DataExceptionController {
     private final DataExceptionService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','VIEWER')")
     public ApiResponse<Page<DataException>> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String severity,
@@ -31,7 +29,6 @@ public class DataExceptionController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN')")
     public ApiResponse<DataException> handle(@PathVariable Long id,
                                               @Valid @RequestBody DataExceptionHandleRequest req,
                                               Authentication auth) {

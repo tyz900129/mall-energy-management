@@ -11,7 +11,11 @@ import java.util.function.Predicate;
 /**
  * 部门权限裁剪策略的纯逻辑：解析祖先链、选取最近策略、判定权限码是否保留。
  * 不依赖 Spring/JDBC，便于单独验证；数据加载见 {@link PermissionService}。
+ *
+ * @deprecated V107 起取消部门权限裁剪（角色/岗位授权为唯一权威来源），
+ *             本类不再参与鉴权，仅保留历史逻辑与单测；不要再新增调用方。
  */
+@Deprecated(forRemoval = false)
 public final class DeptPermissionPolicy {
 
     public enum Mode { PREFIX, EXACT }

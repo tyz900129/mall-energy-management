@@ -9,7 +9,7 @@ import com.wanyuecity.energy.stall.mapper.StallMapper;
 import com.wanyuecity.energy.system.entity.SysUser;
 import com.wanyuecity.energy.system.mapper.SysUserMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
-import com.wanyuecity.energy.system.service.SysUserService;
+import com.wanyuecity.energy.system.service.PermissionService;
 import com.wanyuecity.energy.workflow.entity.ConstructionAcceptance;
 import com.wanyuecity.energy.workflow.entity.ConstructionInspection;
 import com.wanyuecity.energy.workflow.entity.ConstructionWorkflowDetail;
@@ -46,7 +46,7 @@ public class ConstructionWorkflowService {
     private final ConstructionWorkflowDetailMapper detailMapper;
     private final StallMapper stallMapper;
     private final SysUserMapper userMapper;
-    private final SysUserService userService;
+    private final PermissionService permissionService;
     private final JdbcTemplate jdbc;
     private final ConstructionInspectionMapper inspectionMapper;
     private final ConstructionAcceptanceMapper acceptanceMapper;
@@ -340,25 +340,34 @@ public class ConstructionWorkflowService {
         String name = text(user.getDisplayName()) ? user.getDisplayName().trim() : user.getUsername();
         String phone = trim(user.getPhone());
         if (!text(phone)) throw BizException.badRequest("当前用户未维护联系电话，请先联系管理员完善用户资料");
-        Set<String> roles = Set.copyOf(userService.findRoleCodes(user.getId()));
-        if (roles.contains("PROPERTY_MANAGER") || roles.contains("DEVICE_VERIFIER")) {
+        Set<String> perms = permissionService.effectivePermissionCodes(user.getId());
+        boolean canInspect = perms.contains("construction.inspect.security") || perms.contains("construction.inspect.engineering") || perms.contains("construction.inspect.cleaning");
+        boolean canAssign = perms.contains("ops.patrol.assign");
+        if (canInspect && !canAssign) {
             detail.setPropertyEngineerName(name); detail.setPropertyEngineerPhone(phone);
             detail.setCommercialManagerName(required(req.getCommercialManagerName(), "请选择或填写商管负责人"));
             detail.setCommercialManagerPhone(required(req.getCommercialManagerPhone(), "请填写商管负责人电话"));
-        } else {
+        } else if (canAssign && !canInspect) {
             detail.setCommercialManagerName(name); detail.setCommercialManagerPhone(phone);
             detail.setPropertyEngineerName(required(req.getPropertyEngineerName(), "请选择或填写物业部工程专员"));
             detail.setPropertyEngineerPhone(required(req.getPropertyEngineerPhone(), "请填写工程专员电话"));
+        } else {
+            // 管理员或同时具备两类权限：以申请中填写的双方负责人为准
+            detail.setPropertyEngineerName(required(req.getPropertyEngineerName(), "请选择或填写物业部工程专员"));
+            detail.setPropertyEngineerPhone(required(req.getPropertyEngineerPhone(), "请填写工程专员电话"));
+            detail.setCommercialManagerName(required(req.getCommercialManagerName(), "请选择或填写商管负责人"));
+            detail.setCommercialManagerPhone(required(req.getCommercialManagerPhone(), "请填写商管负责人电话"));
         }
     }
 
-    /** 施工申请内部联系人候选：PROPERTY=物业管理员；COMMERCIAL=商管人员/商管主管。 */
+    /** 施工申请内部联系人候选：PROPERTY=具备工程巡检权限的物业人员；COMMERCIAL=具备派工权限的商管人员。 */
     public List<Map<String,Object>> contactOptions(String side){
-        String codes = "PROPERTY".equalsIgnoreCase(side) ? "'PROPERTY_MANAGER'" : "'APPLICANT','OPS_PATROL_MANAGER'";
+        String permission = "PROPERTY".equalsIgnoreCase(side) ? "construction.inspect.engineering" : "ops.patrol.assign";
         return jdbc.queryForList("SELECT u.id,u.display_name displayName,u.phone FROM sys_user u "
-                + "JOIN sys_user_role ur ON ur.user_id=u.id JOIN sys_role r ON r.id=ur.role_id "
-                + "WHERE u.status=1 AND r.code IN (" + codes + ") "
-                + "GROUP BY u.id,u.display_name,u.phone ORDER BY u.display_name");
+                + "JOIN sys_user_role ur ON ur.user_id=u.id JOIN sys_role_permission rp ON rp.role_id=ur.role_id "
+                + "JOIN sys_permission p ON p.id=rp.permission_id "
+                + "WHERE u.status=1 AND p.enabled=1 AND p.code=? "
+                + "GROUP BY u.id,u.display_name,u.phone ORDER BY u.display_name", permission);
     }
 
     private String required(String value, String message) { if (!text(value)) throw BizException.badRequest(message); return value.trim(); }

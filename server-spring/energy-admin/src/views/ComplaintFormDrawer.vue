@@ -269,7 +269,7 @@ async function loadDetail(id: number) {
 
 /** 历史参与人补充到下拉选项，保证回显姓名（名单已停用时也能正常显示）。 */
 function mergeStaff(target: any, rows: any[]) {
-  const list: any[] = target.value
+  const list: any[] = target.value;
   (rows || []).forEach((u: any) => {
     if (u && u.staffId && !list.some((s: any) => s.id === u.staffId)) {
       list.push({ id: u.staffId, staffName: u.userName })

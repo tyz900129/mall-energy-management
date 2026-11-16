@@ -7,7 +7,6 @@ import com.wanyuecity.energy.platform.entity.PlatformDeviceCurrent;
 import com.wanyuecity.energy.platform.mapper.PlatformDeviceCurrentMapper;
 import com.wanyuecity.energy.platform.service.dto.PlatformDeviceView;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,7 +31,6 @@ public class DeviceController {
      * <p>{@code bound} 状态可选：null=全部，{@code true}=已绑定 stall，{@code false}=未绑定。
      */
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','AUDITOR','VIEWER')")
     public ApiResponse<Page<PlatformDeviceView>> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String energyType,
@@ -66,7 +64,6 @@ public class DeviceController {
     }
 
     @GetMapping("/{deviceId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','SYSTEM_ADMIN','APPLICANT','DEVICE_VERIFIER','AUDITOR','VIEWER')")
     public ApiResponse<PlatformDeviceView> get(@PathVariable String deviceId) {
         PlatformDeviceCurrent d = deviceMapper.selectOne(new QueryWrapper<PlatformDeviceCurrent>()
                 .eq("platform_device_id", deviceId)

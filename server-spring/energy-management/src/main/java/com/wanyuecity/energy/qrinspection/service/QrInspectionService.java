@@ -128,6 +128,18 @@ public class QrInspectionService {
         return null;
     }
 
+    /**
+     * 岗位即角色：WY、QD、RD、NT 前缀的岗位角色没有历史角色别名，
+     * 按所属部门分组兜底，保证这些岗位可以提交对应场景的巡检。
+     */
+    private String roleGroupOfUser(UserInfo u) {
+        String byRole = roleGroupOf(u.roles);
+        if (byRole != null) return byRole;
+        if ("PROPERTY".equals(u.deptGroup)) return "PROPERTY";
+        if ("OPERATION".equals(u.deptGroup)) return "COMMERCIAL";
+        return null;
+    }
+
     /** 商管按处室负责楼层过滤；物业/管理员返回 null 表示全量 */
     private List<String> scopeFloors(UserInfo u) {
         if (u.opsDeptId == null) return null;
@@ -142,7 +154,7 @@ public class QrInspectionService {
 
     private String normalizeScene(String scene, UserInfo u) {
         if (scene != null && !scene.isBlank()) return scene;
-        String rg = roleGroupOf(u.roles);
+        String rg = roleGroupOfUser(u);
         if ("COMMERCIAL".equals(rg)) return SCENE_WH_COMM;
         if ("PROPERTY".equals(rg))   return SCENE_WH_PROP;
         return null;
@@ -177,7 +189,7 @@ public class QrInspectionService {
     public List<Map<String, Object>> searchStalls(String keyword, String scene, Authentication auth) {
         UserInfo u = userInfo(auth);
         if (u.departmentId == null && !isAdmin(u)) throw BizException.forbidden("当前账号未绑定部门");
-        String rg = roleGroupOf(u.roles);
+        String rg = roleGroupOfUser(u);
         if (rg == null && !isAdmin(u)) throw BizException.forbidden("当前账号无巡检权限");
 
         List<String> floors = scopeFloors(u);
@@ -218,7 +230,7 @@ public class QrInspectionService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("deptCode", u.deptCode);
         out.put("deptName", u.deptName);
-        out.put("roleGroup", roleGroupOf(u.roles));
+        out.put("roleGroup", roleGroupOfUser(u));
 
         QrInspectionPlan plan = null;
         QrInspectionTask task = null;
@@ -243,7 +255,7 @@ public class QrInspectionService {
                 sc = plan.getScene();
             }
             tpl = plan != null && plan.getTemplateId() != null ? templateMapper.selectById(plan.getTemplateId())
-                    : pickTemplate(sc, roleGroupOf(u.roles), u.deptCode);
+                    : pickTemplate(sc, roleGroupOfUser(u), u.deptCode);
         }
 
         if (tpl == null) throw BizException.badRequest("未配置巡检模板");
@@ -284,7 +296,7 @@ public class QrInspectionService {
         out.put("stallName", stall.getStallName());
         out.put("floorCode", stall.getFloorCode());
 
-        String rg = roleGroupOf(u.roles);
+        String rg = roleGroupOfUser(u);
         boolean admin = isAdmin(u);
         boolean scoped = inScope(stall, u);
         List<Map<String, Object>> scenes = new ArrayList<>();
@@ -364,7 +376,7 @@ public class QrInspectionService {
 
         String scene = normalizeScene(record.getScene(), u);
         if (scene == null) throw BizException.badRequest("无法识别巡检场景");
-        String rg = roleGroupOf(u.roles);
+        String rg = roleGroupOfUser(u);
 
         QrInspectionTemplate tpl;
         QrInspectionPlan plan = null;

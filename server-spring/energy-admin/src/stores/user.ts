@@ -64,12 +64,8 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('device_login_token')
   }
 
+  /** 权限判定只看后端返回的有效权限码（后端已按「角色权限 ∪ ALLOW − DENY」计算）。 */
   function hasPermission(code: string) {
-    const roles = user.value?.roles || []
-    if (roles.includes('SUPER_ADMIN')) return true
-    if (roles.includes('SYSTEM_ADMIN')) {
-      return !code.startsWith('system.user.') && code !== 'construction.delete'
-    }
     return !!user.value?.permissions?.includes(code)
   }
 

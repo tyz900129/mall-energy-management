@@ -11,7 +11,6 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
@@ -23,13 +22,11 @@ public class MigrationController {
     private final MigrationService service;
 
     @PostMapping("/exports")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<MigrationService.JobView> export(@Valid @RequestBody PasswordRequest request) {
         return ApiResponse.ok(service.startExport(request.password()));
     }
 
     @GetMapping("/jobs/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<MigrationService.JobView> job(@PathVariable String id) {
         return ApiResponse.ok(service.getJob(id));
     }
@@ -47,27 +44,23 @@ public class MigrationController {
     }
 
     @PostMapping("/imports/uploads")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<MigrationService.UploadView> initializeUpload(@Valid @RequestBody UploadInitRequest request) {
         return ApiResponse.ok(service.initializeUpload(request.fileName(), request.fileSize()));
     }
 
     @PutMapping(value = "/imports/uploads/{id}/chunks/{index}", consumes = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<MigrationService.UploadView> uploadChunk(@PathVariable String id, @PathVariable int index,
                                                                  @RequestBody byte[] bytes) {
         return ApiResponse.ok(service.appendChunk(id, index, bytes));
     }
 
     @PostMapping("/imports/uploads/{id}/validate")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<MigrationService.JobView> validate(@PathVariable String id,
                                                            @Valid @RequestBody PasswordRequest request) {
         return ApiResponse.ok(service.startValidation(id, request.password()));
     }
 
     @PostMapping("/imports/{jobId}/restore")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<MigrationService.JobView> restore(@PathVariable String jobId,
                                                           @Valid @RequestBody RestoreRequest request) {
         return ApiResponse.ok(service.startRestore(jobId, request.confirmation()));

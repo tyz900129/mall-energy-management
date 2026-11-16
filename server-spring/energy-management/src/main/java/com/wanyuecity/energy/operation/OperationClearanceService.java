@@ -67,8 +67,8 @@ public class OperationClearanceService {
         Map<String, Object> period = currentPeriod();
         if (!Boolean.TRUE.equals(period.get("open"))) throw bad(Objects.toString(period.get("message")));
         Map<String, Object> stall = one("SELECT s.id,s.business_type businessType,s.status," +
-                "COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName " +
-                "FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id WHERE s.operation_qr_token=?", token);
+                "COALESCE(NULLIF(s.stall_name,''),s.stall_code) merchantName " +
+                "FROM stall s WHERE s.operation_qr_token=?", token);
         if (!"OCCUPIED".equals(stall.get("status"))) throw bad("当前铺位不是在用状态，不计入日清");
         if ("CK".equalsIgnoreCase(Objects.toString(stall.get("businessType"), ""))) throw bad("仓库类型铺位不需要提交日清");
 
@@ -111,9 +111,8 @@ public class OperationClearanceService {
 
     public Map<String, Object> todayByToken(String token, String username, boolean unrestricted) {
         Map<String, Object> stall = one("SELECT s.id stallId,s.stall_code stallCode,s.floor_name floorName," +
-                "COALESCE(NULLIF(m.merchant_name,''),NULLIF(s.stall_name,''),s.stall_code) merchantName " +
-                "FROM stall s LEFT JOIN merchant m ON m.id=s.current_merchant_id " +
-                "WHERE s.operation_qr_token=? AND s.status<>'DECOMMISSIONED'", token);
+                "COALESCE(NULLIF(s.stall_name,''),s.stall_code) merchantName " +
+                "FROM stall s WHERE s.operation_qr_token=? AND s.status<>'DECOMMISSIONED'", token);
         Long userId = jdbc.queryForObject("SELECT id FROM sys_user WHERE username=?", Long.class, username);
         if (!unrestricted) {
             Integer owned = jdbc.queryForObject("SELECT COUNT(*) FROM operation_merchant_responsibility " +

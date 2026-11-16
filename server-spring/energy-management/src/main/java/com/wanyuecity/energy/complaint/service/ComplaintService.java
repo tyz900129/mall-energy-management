@@ -70,6 +70,9 @@ public class ComplaintService {
         int pageSize = q.getPageSize() == null || q.getPageSize() < 1 ? 20 : Math.min(q.getPageSize(), 500);
         Filter filter = filter(q, scopeUserId);
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM cs_complaint c " + filter.where(), Long.class, filter.args().toArray());
+        BigDecimal totalCost = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(CASE WHEN c.no_cost=1 THEN 0 ELSE c.company_cost+c.merchant_cost END),0) FROM cs_complaint c " + filter.where(),
+                BigDecimal.class, filter.args().toArray());
         List<Object> args = new ArrayList<>(filter.args());
         args.add(pageSize);
         args.add((pageNum - 1) * pageSize);
@@ -78,6 +81,7 @@ public class ComplaintService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("records", rows);
         result.put("total", total == null ? 0 : total);
+        result.put("totalCost", totalCost == null ? BigDecimal.ZERO : totalCost);
         result.put("current", pageNum);
         result.put("size", pageSize);
         return result;
@@ -580,13 +584,13 @@ public class ComplaintService {
         return userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username).last("LIMIT 1"));
     }
 
-    /** 商管角色（且不具备客服/管理员角色）只能查看自己作为责任商管的单据。 */
+    /** 客诉数据范围：持 complaint.view.all 为全局；APPLICANT（商管课长）默认仅本人责任单据。 */
     public Long scopeUserId(java.util.Collection<? extends org.springframework.security.core.GrantedAuthority> authorities) {
         if (authorities == null) return null;
         boolean manager = false;
         for (var authority : authorities) {
             String code = authority.getAuthority();
-            if (List.of("ROLE_CS_AGENT", "ROLE_CS_MANAGER", "ROLE_SUPER_ADMIN", "ROLE_SYSTEM_ADMIN").contains(code)) return null;
+            if ("complaint.view.all".equals(code)) return null;
             if ("ROLE_APPLICANT".equals(code)) manager = true;
         }
         if (!manager) return null;
