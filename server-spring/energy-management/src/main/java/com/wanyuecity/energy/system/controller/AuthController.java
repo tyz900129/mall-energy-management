@@ -13,6 +13,7 @@ import com.wanyuecity.energy.system.service.dto.DeviceLoginRequest;
 import com.wanyuecity.energy.system.service.dto.RegisterRequest;
 import com.wanyuecity.energy.system.service.dto.LoginRequest;
 import com.wanyuecity.energy.system.service.dto.LoginResponse;
+import com.wanyuecity.energy.system.service.dto.SysUserPasswordRequest;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -23,6 +24,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -130,6 +132,23 @@ public class AuthController {
     private String departmentName(SysUser user) {
         PermissionService.DepartmentInfo department = permissionService.department(user.getId());
         return department == null ? null : department.name();
+    }
+
+    /** 登录用户自助修改密码：校验原密码，不记录密码内容。 */
+    @PutMapping("/password")
+    public ApiResponse<Void> changePassword(@Valid @RequestBody SysUserPasswordRequest req,
+                                            Authentication auth, HttpServletRequest http) {
+        String username = auth == null ? null : auth.getName();
+        userService.changeSelfPassword(username, req.getOldPassword(), req.getNewPassword());
+        SysUser user = userService.findByUsername(username);
+        try {
+            auditLogService.record(username, user == null ? null : user.getId(), "CHANGE_PASSWORD", "AUTH",
+                    user == null ? null : user.getId().toString(), null, "{\"success\":true}",
+                    http.getRemoteAddr(), http.getHeader("User-Agent"));
+        } catch (Exception e) {
+            log.error("password change audit persistence failed: {}", e.getClass().getSimpleName());
+        }
+        return ApiResponse.ok();
     }
 
     /** Health probe: returns 200 if the JWT secret loaded, never throws. */

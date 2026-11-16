@@ -33,6 +33,16 @@ export interface UserPermissionProfile {
   userId:number; username:string; modules:PermissionModule[]; rolePermissionCodes:string[]; effectivePermissionCodes:string[]; overrides:UserPermissionOverride[]
 }
 
+export interface SysUserImportPreview {
+  row: number; username: string; displayName?: string; action: '新建'|'更新'|'跳过'
+  roleCode?: string; departmentName?: string; note?: string
+}
+export interface SysUserImportIssue { row: number; username?: string; reason: string }
+export interface SysUserImportResult {
+  dryRun: boolean; totalRows: number; createCount: number; updateCount: number; skipCount: number; failCount: number
+  preview: SysUserImportPreview[]; errors: SysUserImportIssue[]; warnings: SysUserImportIssue[]
+  errorToken?: string; credentialsToken?: string
+}
 export const systemUserApi = {
   page: (params: { keyword?: string; status?: number; pageNum?: number; pageSize?: number }) =>
     http.get<{ records: SystemUser[]; total: number; size: number; current: number }>('/api/v1/users', { params }),
@@ -42,7 +52,19 @@ export const systemUserApi = {
   resetPassword: (id: number, newPassword: string) => http.put(`/api/v1/users/${id}/password`, { newPassword }),
   assignRoles: (id: number, roleIds: number[]) => http.put<SystemUser>(`/api/v1/users/${id}/roles`, { roleIds }),
   permissions: (id:number) => http.get<UserPermissionProfile>(`/api/v1/users/${id}/permissions`),
-  updatePermissions: (id:number, overrides:UserPermissionOverride[]) => http.put<UserPermissionProfile>(`/api/v1/users/${id}/permissions`, { overrides })
+  updatePermissions: (id:number, overrides:UserPermissionOverride[]) => http.put<UserPermissionProfile>(`/api/v1/users/${id}/permissions`, { overrides }),
+  importTemplate: () => http.get<Blob>('/api/v1/users/import/template', { responseType: 'blob' }),
+  importUsers: (file: File, dryRun: boolean) => {
+    const data = new FormData()
+    data.append('file', file)
+    return http.post<SysUserImportResult>('/api/v1/users/import', data, {
+      params: { dryRun }, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000
+    })
+  },
+  importErrors: (token: string) => http.get<Blob>('/api/v1/users/import/errors', { params: { token }, responseType: 'blob' }),
+  importCredentials: (token: string) => http.get<Blob>('/api/v1/users/import/credentials', { params: { token }, responseType: 'blob' }),
+  exportUsers: (params: { keyword?: string; status?: number; departmentId?: number }) =>
+    http.get<Blob>('/api/v1/users/export', { params, responseType: 'blob' })
 }
 export interface RolePermissionProfile { roleId:number; roleCode:string; roleName:string; modules:PermissionModule[]; permissionCodes:string[] }
 export const systemRoleApi = {

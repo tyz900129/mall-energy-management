@@ -1,6 +1,7 @@
 package com.wanyuecity.energy.system.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wanyuecity.energy.core.BizException;
 import com.wanyuecity.energy.system.entity.SysUser;
@@ -163,6 +164,72 @@ public class SysUserService {
         }
         u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
         userMapper.updateById(u);
+    }
+
+    /** 用户自助修改密码：校验原密码，新密码不得与原密码相同。 */
+    @Transactional
+    public void changeSelfPassword(String username, String oldPassword, String newPassword) {
+        SysUser u = userMapper.findByUsername(username);
+        if (u == null) {
+            throw BizException.unauthorized("用户不存在");
+        }
+        if (oldPassword == null || oldPassword.isBlank()
+                || !passwordEncoder.matches(oldPassword, u.getPasswordHash())) {
+            throw BizException.badRequest("原密码不正确");
+        }
+        if (newPassword == null || newPassword.length() < 6 || newPassword.length() > 64) {
+            throw BizException.badRequest("新密码长度必须为 6-64 位");
+        }
+        if (passwordEncoder.matches(newPassword, u.getPasswordHash())) {
+            throw BizException.badRequest("新密码不能与原密码相同");
+        }
+        u.setPasswordHash(passwordEncoder.encode(newPassword));
+        userMapper.updateById(u);
+    }
+
+    /** Excel 导入新建用户：创建与角色分配在同一事务内完成。 */
+    @Transactional
+    public void createImported(String username, String rawPassword, String displayName, String email,
+                               String phone, Integer status, Long departmentId, Long roleId) {
+        if (userMapper.findByUsername(username) != null) {
+            throw BizException.badRequest("用户名已存在: " + username);
+        }
+        SysUser u = new SysUser();
+        u.setUsername(username);
+        u.setPasswordHash(passwordEncoder.encode(rawPassword));
+        u.setDisplayName(displayName);
+        u.setEmail(email);
+        u.setPhone(phone);
+        u.setStatus(status == null ? 1 : status);
+        u.setDepartmentId(departmentId);
+        userMapper.insert(u);
+        replaceUserRole(u.getId(), roleId);
+    }
+
+    /**
+     * Excel 导入更新用户：displayName/email/phone/status 为 null 表示保持原值；
+     * departmentId 始终按导入结果写入（null 表示置空）。不修改密码。
+     */
+    @Transactional
+    public void updateImported(Long id, String displayName, String email, String phone,
+                               Integer status, Long departmentId, Long roleId) {
+        SysUser u = userMapper.selectById(id);
+        if (u == null) {
+            throw BizException.notFound("User not found: " + id);
+        }
+        if ("admin".equals(u.getUsername())) {
+            throw BizException.badRequest("内置管理员不允许通过 Excel 修改");
+        }
+        LambdaUpdateWrapper<SysUser> wrapper = new LambdaUpdateWrapper<SysUser>()
+                .eq(SysUser::getId, id)
+                .set(displayName != null, SysUser::getDisplayName, displayName)
+                .set(email != null, SysUser::getEmail, email)
+                .set(phone != null, SysUser::getPhone, phone)
+                .set(status != null, SysUser::getStatus, status)
+                .set(SysUser::getDepartmentId, departmentId)
+                .set(SysUser::getUpdatedAt, java.time.LocalDateTime.now());
+        userMapper.update(null, wrapper);
+        replaceUserRole(id, roleId);
     }
 
     @Transactional

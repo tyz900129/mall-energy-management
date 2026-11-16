@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div class="page-header"><div><div class="page-title">用户与权限</div><div class="page-subtitle">角色作为默认权限模板，个人权限用于精细调整</div></div><div><el-button v-if="canManageRoles" style="margin-right:8px" @click="roleDrawerVisible = true">角色管理</el-button><el-button v-if="canUserManage" type="primary" @click="openCreate">新增用户</el-button></div></div>
+    <div class="page-header"><div><div class="page-title">用户与权限</div><div class="page-subtitle">角色作为默认权限模板，个人权限用于精细调整</div></div><div><el-button v-if="canManageRoles" style="margin-right:8px" @click="roleDrawerVisible = true">角色管理</el-button><el-button v-if="canUserManage" style="margin-right:8px" @click="downloadTemplate">下载模板</el-button><el-button v-if="canUserManage" style="margin-right:8px" @click="openImport">导入用户</el-button><el-button v-if="canUserView" style="margin-right:8px" :loading="exporting" @click="exportUsers">导出</el-button><el-button v-if="canUserManage" type="primary" @click="openCreate">新增用户</el-button></div></div>
     <div class="toolbar">
       <el-input v-model="query.keyword" placeholder="用户名/姓名/手机/邮箱" clearable style="width:260px" @keyup.enter="search" />
       <el-select v-model="query.status" placeholder="全部状态" clearable style="width:120px;margin-left:8px"><el-option label="启用" :value="1" /><el-option label="禁用" :value="0" /></el-select>
@@ -88,6 +88,50 @@
       </el-scrollbar>
       <template #footer><el-button @click="permissionVisible=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="current?.username==='admin'" @click="savePermissions">保存个人权限</el-button></template>
     </el-dialog>
+    <el-dialog v-model="importVisible" title="批量导入用户" width="min(920px, 96vw)" top="5vh" destroy-on-close>
+      <el-alert type="info" :closable="false" show-icon>
+        <template #title>请先下载模板填写；导入默认先预览，确认后才会写库。单次最多 1000 行，已有用户默认跳过。</template>
+      </el-alert>
+      <div class="import-toolbar">
+        <el-upload :auto-upload="false" :limit="1" accept=".xlsx,.xls" :file-list="importFileList"
+                   :on-change="onImportFileChange" :on-remove="onImportFileRemove">
+          <el-button>选择 Excel 文件</el-button>
+        </el-upload>
+        <el-button type="primary" plain :loading="importLoading" :disabled="!importFile" @click="previewImport">预览</el-button>
+      </div>
+      <template v-if="importResult">
+        <div class="import-summary">
+          <el-tag>共 {{ importResult.totalRows }} 行</el-tag>
+          <el-tag type="success">新建 {{ importResult.createCount }}</el-tag>
+          <el-tag type="warning">更新 {{ importResult.updateCount }}</el-tag>
+          <el-tag type="info">跳过 {{ importResult.skipCount }}</el-tag>
+          <el-tag type="danger">失败 {{ importResult.failCount }}</el-tag>
+        </div>
+        <el-table :data="importResult.preview" border max-height="42vh" size="small">
+          <el-table-column prop="row" label="行号" width="70" />
+          <el-table-column prop="username" label="用户名" min-width="110" />
+          <el-table-column prop="displayName" label="姓名" min-width="90" />
+          <el-table-column label="动作" width="80"><template #default="{ row }"><el-tag size="small" :type="row.action === '新建' ? 'success' : row.action === '更新' ? 'warning' : 'info'">{{ row.action }}</el-tag></template></el-table-column>
+          <el-table-column prop="roleCode" label="角色编码" min-width="110" />
+          <el-table-column prop="departmentName" label="部门" min-width="110" />
+          <el-table-column prop="note" label="说明" min-width="200" show-overflow-tooltip />
+        </el-table>
+        <div v-if="importResult.errors?.length" class="import-issues">
+          <el-alert type="error" :closable="false" :title="`失败 ${importResult.failCount} 行（最多展示 ${importResult.errors.length} 条）`" />
+          <div v-for="item in importResult.errors" :key="`e-${item.row}-${item.username}`" class="issue-line">第 {{ item.row }} 行{{ item.username ? `（${item.username}）` : '' }}：{{ item.reason }}</div>
+          <el-button v-if="importResult.errorToken" link type="danger" @click="downloadErrors">下载错误明细</el-button>
+        </div>
+        <div v-if="importResult.warnings?.length" class="import-issues">
+          <el-alert type="warning" :closable="false" title="提示" />
+          <div v-for="item in importResult.warnings" :key="`w-${item.row}-${item.username}`" class="issue-line">第 {{ item.row }} 行{{ item.username ? `（${item.username}）` : '' }}：{{ item.reason }}</div>
+        </div>
+      </template>
+      <template #footer>
+        <el-button @click="importVisible = false">关闭</el-button>
+        <el-button v-if="importResult?.credentialsToken" type="success" @click="downloadCredentials">下载初始密码清单</el-button>
+        <el-button v-if="importResult?.dryRun" type="primary" :loading="importLoading" :disabled="!importResult.totalRows" @click="confirmImport">确认导入</el-button>
+      </template>
+    </el-dialog>
     <RoleManagerDrawer v-model="roleDrawerVisible" @changed="reloadRoles" />
   </div>
 </template>
@@ -97,11 +141,12 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import RoleManagerDrawer from './components/RoleManagerDrawer.vue'
-import { systemDepartmentApi, systemRoleApi, systemUserApi, type SystemRole, type SystemDepartment, type SystemUser, type UserPermissionProfile, type UserPermissionOverride } from '@/api/system'
+import { systemDepartmentApi, systemRoleApi, systemUserApi, type SystemRole, type SystemDepartment, type SystemUser, type SysUserImportResult, type UserPermissionProfile, type UserPermissionOverride } from '@/api/system'
 import { formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 const userStore=useUserStore()
 const canUserManage=userStore.hasPermission('system.user.manage')
+const canUserView=userStore.hasPermission('system.user.view')
 const canPermissionManage=userStore.hasPermission('system.user.permission.manage')
 const canManageRoles=computed(()=>userStore.hasPermission('system.user.permission.manage'))
 const assignableRoles=computed(()=>roles.value.filter((r:any)=>r.isAssignable!==0))
@@ -112,6 +157,8 @@ const editVisible=ref(false),rolesVisible=ref(false),passwordVisible=ref(false),
 const query=reactive<{keyword:string;status:number|undefined}>({keyword:'',status:undefined}),page=reactive({pageNum:1,pageSize:20})
 const form=reactive<any>({id:0,username:'',displayName:'',phone:'',email:'',password:'',status:1,roleId:undefined,departmentId:undefined})
 const current=ref<SystemUser>(),selectedRoleId=ref<number>(),newPassword=ref('')
+const importVisible=ref(false),importLoading=ref(false),exporting=ref(false)
+const importFile=ref<File|null>(null),importFileList=ref<any[]>([]),importResult=ref<SysUserImportResult>()
 const permissionProfile=ref<UserPermissionProfile>(),permissionLoading=ref(false),activeModules=ref<string[]>([])
 const permissionEffects=reactive<Record<string,'INHERIT'|'ALLOW'|'DENY'>>({})
 const expandedOps=ref<number[]>([])
@@ -133,6 +180,16 @@ async function savePermissions(){if(!current.value)return;const overrides:UserPe
 function isEffective(code:string){const effect=permissionEffects[code];if(effect==='ALLOW')return true;if(effect==='DENY')return false;return permissionProfile.value?.rolePermissionCodes.includes(code)||false}
 function actionName(type:string){return ({VIEW:'查看',EDIT:'编辑',MANAGE:'管理',DANGER:'高风险'} as any)[type]||type}
 function actionTag(type:string){return type==='DANGER'?'danger':type==='VIEW'?'info':type==='EDIT'?'warning':'success'}
+function saveBlob(blob:Blob,name:string){const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=name;document.body.appendChild(anchor);anchor.click();anchor.remove();URL.revokeObjectURL(url)}
+async function downloadTemplate(){const blob:any=await systemUserApi.importTemplate();saveBlob(blob,'用户导入模板.xlsx')}
+async function exportUsers(){exporting.value=true;try{const blob:any=await systemUserApi.exportUsers({keyword:query.keyword||undefined,status:query.status});saveBlob(blob,`用户清单_${new Date().toISOString().slice(0,10)}.xlsx`)}finally{exporting.value=false}}
+function openImport(){importFile.value=null;importFileList.value=[];importResult.value=undefined;importVisible.value=true}
+function onImportFileChange(file:any){importFile.value=file.raw as File;importFileList.value=[file];importResult.value=undefined}
+function onImportFileRemove(){importFile.value=null;importFileList.value=[];importResult.value=undefined}
+async function previewImport(){if(!importFile.value)return;importLoading.value=true;try{importResult.value=await systemUserApi.importUsers(importFile.value,true) as any;if(!importResult.value?.totalRows)ElMessage.warning('文件中没有可导入的数据行')}finally{importLoading.value=false}}
+async function confirmImport(){if(!importFile.value)return;importLoading.value=true;try{const result:any=await systemUserApi.importUsers(importFile.value,false);importResult.value=result;ElMessage.success(`导入完成：新建 ${result.createCount}，更新 ${result.updateCount}，跳过 ${result.skipCount}，失败 ${result.failCount}`);await load()}finally{importLoading.value=false}}
+async function downloadErrors(){const token=importResult.value?.errorToken;if(!token)return;const blob:any=await systemUserApi.importErrors(token);saveBlob(blob,'用户导入错误明细.xlsx')}
+async function downloadCredentials(){const token=importResult.value?.credentialsToken;if(!token)return;const blob:any=await systemUserApi.importCredentials(token);saveBlob(blob,'用户初始密码清单.xlsx');if(importResult.value)importResult.value.credentialsToken=undefined}
 onMounted(async()=>{roles.value=await systemRoleApi.list() as any;departments.value=await systemDepartmentApi.list() as any;await load()})
 </script>
 
@@ -141,6 +198,9 @@ onMounted(async()=>{roles.value=await systemRoleApi.list() as any;departments.va
 .role-dept{margin-left:6px;font-size:12px;color:#909399}
 .mobile-cards{display:none}
 .permission-user{display:flex;gap:24px;align-items:center;margin:16px 0 10px}.permission-user span{color:#606266}.permission-row{display:grid;grid-template-columns:minmax(230px,1fr) 70px 128px 80px;gap:12px;align-items:center;padding:8px 4px;border-bottom:1px solid #ebeef5}.permission-name{display:flex;flex-direction:column;gap:3px}.permission-name small{color:#909399}.effective{font-size:12px;color:#909399}.effective.on{color:#67c23a}
+.import-toolbar{display:flex;align-items:center;gap:12px;margin:16px 0}
+.import-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.import-issues{margin-top:12px}.import-issues .issue-line{font-size:12px;color:#606266;line-height:1.8;word-break:break-all}
 @media(max-width:700px){
   .desktop-table{display:none}
   .mobile-cards{display:grid;gap:10px}

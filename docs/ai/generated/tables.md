@@ -1,7 +1,7 @@
 # 数据表清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-14 18:56:07 ｜ 代码锚点：feat/permission-code-model@2a47a6a
+> 生成时间：2026-11-16 15:53:29 ｜ 代码锚点：main@4df48fe
 
 
 共 159 张表，来自 59 个含建表语句的迁移脚本（最高 V110）。

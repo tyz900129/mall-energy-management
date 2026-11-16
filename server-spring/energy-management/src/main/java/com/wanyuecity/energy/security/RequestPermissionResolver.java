@@ -231,6 +231,9 @@ public class RequestPermissionResolver {
         if (path.startsWith("/api/v1/platform/config")) return read ? Rule.of("integration.config.view") : Rule.of("integration.config.manage");
         if (path.startsWith("/api/v1/platform/sync-logs")) return Rule.of("integration.sync.view");
         if (path.startsWith("/api/v1/platform/sync")) return read ? Rule.of("integration.sync.view") : Rule.of("integration.sync.execute");
+        // 用户批量导入导出：导出查看权限即可；模板下载、导入执行、错误/凭据下载均要求管理权限
+        if (path.startsWith("/api/v1/users/export")) return Rule.of("system.user.view");
+        if (path.startsWith("/api/v1/users/import")) return Rule.of("system.user.manage");
         if (path.startsWith("/api/v1/users") || path.startsWith("/api/v1/roles") || path.startsWith("/api/v1/menus")) {
             if (path.contains("/permissions")) return Rule.of("system.user.permission.manage");
             return Rule.of(read ? "system.user.view" : "system.user.manage");

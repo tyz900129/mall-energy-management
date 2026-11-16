@@ -39,6 +39,7 @@
           </span>
           <template #dropdown>
             <el-dropdown-menu>
+              <el-dropdown-item command="password">修改密码</el-dropdown-item>
               <el-dropdown-item command="logout">退出并切换账户</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -52,17 +53,26 @@
         </router-view>
       </el-main>
     </el-container>
+    <el-dialog v-model="passwordVisible" title="修改密码" width="440px">
+      <el-form label-width="90px">
+        <el-form-item label="原密码"><el-input v-model="passwordForm.oldPassword" type="password" show-password /></el-form-item>
+        <el-form-item label="新密码"><el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="6-64 位" /></el-form-item>
+        <el-form-item label="确认密码"><el-input v-model="passwordForm.confirmPassword" type="password" show-password /></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="passwordVisible=false">取消</el-button><el-button type="primary" :loading="passwordSaving" @click="submitPassword">保存</el-button></template>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lightning, UserFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { visibleGroups, firstAccessiblePath } from '@/router/menu'
 import { enumLabel } from '@/utils/format'
+import { authApi } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,6 +83,9 @@ const mobileMenuOpen = ref(false)
 const can = (code: string) => userStore.hasPermission(code)
 const menuGroups = computed(() => visibleGroups(can))
 const homePath = computed(() => firstAccessiblePath(can))
+const passwordVisible = ref(false)
+const passwordSaving = ref(false)
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 
 onMounted(async () => {
   window.addEventListener('resize', onResize)
@@ -91,10 +104,30 @@ function toggleMenu() { if (isMobile.value) mobileMenuOpen.value = !mobileMenuOp
 function onMenuSelect() { if (isMobile.value) mobileMenuOpen.value = false }
 
 function onCommand(cmd: string) {
+  if (cmd === 'password') {
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+    passwordVisible.value = true
+    return
+  }
   if (cmd === 'logout') {
     userStore.logout()
     ElMessage.success('已退出，可使用其他账户登录')
     router.push({path:'/login',query:{switch:'1'}})
+  }
+}
+async function submitPassword() {
+  if (!passwordForm.oldPassword) { ElMessage.warning('请输入原密码'); return }
+  if (passwordForm.newPassword.length < 6 || passwordForm.newPassword.length > 64) { ElMessage.warning('新密码长度必须为 6-64 位'); return }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) { ElMessage.warning('两次输入的新密码不一致'); return }
+  passwordSaving.value = true
+  try {
+    await authApi.changePassword(passwordForm.oldPassword, passwordForm.newPassword)
+    ElMessage.success('密码已修改')
+    passwordVisible.value = false
+  } finally {
+    passwordSaving.value = false
   }
 }
 </script>

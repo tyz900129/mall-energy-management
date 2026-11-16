@@ -1,7 +1,7 @@
 # 权限码清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-14 18:56:07 ｜ 代码锚点：feat/permission-code-model@2a47a6a
+> 生成时间：2026-11-16 15:53:29 ｜ 代码锚点：main@4df48fe
 
 
 共 171 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。
@@ -47,7 +47,7 @@
 | `construction.acceptance.manage` | `V45__construction_permit_inspection_acceptance.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.acceptance.request` | `V45__construction_permit_inspection_acceptance.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.attachment.upload` | `V45__construction_permit_inspection_acceptance.sql`<br>`security/RequestPermissionResolver.java` |
-| `construction.create` | `V44__merchant_construction_workflow.sql`<br>`V45__construction_permit_inspection_acceptance.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
+| `construction.create` | `V111__reapply_role_data_permission_alignment.sql`<br>`V44__merchant_construction_workflow.sql`<br>`V45__construction_permit_inspection_acceptance.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.delete` | `V108__permission_code_backfill.sql`<br>`V44__merchant_construction_workflow.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.inspect.cleaning` | `V45__construction_permit_inspection_acceptance.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.inspect.engineering` | `V45__construction_permit_inspection_acceptance.sql`<br>`security/RequestPermissionResolver.java` |
@@ -55,7 +55,7 @@
 | `construction.inspection.config.manage` | `V49__construction_inspection_templates.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.inspection.config.view` | `V49__construction_inspection_templates.sql`<br>`security/RequestPermissionResolver.java` |
 | `construction.manage` | `V44__merchant_construction_workflow.sql`<br>`security/RequestPermissionResolver.java` |
-| `construction.view` | `V44__merchant_construction_workflow.sql`<br>`V45__construction_permit_inspection_acceptance.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
+| `construction.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V44__merchant_construction_workflow.sql`<br>`V45__construction_permit_inspection_acceptance.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `dashboard.stats.base.view` | `V108__permission_code_backfill.sql`<br>`security/RequestPermissionResolver.java` |
 | `dashboard.view` | `V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`security/RequestPermissionResolver.java` |
 | `energy.analysis.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
@@ -103,12 +103,12 @@
 | `integration.sync.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `merchant.id` | `V94__complaint_module.sql` |
 | `merchant.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
-| `merchant.menu` | `V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql` |
+| `merchant.menu` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql` |
 | `merchant.query` | `V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
-| `merchant.view` | `V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `merchant.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `metering.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
-| `metering.menu` | `V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql` |
-| `metering.view` | `V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `metering.menu` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql` |
+| `metering.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.accountability.manage` | `V74__operation_accountability.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.accountability.view` | `V74__operation_accountability.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.clearance.export` | `V86__sys_department_and_permission_scope.sql`<br>`security/RequestPermissionResolver.java` |
@@ -116,7 +116,7 @@
 | `operation.clearance.setting.manage` | `V77__operation_clearance_schedule_and_scan_roles.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.clearance.submit` | `V69__operation_management_foundation.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.clearance.template.manage` | `V72__operation_clearance_templates.sql`<br>`security/RequestPermissionResolver.java` |
-| `operation.clearance.template.view` | `V72__operation_clearance_templates.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `operation.clearance.template.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V72__operation_clearance_templates.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.clearance.view` | `V71__operation_daily_clearance.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.clearance.view.all` | `V108__permission_code_backfill.sql` |
 | `operation.dashboard.view` | `V69__operation_management_foundation.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
@@ -126,7 +126,7 @@
 | `operation.merchant.manage` | `V69__operation_management_foundation.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.merchant.view` | `V69__operation_management_foundation.sql`<br>`V77__operation_clearance_schedule_and_scan_roles.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.property.template.manage` | `V73__operation_property_inspection.sql`<br>`security/RequestPermissionResolver.java` |
-| `operation.property.template.view` | `V73__operation_property_inspection.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `operation.property.template.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V73__operation_property_inspection.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.property.view` | `V73__operation_property_inspection.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.violation.manage` | `V76__fixed_property_inspection_and_violation_items.sql`<br>`security/RequestPermissionResolver.java` |
 | `operation.violation.view` | `V76__fixed_property_inspection_and_violation_items.sql`<br>`security/RequestPermissionResolver.java` |
@@ -156,13 +156,13 @@
 | `stall.engineering.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `stall.engineering.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `stall.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
-| `stall.menu` | `V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql` |
-| `stall.view` | `V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
+| `stall.menu` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql` |
+| `stall.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.audit.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.dept.manage` | `V100__dept_org_manage_s3.sql`<br>`security/RequestPermissionResolver.java`<br>`system\controller\SysDepartmentController.java` |
 | `system.dept.view` | `V100__dept_org_manage_s3.sql`<br>`security/RequestPermissionResolver.java`<br>`system\controller\SysDepartmentController.java` |
 | `system.dictionary.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
-| `system.dictionary.view` | `V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `system.dictionary.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.migration.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.user.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.user.permission.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
@@ -176,8 +176,8 @@
 | `visitor.view.all` | `V50__access_control_and_visitor_management.sql`<br>`security/RequestPermissionResolver.java` |
 | `visitor.view.own` | `V50__access_control_and_visitor_management.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `webhook.retry.max` | `V1__init_system.sql` |
-| `workflow.create` | `V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `workflow.create` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `workflow.delete` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `workflow.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
-| `workflow.view` | `V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
+| `workflow.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `workflow.view.all` | `V108__permission_code_backfill.sql` |

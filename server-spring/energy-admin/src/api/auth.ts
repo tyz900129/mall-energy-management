@@ -24,5 +24,6 @@ export const authApi = {
   register: (data: {username:string;password:string;displayName?:string;phone?:string}) => http.post<string>('/auth/register',data),
   deviceLogin: (data:{deviceToken:string;fingerprint:string}) => http.post<LoginResponse>('/auth/device-login',data),
   me: () => http.get<UserInfo>('/auth/me'),
+  changePassword: (oldPassword: string, newPassword: string) => http.put('/auth/password', { oldPassword, newPassword }),
   logout: () => http.post('/auth/logout').catch(() => null)
 }

@@ -1,10 +1,10 @@
 # 接口地图（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-14 18:56:07 ｜ 代码锚点：feat/permission-code-model@2a47a6a
+> 生成时间：2026-11-16 15:53:29 ｜ 代码锚点：main@4df48fe
 
 
-共 498 个接口，60 个控制器。
+共 504 个接口，60 个控制器。
 
 > “代码内权限”为空表示该接口由 `RequestPermissionResolver` 的路径映射鉴权，未写 `@PreAuthorize`。
 
@@ -338,6 +338,7 @@
 | system | AuthController | deviceLogin | POST | `/auth/device-login` | — |
 | system | AuthController | login | POST | `/auth/login` | — |
 | system | AuthController | me | GET | `/auth/me` | — |
+| system | AuthController | changePassword | PUT | `/auth/password` | — |
 | system | AuthController | ping | GET | `/auth/ping` | — |
 | system | AuthController | register | POST | `/auth/register` | — |
 | system | BusinessDictionaryController | list | GET | `/api/v1/dictionaries` | — |
@@ -386,6 +387,11 @@
 | system | SysRoleController | assignPermissions | PUT | `/api/v1/roles/{id}/permissions` | — |
 | system | SysUserAdminController | list | GET | `/api/v1/users` | — |
 | system | SysUserAdminController | create | POST | `/api/v1/users` | — |
+| system | SysUserAdminController | export | GET | `/api/v1/users/export` | — |
+| system | SysUserAdminController | importUsers | POST | `/api/v1/users/import` | — |
+| system | SysUserAdminController | importCredentials | GET | `/api/v1/users/import/credentials` | — |
+| system | SysUserAdminController | importErrors | GET | `/api/v1/users/import/errors` | — |
+| system | SysUserAdminController | importTemplate | GET | `/api/v1/users/import/template` | — |
 | system | SysUserAdminController | delete | DELETE | `/api/v1/users/{id}` | — |
 | system | SysUserAdminController | get | GET | `/api/v1/users/{id}` | — |
 | system | SysUserAdminController | update | PUT | `/api/v1/users/{id}` | — |
