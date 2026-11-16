@@ -101,7 +101,7 @@ npm run build   # vue-tsc --noEmit && vite build
 - JWT 只携带用户 ID 与角色；权限码每次请求实时查库，不缓存在 token。
 - 读取路径（GET）通常映射 `*.view`，写操作映射 `*.manage/create/update/delete/execute`。
 - 公开路径必须在 `RequestPermissionResolver` 显式声明，并同步 `SecurityConfig`。
-- V107–V110 属于 `feat/permission-code-model` 分支，尚未合并 main；改动前先确认当前分支与生产迁移版本。
+- V107–V111 已随 `feat/permission-code-model` 合并进 main；改动前先确认生产迁移版本。
 - `DeptPermissionPolicy` 已标记废弃，不得重新调用。
 
 ---
