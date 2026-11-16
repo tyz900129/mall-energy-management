@@ -2,7 +2,7 @@
 
 > 本文件是 AI 协作的唯一规则源。任何 AI 在修改本仓库前，先读完本文件，再按 §6 路由到对应模块卡。
 > 优先级：**用户本轮明确指令 > 代码与数据库的客观事实 > 本文件 > docs/ai/** > README.md / 旧文档**。
-> 核对锚点：2026-11-15 ｜ main@83e49c4 ｜ Flyway 最高 V111 ｜ 当前另有分支 feat/permission-code-model
+> 核对锚点：2026-11-16 ｜ main ｜ Flyway 最高 V112 ｜ 当前另有分支 feat/permission-code-model
 
 ---
 
@@ -15,7 +15,7 @@
 |---|---|
 | 后端 | `server-spring/energy-management`，Java 17 / Spring Boot 3.3.5 / MyBatis-Plus / MySQL 8 / Flyway |
 | 前端 | `server-spring/energy-admin`，Vue 3 / TypeScript / Vite / Element Plus / Pinia |
-| 迁移 | `server-spring/energy-management/src/main/resources/db/migration`，当前最高 V111 |
+| 迁移 | `server-spring/energy-management/src/main/resources/db/migration`，当前最高 V112 |
 | 部署 | Docker Compose；220 生产、225 开发（细节不在本文件） |
 | 代码规模 | 约 385 个 Java 文件、57 个 Controller、90 个前端页面 |
 
@@ -61,6 +61,12 @@ npm run build   # vue-tsc --noEmit && vite build
 10. **免登录 H5 公开接口必须两层放行**：`SecurityConfig` 按方法精确 permitAll + `RequestPermissionResolver` 返回 `PUBLIC`。
 11. **不新增巡检/巡场引擎**。新需求优先复用 `inspection`（含日历）或 `qrinspection`。
 12. **文档与代码不得包含**账号、密码、密钥、证书、生产 IP。生产环境只写“220 生产 / 225 开发”。
+13. **时间格式统一**：接口与页面一律使用 `yyyy-MM-dd HH:mm:ss`（24 小时制、本地时区 Asia/Shanghai，UTF-8 编码）。
+    禁止在展示层出现 `2026-11-16T09:00:00` 这类 ISO 串、时间戳数字或 `HH:mm` 之外的其它格式；新建页面与接口必须遵守。
+14. **照片预览一律页内查看**：缩略图点击后在当前页用弹窗 / 抽屉 / 内置大图浏览，禁止 `window.open`、`target="_blank"` 或跳转新页面打开图片；
+    手机端按 768px 断点适配，保证缩略图排列、可点区域与手势操作符合移动端视觉与交互习惯。
+15. **记录中只展示人员姓名**：操作日志、任务记录、导出与通知一律用人员姓名（`display_name`），不得显示登录账号 `username`；
+    无姓名时用“未分配”“系统”等占位，禁止把账号名当人名展示。
 
 ---
 

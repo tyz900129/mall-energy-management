@@ -975,7 +975,8 @@ public class OpsPatrolService {
                         + "i.account_number AS accountNumber,i.merchant_code AS merchantCode,"
                         + "i.floor_name AS floorName,i.category,i.urgency,i.description,i.status,i.due_at AS dueAt,i.owner_name AS ownerName,"
                         + "i.overdue_flag AS overdueFlag,i.repeat_flag AS repeatFlag,i.submitter_name AS submitterName,i.submitted_at AS submittedAt,"
-                        + "i.rectified_at AS rectifiedAt,i.closed_at AS closedAt "
+                        + "i.rectified_at AS rectifiedAt,i.closed_at AS closedAt,"
+                        + "(SELECT COALESCE(NULLIF(u.display_name,''),u.username) FROM sys_user u WHERE u.username=i.reviewed_by LIMIT 1) AS reviewerName "
                         + "FROM ops_patrol_issue i JOIN ops_patrol_dept d ON d.id=i.dept_id" + where + " ORDER BY i.id DESC LIMIT ?,?", params.toArray());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total == null ? 0 : total);
@@ -988,7 +989,9 @@ public class OpsPatrolService {
         List<Map<String, Object>> attachments = attachmentService.list("OPS_ISSUE", id);
         for (Map<String, Object> row : attachments) row.put("url", "/api/v1/ops-patrol/issues/" + id + "/attachments/" + row.get("id"));
         issue.put("attachments", attachments);
-        issue.put("logs", jdbc.queryForList("SELECT action,from_status AS fromStatus,to_status AS toStatus,operator,note,created_at AS createdAt FROM ops_patrol_issue_log WHERE issue_id=? ORDER BY id", id));
+        issue.put("logs", jdbc.queryForList("SELECT action,from_status AS fromStatus,to_status AS toStatus,operator,"
+                + "COALESCE((SELECT COALESCE(NULLIF(u.display_name,''),u.username) FROM sys_user u WHERE u.username=l.operator LIMIT 1),l.operator) AS operatorName,"
+                + "note,created_at AS createdAt FROM ops_patrol_issue_log l WHERE issue_id=? ORDER BY id", id));
         return issue;
     }
 
@@ -1039,7 +1042,9 @@ public class OpsPatrolService {
 
     private Map<String, Object> issueRow(Long id) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT i.*,d.name AS deptName FROM ops_patrol_issue i JOIN ops_patrol_dept d ON d.id=i.dept_id WHERE i.id=?", id);
+                "SELECT i.*,d.name AS deptName,"
+                        + "(SELECT COALESCE(NULLIF(u.display_name,''),u.username) FROM sys_user u WHERE u.username=i.reviewed_by LIMIT 1) AS reviewerName "
+                        + "FROM ops_patrol_issue i JOIN ops_patrol_dept d ON d.id=i.dept_id WHERE i.id=?", id);
         if (rows.isEmpty()) throw BizException.notFound("问题不存在");
         return rows.get(0);
     }

@@ -1,10 +1,10 @@
 # 接口地图（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-16 15:53:29 ｜ 代码锚点：main@4df48fe
+> 生成时间：2026-11-16 23:02:58 ｜ 代码锚点：main@7c2a8ef
 
 
-共 504 个接口，60 个控制器。
+共 511 个接口，60 个控制器。
 
 > “代码内权限”为空表示该接口由 `RequestPermissionResolver` 的路径映射鉴权，未写 `@PreAuthorize`。
 
@@ -107,6 +107,13 @@
 | facility | FacilityTopologyController | update | PUT | `/api/v1/facility-topologies/{systemType}/nodes/{id}` | — |
 | facility | FacilityTopologyController | qr | GET | `/api/v1/facility-topologies/{systemType}/nodes/{id}/qr` | — |
 | inspection | CalendarController | logs | GET | `/api/v1/calendar/generation-logs` | — |
+| inspection | CalendarController | ownerOptions | GET | `/api/v1/calendar/owner-options` | — |
+| inspection | CalendarController | plans | GET | `/api/v1/calendar/plans` | — |
+| inspection | CalendarController | createPlan | POST | `/api/v1/calendar/plans` | — |
+| inspection | CalendarController | plan | GET | `/api/v1/calendar/plans/{id}` | — |
+| inspection | CalendarController | updatePlan | PUT | `/api/v1/calendar/plans/{id}` | — |
+| inspection | CalendarController | generate | POST | `/api/v1/calendar/plans/{id}/generate` | — |
+| inspection | CalendarController | toggle | POST | `/api/v1/calendar/plans/{id}/toggle` | — |
 | inspection | CalendarController | tasks | GET | `/api/v1/calendar/tasks` | — |
 | inspection | CalendarPublicController | task | GET | `/api/v1/calendar-public/tasks/{token}` | — |
 | inspection | CalendarPublicController | upload | POST | `/api/v1/calendar-public/tasks/{token}/photos` | — |

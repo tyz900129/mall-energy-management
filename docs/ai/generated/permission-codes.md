@@ -1,7 +1,7 @@
 # 权限码清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-16 15:53:29 ｜ 代码锚点：main@4df48fe
+> 生成时间：2026-11-16 23:02:58 ｜ 代码锚点：main@7c2a8ef
 
 
 共 171 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。

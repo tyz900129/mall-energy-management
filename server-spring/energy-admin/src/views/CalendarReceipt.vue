@@ -52,7 +52,7 @@
           </div>
           <div class="photo-grid">
             <div v-for="photo in photos" :key="photo.id" class="photo-item">
-              <img :src="calendarPublicApi.photoUrl(token, photo.id)" alt="现场照片" />
+              <el-image class="photo-img" :src="calendarPublicApi.photoUrl(token, photo.id)" :preview-src-list="photoPreviewUrls" :initial-index="photos.indexOf(photo)" fit="cover" preview-teleported />
             </div>
             <label v-if="detail.submittable && photos.length < (detail.maxPhotos || 9)" class="photo-add">
               <input type="file" accept="image/jpeg,image/png" multiple hidden @change="onPick" />
@@ -107,6 +107,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { CircleCheckFilled, Plus } from '@element-plus/icons-vue'
 import { calendarPublicApi } from '@/api/calendarPublic'
+import { formatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const token = String(route.params.token || '')
@@ -119,27 +120,29 @@ const issues = ref<{ description: string; level: string }[]>([])
 const submitter = reactive({ name: '', phone: '', summary: '' })
 
 const photos = computed<any[]>(() => detail.value.photos || [])
+const photoPreviewUrls = computed(() => photos.value.map((p: any) => calendarPublicApi.photoUrl(token, p.id)))
 const statusText = computed(() => ({
   PENDING: '待回执', IN_PROGRESS: '进行中', OVERDUE: '已超时',
   PENDING_RECTIFICATION: '待整改', COMPLETED: '已完成', CLOSED: '已关闭', CANCELLED: '已取消'
 } as Record<string, string>)[detail.value.status] || detail.value.status)
 
 const fields = computed(() => (detail.value.fields || []).map((item: any) => {
-  const type = String(item.type || item.fieldType || '').toUpperCase()
+  const type = String(item.type || item.fieldType || item.controlType || '').toUpperCase()
   const options = Array.isArray(item.options) ? item.options.map((o: any) => typeof o === 'string' ? o : (o.label ?? o.value)).filter(Boolean) : []
   return {
     key: String(item.key || item.fieldKey || item.label || ''),
     label: String(item.label || item.name || item.key || '巡检项'),
     required: !!(item.required ?? item.isRequired),
+    isPhoto: type.includes('PHOTO'),
     options,
     boolean: !options.length && ['BOOLEAN', 'CHECK', 'PASS_FAIL', 'RESULT'].includes(type),
     multiline: type.includes('TEXTAREA') || type === 'TEXT'
   }
-}).filter((f: any) => f.key))
+}).filter((f: any) => f.key && !f.isPhoto))
 
 function formatTime(value: any) {
   if (!value) return ''
-  return String(value).replace('T', ' ').slice(0, 16)
+  return formatDateTime(value)
 }
 
 async function load() {
@@ -177,6 +180,8 @@ async function onPick(event: Event) {
 async function submit() {
   if (!submitter.name.trim()) { ElMessage.warning('请填写回执人姓名'); return }
   if (submitter.phone && !/^1[3-9]\d{9}$/.test(submitter.phone.trim())) { ElMessage.warning('手机号格式不正确'); return }
+  const missing = fields.value.find((f: any) => f.required && !String(form[f.key] ?? '').trim())
+  if (missing) { ElMessage.warning(`请填写：${missing.label}`); return }
   const payloadIssues = issues.value.filter(item => item.description.trim())
   submitting.value = true
   try {
@@ -217,8 +222,9 @@ onMounted(load)
 .control { flex: 1; min-width: 0; }
 .required { color: #f56c6c; margin-left: 2px; }
 .photo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 768px) { .photo-grid { grid-template-columns: repeat(3, 1fr); } }
 .photo-item, .photo-add { aspect-ratio: 1; border-radius: 8px; overflow: hidden; }
-.photo-item img { width: 100%; height: 100%; object-fit: cover; }
+.photo-item img, .photo-item .photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-add { border: 1px dashed #c8d1de; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #8a94a6; font-size: 12px; gap: 2px; background: #fafbfc; }
 .hint { margin-top: 8px; font-size: 12px; color: #8a94a6; }
 .issue-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }

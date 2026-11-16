@@ -57,6 +57,7 @@ const routes = [
       { path: 'inspection/dashboard', name: 'InspectionDashboard', component: () => import('@/views/InspectionDashboard.vue'), meta: { title: '巡检数据大屏', permission:'inspection.dashboard.view' } },
       { path: 'inspection/tasks', name: 'InspectionTasks', component: () => import('@/views/InspectionTasks.vue'), meta: { title: '巡检任务', permission:'inspection.task.view' } },
       { path: 'calendar', name: 'CalendarView', component: () => import('@/views/CalendarView.vue'), meta: { title: '任务日历', permission:'calendar.view' } },
+      { path: 'calendar/plans', name: 'CalendarPlans', component: () => import('@/views/CalendarPlans.vue'), meta: { title: '日历计划', permission:'calendar.view' } },
       { path: 'inspection/issues', name: 'InspectionIssues', component: () => import('@/views/InspectionIssues.vue'), meta: { title: '巡检问题整改', permission:'inspection.issue.manage' } },
       { path: 'inspection/config', name: 'InspectionManagement', component: () => import('@/views/InspectionManagement.vue'), meta: { title: '巡检配置', permission:'inspection.plan.manage' } },
       { path: 'inspection/equipment', name: 'InspectionEquipment', component: () => import('@/views/InspectionEquipment.vue'), meta: { title: '设施设备台账', permission:'inspection.equipment.view' } },

@@ -156,7 +156,7 @@
               <el-tag size="small" :type="issueStatusTag(iss.status)" effect="plain">{{ issueStatusLabel(iss.status) }}</el-tag>
             </div>
             <div class="h-desc">{{ iss.description }}</div>
-            <div class="h-meta">{{ [iss.merchantName, iss.category].filter(Boolean).join(' · ') }}<template v-if="iss.dueAt"> · 时限 {{ fmtTime(iss.dueAt) }}</template></div>
+            <div class="h-meta">{{ [iss.merchantName, iss.category].filter(Boolean).join(' · ') }}<template v-if="iss.dueAt"> · 时限 {{ fmt(iss.dueAt) }}</template></div>
           </div>
 
           <template v-if="handover?.confirmed">
@@ -180,6 +180,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { opsPatrolPublicApi } from '@/api/opsPatrol'
+import { formatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const token = String(route.query.token || '')
@@ -288,8 +289,9 @@ function issueStatusLabel(st: string) {
 function issueStatusTag(st: string) {
   return ({ PENDING: 'danger', RECTIFYING: 'warning', REVIEWING: 'primary', CLOSED: 'success' } as Record<string, any>)[st] || 'info'
 }
+// 时段位标（同日班次起止），按规则13保留 HH:mm
 function fmtTime(v: string) { return v ? String(v).slice(11, 16) : '-' }
-function fmt(v: string) { return v ? String(v).replace('T', ' ').slice(0, 16) : '-' }
+function fmt(v: string) { return formatDateTime(v) }
 function btnLabel(t: any) {
   if (t.status === 'DONE') return '查看结果'
   if (t.status === 'EXEMPT') return '已豁免'

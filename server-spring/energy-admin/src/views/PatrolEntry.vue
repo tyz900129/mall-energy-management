@@ -36,6 +36,7 @@ import { computed,onMounted,ref } from 'vue'
 import { useRoute,useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { patrolApi } from '@/api/patrol'
+import { formatDateTime } from '@/utils/format'
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
@@ -46,7 +47,7 @@ const percent = computed(()=> data.value.total ? Math.round((data.value.complete
 function btnClass(point:any){
   return { normal: point.state==='NORMAL', abnormal: point.state==='ABNORMAL' }
 }
-function shortTime(value:string){ return value ? value.replace('T',' ').slice(11,16) : '' }
+function shortTime(value:string){ return formatDateTime(value) }
 function issueLabel(status:string){
   return ({UNASSIGNED:'待分派',ASSIGNED:'已推送部门',RECTIFYING:'整改中',REVIEWING:'待复核',CLOSED:'已闭环'} as Record<string,string>)[status] || '处理中'
 }

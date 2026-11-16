@@ -150,6 +150,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { opsPatrolApi } from '@/api/opsPatrol'
+import { formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 import { useIsMobile } from '@/composables/useIsMobile'
 
@@ -203,7 +204,7 @@ function resultTagType(r: string) { return ({ PASS: 'success', FAIL: 'danger', N
 function issueStatusLabel(st: string) {
   return ({ PENDING: '待跟进', RECTIFYING: '整改中', REVIEWING: '待复核', CLOSED: '已闭环' } as Record<string, string>)[st] || st
 }
-function fmt(v: string) { return v ? String(v).replace('T', ' ').slice(0, 16) : '-' }
+function fmt(v: string) { return formatDateTime(v) }
 
 async function openDetail(task: any) {
   drawer.value = true

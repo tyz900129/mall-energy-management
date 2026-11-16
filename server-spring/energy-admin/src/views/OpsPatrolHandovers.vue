@@ -54,6 +54,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { opsPatrolApi } from '@/api/opsPatrol'
+import { formatDateTime } from '@/utils/format'
 import { useIsMobile } from '@/composables/useIsMobile'
 
 const isMobile = useIsMobile()
@@ -77,7 +78,7 @@ function statusLabel(st: string) {
 function statusTagType(st: string) {
   return ({ PENDING: 'danger', RECTIFYING: 'warning', REVIEWING: 'primary', CLOSED: 'success' } as Record<string, any>)[st] || 'info'
 }
-function fmt(v: string) { return v ? String(v).replace('T', ' ').slice(0, 16) : '-' }
+function fmt(v: string) { return formatDateTime(v) }
 onMounted(load)
 </script>
 

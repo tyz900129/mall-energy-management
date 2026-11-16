@@ -7,6 +7,7 @@ export const inspectionApi={
   tasks:(params:any)=>request.get('/api/v1/inspections/tasks',{params}), task:(id:any)=>request.get(`/api/v1/inspections/tasks/${id}`), submit:(id:any,d:any)=>request.post(`/api/v1/inspections/tasks/${id}/submit`,d),
   claim:(id:any)=>request.post(`/api/v1/inspections/tasks/${id}/claim`), reassign:(id:any,d:any)=>request.post(`/api/v1/inspections/tasks/${id}/reassign`,d),
   taskByToken:(token:string)=>request.get(`/api/v1/inspections/tasks/token/${token}`), attachments:(id:any)=>request.get(`/api/v1/inspections/tasks/${id}/attachments`),
+  attachmentFile:(id:any,attachmentId:any)=>request.get(`/api/v1/inspections/tasks/${id}/attachments/${attachmentId}`,{responseType:'blob'}),
   issues:(params:any={})=>request.get('/api/v1/inspections/issues',{params}), rectify:(id:any,note:string)=>request.post(`/api/v1/inspections/issues/${id}/rectify`,{note}), review:(id:any,passed:boolean)=>request.post(`/api/v1/inspections/issues/${id}/review`,{passed}),
   dashboard:()=>request.get('/api/v1/inspections/dashboard')
 }

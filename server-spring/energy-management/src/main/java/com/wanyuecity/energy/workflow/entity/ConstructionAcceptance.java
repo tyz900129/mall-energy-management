@@ -24,6 +24,8 @@ public class ConstructionAcceptance {
     private LocalDateTime requestedAt;
     private String inspectedBy;
     private LocalDateTime inspectedAt;
+    @TableField(exist = false) private String requesterName;
+    @TableField(exist = false) private String inspectorName;
     @TableField(fill = FieldFill.INSERT) private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE) private LocalDateTime updatedAt;
 }

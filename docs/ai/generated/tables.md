@@ -1,10 +1,10 @@
 # 数据表清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-16 15:53:29 ｜ 代码锚点：main@4df48fe
+> 生成时间：2026-11-16 23:02:58 ｜ 代码锚点：main@7c2a8ef
 
 
-共 159 张表，来自 59 个含建表语句的迁移脚本（最高 V110）。
+共 160 张表，来自 60 个含建表语句的迁移脚本（最高 V112）。
 
 | 表名 | 创建迁移 | 版本 |
 |---|---|---|
@@ -167,3 +167,4 @@
 | `energy_exception_account` | V110__energy_device_offline_and_exception_account.sql | V110 |
 | `energy_exception_monitor_setting` | V110__energy_device_offline_and_exception_account.sql | V110 |
 | `energy_exception_sync_run` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `inspection_task_log` | V112__inspection_task_operation_log.sql | V112 |

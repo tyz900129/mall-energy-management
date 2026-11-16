@@ -76,7 +76,9 @@
         <el-table-column label="巡检人部门" width="130">
           <template #default="{ row }">{{ deptName(row.deptCode) }}</template>
         </el-table-column>
-        <el-table-column prop="submittedBy" label="提交人" width="110" />
+        <el-table-column label="提交人" width="110">
+          <template #default="{ row }">{{ row.submitterName || '-' }}</template>
+        </el-table-column>
         <el-table-column label="提交时间" width="160">
           <template #default="{ row }">{{ fmt(row.submittedAt) }}</template>
         </el-table-column>
@@ -105,6 +107,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
+import { formatDateTime } from '@/utils/format'
 
 const tasks = ref<any[]>([])
 const activeTask = computed(() => tasks.value.find(t => t.status === 'ACTIVE'))
@@ -136,7 +139,7 @@ function deptNames(codes?: string) {
   if (!codes) return '全体部门'
   return codes.split(',').map(c => deptName(c.trim())).join('、')
 }
-function fmt(t?: string) { return t ? String(t).replace('T', ' ').substring(0, 16) : '-' }
+function fmt(t?: string) { return t ? formatDateTime(t) : '-' }
 function parseItems(s?: string) { try { return JSON.parse(s || '[]') } catch { return [] } }
 const closedCount = computed(() => (detailIssues.value || []).filter(i => i.status === 'CLOSED').length)
 

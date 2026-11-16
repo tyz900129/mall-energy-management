@@ -104,7 +104,7 @@
       <el-form-item label="现场照片">
         <div class="attachment-box">
           <div v-for="item in attachments" :key="item.id" class="attachment-item">
-            <el-image v-if="attachmentUrls[item.id]" :src="attachmentUrls[item.id]" fit="cover" class="thumb" @click="preview(item)" />
+            <el-image v-if="attachmentUrls[item.id]" :src="attachmentUrls[item.id]" :preview-src-list="attachmentPreviewUrls" :initial-index="attachmentPreviewUrls.indexOf(attachmentUrls[item.id])" fit="cover" class="thumb" preview-teleported />
             <el-button link type="danger" @click="removeAttachment(item)">删除</el-button>
           </div>
           <el-upload v-model:file-list="fileList" :auto-upload="false" accept="image/*" list-type="picture-card"
@@ -168,6 +168,7 @@ const businessTypes = ref<any[]>([])
 const floors = ref<any[]>([])
 const dicts = reactive<Record<string, any[]>>({ CATEGORY: [], CHANNEL: [], SATISFACTION: [], STATUS: [] })
 const attachmentUrls = reactive<Record<number, string>>({})
+const attachmentPreviewUrls = computed(() => attachments.value.map((a: any) => attachmentUrls[a.id]).filter(Boolean))
 const userStore = useUserStore()
 const canCreateBrand = computed(() => userStore.hasPermission('complaint.brand.manage') || userStore.hasPermission('complaint.create'))
 
@@ -322,12 +323,6 @@ async function saveBrand() {
     brandDialogVisible.value = false
     ElMessage.success('品牌已新增并选中')
   } finally { brandSaving.value = false }
-}
-
-async function preview(item: any) {
-  const blob: any = await complaintApi.attachmentFile(props.complaintId as number, item.id)
-  const url = window.URL.createObjectURL(blob)
-  window.open(url, '_blank')
 }
 
 async function removeAttachment(item: any) {

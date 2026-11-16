@@ -45,6 +45,7 @@
 import { computed,onMounted,reactive,ref } from 'vue'
 import { ElMessage,ElMessageBox } from 'element-plus'
 import { patrolApi } from '@/api/patrol'
+import { formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 const user = useUserStore()
 const isSuperAdmin = computed(() => user.hasPermission('patrol.delete'))
@@ -54,7 +55,7 @@ const total = ref(0)
 const loading = ref(false)
 const query = reactive<any>({page:1,size:20})
 
-function formatTime(value:string){ return value ? value.replace('T',' ').slice(0,16) : '-' }
+function formatTime(value:string){ return formatDateTime(value) }
 function issueLabel(status:string){
   return ({UNASSIGNED:'待分派',ASSIGNED:'待整改',RECTIFYING:'整改中',REVIEWING:'待复核',CLOSED:'已闭环'} as Record<string,string>)[status] || '处理中'
 }

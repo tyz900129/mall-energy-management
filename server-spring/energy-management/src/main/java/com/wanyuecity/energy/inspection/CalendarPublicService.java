@@ -73,6 +73,7 @@ public class CalendarPublicService {
         if (name.length() > 32) throw BizException.badRequest("回执人姓名过长");
         String phone = text(body, "phone");
         if (!phone.isBlank() && !PHONE.matcher(phone).matches()) throw BizException.badRequest("手机号格式不正确");
+        validateRequired(task, body.get("result"));
         if (intValue(task.get("requirePhoto"), 0) == 1 && photoRows(id).isEmpty())
             throw BizException.badRequest("该任务要求至少上传1张现场照片");
 
@@ -101,7 +102,35 @@ public class CalendarPublicService {
                     defaultText(issue, "level", "WARNING"), limit(text(issue, "description"), 1000),
                     limit(text(issue, "rectificationRequirement"), 1000));
         }
+        logReceipt(id, name, issues.isEmpty() ? "H5 提交回执" : "H5 提交回执并登记 " + issues.size() + " 个问题", ip);
         return view(requireTask(token));
+    }
+
+    /** 操作日志失败不影响回执结果。 */
+    private void logReceipt(Long taskId, String actor, String detail, String ip) {
+        try {
+            jdbc.update("INSERT INTO inspection_task_log(task_id,action,actor_type,actor_name,detail,ip) VALUES(?,?,?,?,?,?)",
+                    taskId, "H5_SUBMIT", "H5", cleanLimit(actor, 64), cleanLimit(detail, 500), cleanLimit(ip, 64));
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 必填项服务端兜底校验：表单字段声明 required 时，回执结果不能为空。 */
+    private void validateRequired(Map<String,Object> task, Object resultRaw) {
+        Map<?,?> result = resultRaw instanceof Map<?,?> m ? m : Map.of();
+        for (Object item : fields(task.get("fieldsJson"))) {
+            if (!(item instanceof Map<?,?> f)) continue;
+            if (!boolValue(f.get("required")) && !boolValue(f.get("isRequired"))) continue;
+            String type = (text(f, "type") + " " + text(f, "fieldType") + " " + text(f, "controlType")).toUpperCase();
+            if (type.contains("PHOTO")) continue;
+            String key = firstText(f, "key", "fieldKey", "label", "name");
+            if (key.isEmpty()) continue;
+            Object value = result.get(key);
+            if (value == null || String.valueOf(value).isBlank()) {
+                String label = firstText(f, "label", "name", "key", "fieldKey");
+                throw BizException.badRequest("请填写：" + (label.isEmpty() ? key : label));
+            }
+        }
     }
 
     private Map<String,Object> requireTask(String token) {
@@ -180,6 +209,19 @@ public class CalendarPublicService {
     }
 
     private Long taskId(Map<String,Object> task) { return ((Number) task.get("id")).longValue(); }
+    private static String firstText(Map<?,?> m, String... keys) {
+        for (String key : keys) {
+            String value = text(m, key);
+            if (!value.isBlank()) return value;
+        }
+        return "";
+    }
+    private static boolean boolValue(Object value) {
+        if (value == null) return false;
+        if (value instanceof Boolean b) return b;
+        if (value instanceof Number n) return n.intValue() != 0;
+        return "true".equalsIgnoreCase(String.valueOf(value)) || "1".equals(String.valueOf(value));
+    }
     private static String text(Map<?,?> m, String key) {
         Object value = m.get(key);
         return value == null ? "" : String.valueOf(value).trim();

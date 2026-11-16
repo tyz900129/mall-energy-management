@@ -228,6 +228,142 @@ public class InspectionService {
         return jdbc.queryForList("SELECT g.id,g.plan_id planId,p.name planName,g.occur_date occurDate,g.period_key periodKey,g.task_count taskCount,g.result,g.message,g.created_at createdAt FROM calendar_generation_log g LEFT JOIN inspection_plan p ON p.id=g.plan_id WHERE (? IS NULL OR g.plan_id=?) AND g.occur_date BETWEEN ? AND ? ORDER BY g.id DESC LIMIT 200",planId,planId,Date.valueOf(begin),Date.valueOf(end));
     }
 
+    /** 日历计划列表：只返回 CALENDAR 类型，并计算下次生成时间。 */
+    public List<Map<String,Object>> calendarPlans(String keyword,String status,String category){
+        StringBuilder sql=new StringBuilder("SELECT p.id,p.name,p.category,p.frequency_type frequencyType,p.frequency_value frequencyValue,p.start_date startDate,p.end_date endDate,p.execute_time executeTime,p.overdue_minutes overdueMinutes,p.owner_type ownerType,p.owner_id ownerId,p.owner_dept_id ownerDeptId,p.target_mode targetMode,p.claim_mode claimMode,p.form_mode formMode,p.require_photo requirePhoto,p.advance_minutes advanceMinutes,p.urge_minutes urgeMinutes,p.webhook_config_ids webhookConfigIds,p.enabled,p.last_generated_at lastGeneratedAt,p.updated_at updatedAt,COALESCE(CASE p.owner_type WHEN 'USER' THEN u.display_name WHEN 'ROLE' THEN r.name ELSE d.name END,p.assignee_name) ownerName,COALESCE(CASE p.owner_type WHEN 'DEPT' THEN d.name WHEN 'USER' THEN ud.name ELSE rd.name END,'-') ownerDeptName FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id LEFT JOIN sys_user u ON u.id=p.owner_id AND p.owner_type='USER' LEFT JOIN sys_role r ON r.id=p.owner_id AND p.owner_type='ROLE' LEFT JOIN sys_department d ON d.id=p.owner_id AND p.owner_type='DEPT' LEFT JOIN sys_department ud ON ud.id=u.department_id LEFT JOIN sys_department rd ON rd.id=r.dept_id WHERE y.code='CALENDAR'");
+        List<Object> args=new ArrayList<>();
+        if(keyword!=null&&!keyword.isBlank()){sql.append(" AND (p.name LIKE ? OR COALESCE(CASE p.owner_type WHEN 'USER' THEN u.display_name WHEN 'ROLE' THEN r.name ELSE d.name END,'') LIKE ?)");String kw="%"+keyword.trim()+"%";args.add(kw);args.add(kw);}
+        if(status!=null&&!status.isBlank()){sql.append(" AND p.enabled=?");args.add(("1".equals(status.trim())||"ENABLED".equalsIgnoreCase(status.trim()))?1:0);}
+        if(category!=null&&!category.isBlank()){sql.append(" AND p.category=?");args.add(category.trim());}
+        sql.append(" ORDER BY p.enabled DESC,p.id DESC LIMIT 500");
+        List<Map<String,Object>> rows=new ArrayList<>();
+        for(Map<String,Object> row:jdbc.queryForList(sql.toString(),args.toArray())){
+            Map<String,Object> item=new LinkedHashMap<>(row);
+            item.put("nextRunAt",nextRunAt(item));
+            rows.add(item);
+        }
+        return rows;
+    }
+
+    public Map<String,Object> calendarPlan(Long id){
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT p.id,p.name,p.category,p.frequency_type frequencyType,p.frequency_value frequencyValue,p.start_date startDate,p.end_date endDate,p.execute_time executeTime,p.overdue_minutes overdueMinutes,p.owner_type ownerType,p.owner_id ownerId,p.owner_dept_id ownerDeptId,p.target_mode targetMode,p.claim_mode claimMode,p.form_mode formMode,p.require_photo requirePhoto,p.advance_minutes advanceMinutes,p.urge_minutes urgeMinutes,p.webhook_config_ids webhookConfigIds,p.enabled,p.last_generated_at lastGeneratedAt,p.updated_at updatedAt FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id WHERE p.id=? AND y.code='CALENDAR'",id);
+        if(rows.isEmpty()) bad("日历计划不存在");
+        Map<String,Object> item=new LinkedHashMap<>(rows.get(0));
+        item.put("nextRunAt",nextRunAt(item));
+        item.put("logs",generationLogs(id,LocalDate.now().minusDays(6),LocalDate.now()));
+        return item;
+    }
+
+    @Transactional
+    public Map<String,Object> saveCalendarPlan(Long id,Map<String,Object> body){
+        String name=text(body,"name");
+        if(name.isBlank()) bad("计划名称不能为空");
+        if(name.length()>100) bad("计划名称不能超过100个字符");
+        LocalDate start=parseDate(body.get("startDate")); if(start==null) bad("请选择开始日期");
+        LocalDate endDate=parseDate(body.get("endDate")); if(endDate!=null&&endDate.isBefore(start)) bad("结束日期不能早于开始日期");
+        LocalTime execute=parseTime(body.get("executeTime")); if(execute==null) bad("请选择执行时间");
+        String category=defaultText(body,"category","OTHER");
+        if(!Set.of("DAILY","SAFETY","CLEANING","OPERATION","MEETING","OTHER").contains(category)) bad("任务分类无效");
+        String frequency=defaultText(body,"frequencyType","DAILY");
+        if(!Set.of("DAILY","WEEKLY","MONTHLY","INTERVAL_DAYS").contains(frequency)) bad("执行频率无效");
+        int frequencyValue=Math.max(1,intValue(body.get("frequencyValue"),1));
+        String ownerType=defaultText(body,"ownerType","DEPT");
+        if(!Set.of("USER","ROLE","DEPT").contains(ownerType)) bad("归属类型无效");
+        Long ownerId=longValue(body.get("ownerId")); if(ownerId==null) bad("请选择责任对象");
+        String targetMode="DEPT".equals(ownerType)?defaultText(body,"targetMode","UNIT"):"UNIT";
+        if(!Set.of("UNIT","PER_CHILD").contains(targetMode)) bad("下发方式无效");
+        String claimMode=text(body,"claimMode");
+        if(claimMode.isBlank()) claimMode="USER".equals(ownerType)?"NONE":"CLAIM";
+        if(!Set.of("NONE","CLAIM","AUTO").contains(claimMode)) bad("认领方式无效");
+        String formMode=defaultText(body,"formMode","NONE");
+        if(!Set.of("CHECKLIST","NONE","INSPECTION").contains(formMode)) bad("回执模式无效");
+        Long ownerDeptId=longValue(body.get("ownerDeptId"));
+        if(ownerDeptId==null){
+            if("DEPT".equals(ownerType)) ownerDeptId=ownerId;
+            else if("ROLE".equals(ownerType)){List<Long> l=jdbc.queryForList("SELECT dept_id FROM sys_role WHERE id=?",Long.class,ownerId);ownerDeptId=l.isEmpty()?null:l.get(0);}
+            else {List<Long> l=jdbc.queryForList("SELECT department_id FROM sys_user WHERE id=?",Long.class,ownerId);ownerDeptId=l.isEmpty()?null:l.get(0);}
+        }
+        // 提前校验责任对象，避免生成阶段才发现归属无效
+        resolveOwner(ownerType,ownerId,text(body,"assigneeName"),claimMode);
+        Long typeId=calendarTypeId();
+        Long templateId=calendarTemplateId(typeId);
+        int enabled=boolInt(body,"enabled",1);
+        String webhook;
+        if(body.containsKey("webhookConfigIds")) webhook=jsonText(body.get("webhookConfigIds"));
+        else if(id!=null) webhook=String.valueOf(one("SELECT webhook_config_ids v FROM inspection_plan WHERE id=?",id).getOrDefault("v","[]"));
+        else webhook="[]";
+        Object[] args={name,typeId,templateId,category,frequency,frequencyValue,"{}",Date.valueOf(start),sqlDate(body.get("endDate")),Time.valueOf(execute),intValue(body.get("overdueMinutes"),1440),longValue(body.get("assigneeUserId")),text(body,"assigneeName"),webhook,ownerType,ownerId,ownerDeptId,targetMode,claimMode,formMode,boolInt(body,"requirePhoto",0),intValue(body.get("advanceMinutes"),0),intValue(body.get("urgeMinutes"),30),enabled};
+        if(id==null){
+            jdbc.update("INSERT INTO inspection_plan(name,inspection_type_id,template_id,category,frequency_type,frequency_value,schedule_config_json,start_date,end_date,execute_time,overdue_minutes,assignee_user_id,assignee_name,webhook_config_ids,owner_type,owner_id,owner_dept_id,target_mode,claim_mode,form_mode,require_photo,advance_minutes,urge_minutes,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",args);
+            id=jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);
+        }else{
+            Integer exists=jdbc.queryForObject("SELECT COUNT(*) FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id WHERE p.id=? AND y.code='CALENDAR'",Integer.class,id);
+            if(exists==null||exists==0) bad("日历计划不存在");
+            Object[] update=Arrays.copyOf(args,args.length+1);update[args.length]=id;
+            jdbc.update("UPDATE inspection_plan SET name=?,inspection_type_id=?,template_id=?,category=?,frequency_type=?,frequency_value=?,schedule_config_json=?,start_date=?,end_date=?,execute_time=?,overdue_minutes=?,assignee_user_id=?,assignee_name=?,webhook_config_ids=?,owner_type=?,owner_id=?,owner_dept_id=?,target_mode=?,claim_mode=?,form_mode=?,require_photo=?,advance_minutes=?,urge_minutes=?,enabled=? WHERE id=?",update);
+            jdbc.update("DELETE FROM inspection_plan_target WHERE plan_id=?",id);
+        }
+        if(!("DEPT".equals(ownerType)&&"PER_CHILD".equals(targetMode))) {
+            // 日历计划按计划整体下发，不使用设备对象；保留一条占位目标供生成器复用
+            jdbc.update("INSERT INTO inspection_plan_target(plan_id,target_type,target_id,target_code,target_name,location_text,enabled) VALUES(?,?,?,?,?,?,1)",id,"CALENDAR",String.valueOf(ownerId),"",name,"");
+        }
+        if(enabled==1) generatePlan(id,LocalDate.now());
+        return calendarPlan(id);
+    }
+
+    @Transactional
+    public Map<String,Object> toggleCalendarPlan(Long id,boolean enabled){
+        Integer exists=jdbc.queryForObject("SELECT COUNT(*) FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id WHERE p.id=? AND y.code='CALENDAR'",Integer.class,id);
+        if(exists==null||exists==0) bad("日历计划不存在");
+        jdbc.update("UPDATE inspection_plan SET enabled=?,updated_at=NOW(3) WHERE id=?",enabled?1:0,id);
+        if(enabled) generatePlan(id,LocalDate.now());
+        return calendarPlan(id);
+    }
+
+    private Long calendarTypeId(){
+        List<Long> ids=jdbc.queryForList("SELECT id FROM inspection_type WHERE code='CALENDAR' ORDER BY id LIMIT 1",Long.class);
+        if(ids.isEmpty()) bad("日历任务类型未初始化，请先执行数据库迁移");
+        return ids.get(0);
+    }
+
+    private Long calendarTemplateId(Long typeId){
+        List<Long> ids=jdbc.queryForList("SELECT id FROM inspection_template WHERE inspection_type_id=? AND enabled=1 ORDER BY id LIMIT 1",Long.class,typeId);
+        if(!ids.isEmpty()) return ids.get(0);
+        jdbc.update("INSERT INTO inspection_template(inspection_type_id,name,version_no,fields_json,enabled) VALUES(?,?,1,'[]',1)",typeId,"日历任务默认回执");
+        return jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);
+    }
+
+    /** 计算下一次计划生成时间，最多向后看 400 天。 */
+    private LocalDateTime nextRunAt(Map<String,Object> row){
+        LocalDate start=toDate(row.get("startDate")); if(start==null) return null;
+        LocalDate end=toDate(row.get("endDate"));
+        Object time=row.get("executeTime");
+        LocalTime execute=time instanceof Time t?t.toLocalTime():parseTime(time);
+        if(execute==null) return null;
+        Map<String,Object> probe=new LinkedHashMap<>();
+        probe.put("frequency_type",row.get("frequencyType"));
+        probe.put("frequency_value",row.get("frequencyValue"));
+        probe.put("start_date",row.get("startDate"));
+        LocalDate today=LocalDate.now(); LocalDate d=start.isAfter(today)?start:today; LocalDateTime now=LocalDateTime.now();
+        for(int i=0;i<400&&(end==null||!d.isAfter(end));i++,d=d.plusDays(1)){
+            if(!due(probe,d)) continue;
+            LocalDateTime at=LocalDateTime.of(d,execute);
+            if(!at.isBefore(now)) return at;
+        }
+        return null;
+    }
+
+    /** 任务操作日志：写入失败不阻断主流程。 */
+    public void logTask(Long taskId,String action,String actorType,String actorName,String detail,String ip){
+        try{
+            jdbc.update("INSERT INTO inspection_task_log(task_id,action,actor_type,actor_name,detail,ip) VALUES(?,?,?,?,?,?)",taskId,trunc(action,32),trunc(actorType,16),trunc(actorName,64),trunc(detail,500),trunc(ip,64));
+        }catch(Exception ignored){}
+    }
+
+    public List<Map<String,Object>> taskLogs(Long taskId){
+        return jdbc.queryForList("SELECT id,task_id taskId,action,actor_type actorType,actor_name actorName,detail,ip,created_at createdAt FROM inspection_task_log WHERE task_id=? ORDER BY id DESC LIMIT 100",taskId);
+    }
+
     @Transactional
     public int generatePlan(Long planId, LocalDate day){
         Map<String,Object> p=one("SELECT p.*,y.code typeCode FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id WHERE p.id=?",planId);
@@ -265,6 +401,7 @@ public class InspectionService {
     }
 
     private static String limit(String s){if(s==null)return null;return s.length()>500?s.substring(0,500):s;}
+    private static String trunc(String s,int max){if(s==null)return null;return s.length()>max?s.substring(0,max):s;}
 
     private int insertTask(Map<String,Object> p,String period,LocalDateTime scheduled,LocalDateTime dueAt,String targetType,String targetId,String targetCode,String targetName,String locationText,Owner o,boolean calendar){
         try{
@@ -279,7 +416,7 @@ public class InspectionService {
     }
 
     public List<Map<String,Object>> tasks(String status,String keyword,String username,boolean ownOnly){
-        StringBuilder sql=new StringBuilder("SELECT k.id,k.task_no taskNo,k.plan_id planId,p.name planName,y.name inspectionTypeName,k.target_type targetType,k.target_code targetCode,k.target_name targetName,k.location_text locationText,k.scheduled_at scheduledAt,k.due_at dueAt,k.assignee_user_id assigneeUserId,k.assignee_name assigneeName,k.access_token accessToken,k.status,k.source_type sourceType,k.owner_type ownerType,k.owner_id ownerId,k.owner_name ownerName,k.owner_dept_id ownerDeptId,k.owner_dept_name ownerDeptName,k.claimed_by claimedBy,k.claimed_at claimedAt,k.assignee_status assigneeStatus,k.started_at startedAt,k.submitted_at submittedAt,k.result_summary resultSummary,k.completed_by completedBy,p.claim_mode planClaimMode FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id JOIN inspection_type y ON y.id=k.inspection_type_id WHERE 1=1");
+        StringBuilder sql=new StringBuilder("SELECT k.id,k.task_no taskNo,k.plan_id planId,p.name planName,y.name inspectionTypeName,k.target_type targetType,k.target_code targetCode,k.target_name targetName,k.location_text locationText,k.scheduled_at scheduledAt,k.due_at dueAt,k.assignee_user_id assigneeUserId,k.assignee_name assigneeName,k.access_token accessToken,k.status,k.source_type sourceType,k.owner_type ownerType,k.owner_id ownerId,k.owner_name ownerName,k.owner_dept_id ownerDeptId,k.owner_dept_name ownerDeptName,k.claimed_by claimedBy,(SELECT COALESCE(NULLIF(u2.display_name,''),u2.username) FROM sys_user u2 WHERE u2.username=k.claimed_by LIMIT 1) claimedByName,k.claimed_at claimedAt,k.assignee_status assigneeStatus,k.started_at startedAt,k.submitted_at submittedAt,k.result_summary resultSummary,k.completed_by completedBy,p.claim_mode planClaimMode FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id JOIN inspection_type y ON y.id=k.inspection_type_id WHERE 1=1");
         List<Object> args=new ArrayList<>(); if(status!=null&&!status.isBlank()){sql.append(" AND k.status=?");args.add(status);} if(keyword!=null&&!keyword.isBlank()){sql.append(" AND (k.task_no LIKE ? OR k.target_name LIKE ? OR k.target_code LIKE ?)");String x="%"+keyword+"%";args.add(x);args.add(x);args.add(x);}
         if(ownOnly){
             Map<String,Object> u=userRow(username);
@@ -294,8 +431,8 @@ public class InspectionService {
     }
 
     public Map<String,Object> task(Long id){
-        Map<String,Object> r=one("SELECT k.*,k.task_no taskNo,k.plan_id planId,k.target_type targetType,k.target_id targetId,k.target_code targetCode,k.target_name targetName,k.location_text locationText,k.equipment_snapshot_json equipmentSnapshotJson,k.scheduled_at scheduledAt,k.due_at dueAt,k.assignee_user_id assigneeUserId,k.assignee_name assigneeName,k.access_token accessToken,k.status,k.source_type sourceType,k.owner_type ownerType,k.owner_id ownerId,k.owner_name ownerName,k.owner_dept_id ownerDeptId,k.owner_dept_name ownerDeptName,k.owner_ancestors ownerAncestors,k.claimed_by claimedBy,k.claimed_at claimedAt,k.assignee_status assigneeStatus,k.started_at startedAt,k.submitted_at submittedAt,k.result_json resultJson,k.result_summary resultSummary,k.completed_by completedBy,p.name planName,p.category,p.form_mode formMode,p.require_photo requirePhoto,p.advance_minutes advanceMinutes,p.urge_minutes urgeMinutes,p.claim_mode planClaimMode,y.name inspectionTypeName,t.name templateName,t.fields_json fieldsJson FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id JOIN inspection_type y ON y.id=k.inspection_type_id JOIN inspection_template t ON t.id=k.template_id WHERE k.id=?",id);
-        r.put("issues",issues(id,null));return r;
+        Map<String,Object> r=one("SELECT k.*,k.task_no taskNo,k.plan_id planId,k.target_type targetType,k.target_id targetId,k.target_code targetCode,k.target_name targetName,k.location_text locationText,k.equipment_snapshot_json equipmentSnapshotJson,k.scheduled_at scheduledAt,k.due_at dueAt,k.assignee_user_id assigneeUserId,k.assignee_name assigneeName,k.access_token accessToken,k.status,k.source_type sourceType,k.owner_type ownerType,k.owner_id ownerId,k.owner_name ownerName,k.owner_dept_id ownerDeptId,k.owner_dept_name ownerDeptName,k.owner_ancestors ownerAncestors,k.claimed_by claimedBy,(SELECT COALESCE(NULLIF(u2.display_name,''),u2.username) FROM sys_user u2 WHERE u2.username=k.claimed_by LIMIT 1) claimedByName,k.claimed_at claimedAt,k.assignee_status assigneeStatus,k.started_at startedAt,k.submitted_at submittedAt,k.result_json resultJson,k.result_summary resultSummary,k.completed_by completedBy,p.name planName,p.category,p.form_mode formMode,p.require_photo requirePhoto,p.advance_minutes advanceMinutes,p.urge_minutes urgeMinutes,p.claim_mode planClaimMode,y.name inspectionTypeName,t.name templateName,t.fields_json fieldsJson FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id JOIN inspection_type y ON y.id=k.inspection_type_id JOIN inspection_template t ON t.id=k.template_id WHERE k.id=?",id);
+        r.put("issues",issues(id,null));r.put("logs",taskLogs(id));return r;
     }
     public Map<String,Object> taskByToken(String token){Map<String,Object> row=one("SELECT id FROM inspection_task WHERE access_token=?",token);return task(longValue(row.get("id")));}
     public byte[] qr(Long id){Map<String,Object> t=task(id);try{String token=String.valueOf(t.get("accessToken"));String source=String.valueOf(t.get("sourceType"));String path="CALENDAR".equals(source)||"MANUAL".equals(source)?"/calendar/receipt/"+token:"/inspection/tasks?taskToken="+token;String url=publicBaseUrl.replaceAll("/$","")+path;BitMatrix matrix=new QRCodeWriter().encode(url,BarcodeFormat.QR_CODE,420,420);ByteArrayOutputStream out=new ByteArrayOutputStream();MatrixToImageWriter.writeToStream(matrix,"PNG",out);return out.toByteArray();}catch(Exception e){bad("巡检二维码生成失败");return new byte[0];}}
@@ -313,6 +450,7 @@ public class InspectionService {
         jdbc.update("UPDATE inspection_task SET status=?,started_at=COALESCE(started_at,NOW(3)),submitted_at=NOW(3),result_json=?,result_summary=?,completed_by=?,claimed_by=COALESCE(claimed_by,?),claimed_at=COALESCE(claimed_at,NOW(3)),assignee_user_id=COALESCE(assignee_user_id,?),assignee_name=COALESCE(NULLIF(assignee_name,''),?),assignee_status='ASSIGNED',submitter_name=?,submit_source='WEB',late_minutes=? WHERE id=?",issueCount>0?"PENDING_RECTIFICATION":"COMPLETED",result,text(body,"summary"),username,username,uid,display,display,lateMinutes,id);
         jdbc.update("DELETE FROM inspection_issue WHERE task_id=? AND status='PENDING'",id);
         if(issues instanceof List<?> list) for(Object item:list) if(item instanceof Map<?,?> m) jdbc.update("INSERT INTO inspection_issue(task_id,field_key,field_label,level,description,rectification_requirement,responsible_user_id,responsible_name,due_at,status) VALUES(?,?,?,?,?,?,?,?,?,'PENDING')",id,text(m,"fieldKey"),text(m,"fieldLabel"),defaultText(m,"level","WARNING"),text(m,"description"),text(m,"rectificationRequirement"),longValue(m.get("responsibleUserId")),text(m,"responsibleName"),sqlTimestamp(m.get("dueAt")));
+        logTask(id,"SUBMIT","USER",display,issueCount>0?"提交回执并登记 "+issueCount+" 个问题":"提交回执",null);
         return task(id);
     }
 
@@ -341,11 +479,12 @@ public class InspectionService {
             if(username.equals(String.valueOf(again.get("claimedBy")))) return task(id);
             bad("任务已被他人认领");
         }
+        logTask(id,"CLAIM","USER",display,"认领任务",null);
         return task(id);
     }
 
     @Transactional
-    public Map<String,Object> reassign(Long id,Map<String,Object> body){
+    public Map<String,Object> reassign(Long id,Map<String,Object> body,String actor){
         Map<String,Object> t=one("SELECT id,status FROM inspection_task WHERE id=?",id);
         if(Set.of("COMPLETED","CLOSED","CANCELLED").contains(String.valueOf(t.get("status")))) bad("已完成或已取消的任务不允许重新归属");
         String type=defaultText(body,"ownerType","DEPT"); Long oid=longValue(body.get("ownerId"));
@@ -353,6 +492,9 @@ public class InspectionService {
         if(oid==null) bad("请选择新的责任对象");
         Owner o=resolveOwner(type,oid,null,"CLAIM");
         jdbc.update("UPDATE inspection_task SET owner_type=?,owner_id=?,owner_name=?,owner_dept_id=?,owner_dept_name=?,owner_ancestors=?,claimed_by=NULL,claimed_at=NULL,assignee_user_id=?,assignee_name=?,assignee_status=? WHERE id=?",o.type(),o.id(),o.name(),o.deptId(),o.deptName(),o.ancestors(),o.assigneeId(),o.assigneeName(),o.assigneeStatus(),id);
+        Map<String,Object> actorRow=userRow(actor);
+        String actorName=actorRow==null?actor:String.valueOf(actorRow.getOrDefault("name",actor));
+        logTask(id,"REASSIGN","USER",actorName,"责任归属调整为 "+("USER".equals(o.type())?"个人":("ROLE".equals(o.type())?"岗位":"部门"))+"："+o.name(),null);
         return task(id);
     }
 

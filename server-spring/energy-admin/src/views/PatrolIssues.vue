@@ -129,6 +129,7 @@ import { computed,onBeforeUnmount,onMounted,reactive,ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { patrolApi } from '@/api/patrol'
+import { formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 const user = useUserStore()
 const route = useRoute()
@@ -172,7 +173,7 @@ function statusLabel(status:string){
 function statusType(status:string):'primary'|'success'|'warning'|'info'|'danger'{
   return ({UNASSIGNED:'warning',ASSIGNED:'primary',RECTIFYING:'primary',REVIEWING:'warning',CLOSED:'success',REJECTED:'danger'} as Record<string,'primary'|'success'|'warning'|'info'|'danger'>)[status] || 'info'
 }
-function formatTime(value:string){ return value ? value.replace('T',' ').slice(0,16) : '-' }
+function formatTime(value:string){ return formatDateTime(value) }
 function isOverdue(row:any){ return !!row.dueAt && !['CLOSED'].includes(row.status) && new Date(row.dueAt).getTime() < Date.now() }
 function photoUrl(a:any){ return current.value ? `/api/v1/patrol-public/attachments/${current.value.feedbackToken}/${a.id}` : '' }
 

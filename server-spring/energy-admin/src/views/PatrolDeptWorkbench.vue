@@ -31,6 +31,7 @@
 import { onMounted,ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { patrolApi } from '@/api/patrol'
+import { formatDateTime } from '@/utils/format'
 const route = useRoute()
 const token = String(route.params.token||'')
 const loading = ref(false)
@@ -45,7 +46,7 @@ function statusLabel(status:string){
 function statusType(status:string):'primary'|'success'|'warning'|'info'|'danger'{
   return ({ASSIGNED:'primary',RECTIFYING:'primary',REVIEWING:'warning',CLOSED:'success'} as Record<string,'primary'|'success'|'warning'|'info'|'danger'>)[status] || 'info'
 }
-function short(value:string){ return value ? value.replace('T',' ').slice(5,16) : '-' }
+function short(value:string){ return formatDateTime(value) }
 async function load(){
   loading.value=true
   try{ data.value = await patrolApi.publicDepartment(token, range.value) as any || {issues:[]} }

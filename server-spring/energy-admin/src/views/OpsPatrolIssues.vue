@@ -109,13 +109,13 @@
           </template>
           <template v-if="detail.review_note">
             <div class="sec-title">复核意见</div>
-            <p class="desc">{{ detail.review_note }}<span class="sub">（{{ detail.reviewed_by }} · {{ fmt(detail.reviewed_at) }}）</span></p>
+            <p class="desc">{{ detail.review_note }}<span class="sub">（{{ detail.reviewerName || '-' }} · {{ fmt(detail.reviewed_at) }}）</span></p>
           </template>
 
           <div class="sec-title">处理记录</div>
           <el-timeline>
             <el-timeline-item v-for="(l, i) in detail.logs" :key="i" :timestamp="fmt(l.createdAt)" placement="top">
-              <b>{{ l.operator || '系统' }}</b> {{ actionLabel(l.action) }}<span v-if="l.note">：{{ l.note }}</span>
+              <b>{{ l.operatorName || '-' }}</b> {{ actionLabel(l.action) }}<span v-if="l.note">：{{ l.note }}</span>
             </el-timeline-item>
           </el-timeline>
 
@@ -160,6 +160,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { opsPatrolApi } from '@/api/opsPatrol'
+import { formatDateTime } from '@/utils/format'
 import http from '@/api/http'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { useUserStore } from '@/stores/user'
@@ -237,7 +238,7 @@ function statusTagType(st: string) {
 function actionLabel(a: string) {
   return ({ CREATE: '创建问题', ASSIGN: '指派跟进', TRANSFER: '变更跟进人', RECTIFY: '提交整改', FEEDBACK_CLOSE: '整改闭环', REVIEW_PASS: '复核通过', REVIEW_REJECT: '复核驳回', OVERDUE_NOTICE: '逾期提醒' } as Record<string, string>)[a] || '状态变更'
 }
-function fmt(v: string) { return v ? String(v).replace('T', ' ').slice(0, 16) : '-' }
+function fmt(v: string) { return formatDateTime(v) }
 
 async function assign() {
   if (!assignName.value.trim()) return ElMessage.warning('请填写跟进人姓名')

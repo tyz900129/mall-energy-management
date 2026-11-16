@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -280,13 +283,36 @@ public class ConstructionWorkflowService {
         view.setRelatedWorkflowId(detail.getRelatedWorkflowId());
         view.setAcceptanceRequestedAt(detail.getAcceptanceRequestedAt());
         view.setInspections(inspectionMapper.selectList(new QueryWrapper<ConstructionInspection>().eq("workflow_id", workflow.getId()).orderByDesc("inspected_at")));
-        view.setAcceptances(acceptanceMapper.selectList(new QueryWrapper<ConstructionAcceptance>().eq("workflow_id", workflow.getId()).orderByDesc("round_no")));
+        List<ConstructionAcceptance> acceptances = acceptanceMapper.selectList(new QueryWrapper<ConstructionAcceptance>().eq("workflow_id", workflow.getId()).orderByDesc("round_no"));
+        fillAcceptanceNames(acceptances);
+        view.setAcceptances(acceptances);
         if (detail.getRelatedWorkflowId() != null) { Workflow related = workflowMapper.selectById(detail.getRelatedWorkflowId()); if (related != null) view.setRelatedWorkflowNo(related.getWorkflowNo()); }
         view.setStatus(workflow.getStatus()); view.setApplicantName(workflow.getApplicantName()); view.setRemark(workflow.getRemark()); view.setSubmittedAt(workflow.getSubmittedAt());
         view.setStallStatusBefore(detail.getStallStatusBefore()); view.setStallStatusAfter(detail.getStallStatusAfter()); view.setCompletedBy(detail.getCompletedBy()); view.setCompletedAt(detail.getCompletedAt());
         view.setArchivedAt(detail.getArchivedAt());
         view.setCreatedAt(workflow.getCreatedAt()); view.setUpdatedAt(workflow.getUpdatedAt());
         return view;
+    }
+
+    /** 验收记录的申请/验收账号批量换成人员姓名，仅用于展示，不落库。 */
+    private void fillAcceptanceNames(List<ConstructionAcceptance> acceptances) {
+        Set<String> accounts = new LinkedHashSet<>();
+        for (ConstructionAcceptance a : acceptances) {
+            if (text(a.getRequestedBy())) accounts.add(a.getRequestedBy().trim());
+            if (text(a.getInspectedBy())) accounts.add(a.getInspectedBy().trim());
+        }
+        if (accounts.isEmpty()) return;
+        String placeholders = String.join(",", Collections.nCopies(accounts.size(), "?"));
+        Map<String, String> names = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                "SELECT u.username,COALESCE(NULLIF(u.display_name,''),u.username) AS name FROM sys_user u WHERE u.username IN (" + placeholders + ")",
+                accounts.toArray())) {
+            names.put(String.valueOf(row.get("username")), String.valueOf(row.get("name")));
+        }
+        for (ConstructionAcceptance a : acceptances) {
+            a.setRequesterName(names.getOrDefault(text(a.getRequestedBy()) ? a.getRequestedBy().trim() : "", ""));
+            a.setInspectorName(names.getOrDefault(text(a.getInspectedBy()) ? a.getInspectedBy().trim() : "", ""));
+        }
     }
 
     private Long findRelatedWorkflowId(Long stallId, String type) {

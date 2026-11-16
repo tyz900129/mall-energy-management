@@ -951,6 +951,7 @@ public class QrInspectionService {
 
         List<QrInspectionTaskTarget> targets = taskTargetMapper.selectList(
                 new QueryWrapper<QrInspectionTaskTarget>().eq("task_id", id).orderByDesc("id"));
+        Map<String, String> submitterNames = submitterNamesOf(targets);
         List<Map<String, Object>> targetRows = new ArrayList<>();
         for (QrInspectionTaskTarget tg : targets) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -959,6 +960,7 @@ public class QrInspectionService {
             m.put("status", tg.getStatus());
             m.put("submittedAt", tg.getSubmittedAt());
             m.put("submittedBy", tg.getSubmittedBy());
+            m.put("submitterName", submitterNames.getOrDefault(tg.getSubmittedBy(), ""));
             m.put("deptCode", tg.getSelectedDeptCode());
             Stall s = stallMapper.selectById(tg.getStallId());
             if (s != null) {
@@ -972,6 +974,23 @@ public class QrInspectionService {
         out.put("records", recordMapper.selectList(new QueryWrapper<QrInspectionRecord>().eq("task_id", id).orderByDesc("submitted_at")));
         out.put("issues", issueMapper.selectList(new QueryWrapper<QrInspectionIssue>().eq("task_id", id)));
         return out;
+    }
+
+    /** 批量把提交账号换成人员姓名，避免逐条查询。 */
+    private Map<String, String> submitterNamesOf(List<QrInspectionTaskTarget> targets) {
+        Set<String> accounts = targets.stream()
+                .map(QrInspectionTaskTarget::getSubmittedBy)
+                .filter(a -> a != null && !a.isBlank())
+                .collect(Collectors.toSet());
+        if (accounts.isEmpty()) return Map.of();
+        String placeholders = String.join(",", Collections.nCopies(accounts.size(), "?"));
+        Map<String, String> names = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                "SELECT u.username,COALESCE(NULLIF(u.display_name,''),u.username) AS name FROM sys_user u WHERE u.username IN (" + placeholders + ")",
+                accounts.toArray())) {
+            names.put(String.valueOf(row.get("username")), String.valueOf(row.get("name")));
+        }
+        return names;
     }
 
     public QrInspectionIssue issueByToken(String token) {

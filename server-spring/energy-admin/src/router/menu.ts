@@ -92,7 +92,8 @@ export const MENU_GROUPS: MenuGroup[] = [
     key: 'task-center', title: '任务中心', icon: Calendar,
     anyOf: ['calendar.view', 'calendar.manage', 'calendar.report'],
     items: [
-      { path: '/calendar', title: '任务日历', permission: 'calendar.view' }
+      { path: '/calendar', title: '任务日历', permission: 'calendar.view' },
+      { path: '/calendar/plans', title: '日历计划', permission: 'calendar.manage' }
     ]
   },
   {

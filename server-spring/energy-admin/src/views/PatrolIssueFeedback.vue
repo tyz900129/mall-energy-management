@@ -69,6 +69,7 @@ import { computed,onMounted,ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { patrolApi } from '@/api/patrol'
+import { formatDateTime } from '@/utils/format'
 const route = useRoute()
 const token = String(route.params.token||'')
 const loading = ref(false)
@@ -80,7 +81,7 @@ const note = ref('')
 const photos = ref<{file:File,preview:string}[]>([])
 const overdue = computed(()=> !!issue.value?.dueAt && issue.value.status!=='CLOSED' && new Date(issue.value.dueAt).getTime()<Date.now())
 
-function short(value:string){ return value ? value.replace('T',' ').slice(0,16) : '-' }
+function short(value:string){ return formatDateTime(value) }
 function statusLabel(status:string){
   return ({UNASSIGNED:'待分派',ASSIGNED:'待整改',RECTIFYING:'整改中',REVIEWING:'待复核',CLOSED:'已闭环'} as Record<string,string>)[status] || status
 }
