@@ -40,11 +40,20 @@ public interface PlatformAdapter {
     /** Fetch accounts returned by the source platform's arrears filter. */
     List<PlatformAccount> fetchArrearsAccounts(String baseUrl, String sessionToken, String spaceId);
 
+    /** Fetch accounts returned by the source platform's exception filter (type=exception). */
+    List<PlatformAccount> fetchExceptionAccounts(String baseUrl, String sessionToken, String spaceId);
+
     /** Fetch daily history bills for one billing account. */
     List<PlatformAccountBill> fetchAccountHistoryBills(String baseUrl, String sessionToken, String platformAccountId);
 
     /** Fetch all devices under the given space. Paginates internally. */
     List<PlatformDevice> fetchDevices(String baseUrl, String sessionToken, String spaceId);
+
+    /**
+     * Fetch device monitoring rows (通讯状态与采集时间) for the whole space.
+     * 只调用列表接口、不逐个拉详情，适合高频离线巡检。
+     */
+    List<PlatformDevice> fetchDeviceMonitoring(String baseUrl, String sessionToken, String spaceId);
 
     /**
      * Fetch account-device binding relations. The default strategy is to use the

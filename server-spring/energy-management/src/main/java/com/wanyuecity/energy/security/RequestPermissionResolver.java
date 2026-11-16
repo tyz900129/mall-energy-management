@@ -264,6 +264,8 @@ public class RequestPermissionResolver {
     }
 
     private Rule energy(String path, String method, boolean read) {
+        if (path.contains("/device-alerts")) return read ? Rule.of("energy.offline.view") : Rule.of("energy.offline.manage");
+        if (path.contains("/exception-accounts")) return read ? Rule.of("energy.exception.view") : Rule.of("energy.exception.manage");
         if (path.contains("/account-anomalies")) return read ? Rule.of("energy.anomaly.view") : Rule.of("energy.anomaly.manage");
         if (path.contains("/balance-warnings")) return read ? Rule.of("energy.balance-warning.view") : Rule.of("energy.balance-warning.manage");
         if (path.startsWith("/api/v1/energy/arrears")) return read ? Rule.of("energy.arrears.view") : Rule.of("energy.arrears.manage");

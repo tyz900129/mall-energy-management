@@ -1,10 +1,10 @@
 # 数据表清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-13 20:46:20 ｜ 代码锚点：feat/permission-code-model@9f40f22
+> 生成时间：2026-11-14 18:56:07 ｜ 代码锚点：feat/permission-code-model@2a47a6a
 
 
-共 152 张表，来自 58 个含建表语句的迁移脚本（最高 V103）。
+共 159 张表，来自 59 个含建表语句的迁移脚本（最高 V110）。
 
 | 表名 | 创建迁移 | 版本 |
 |---|---|---|
@@ -160,3 +160,10 @@
 | `sys_dept_permission_policy` | V99__dept_permission_policy_s2.sql | V99 |
 | `dept_move_log` | V100__dept_org_manage_s3.sql | V100 |
 | `calendar_generation_log` | V103__task_center_foundation_p1.sql | V103 |
+| `energy_device_alert_event` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `energy_device_alert_run` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `energy_device_monitor_setting` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `energy_device_offline_exclude` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `energy_exception_account` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `energy_exception_monitor_setting` | V110__energy_device_offline_and_exception_account.sql | V110 |
+| `energy_exception_sync_run` | V110__energy_device_offline_and_exception_account.sql | V110 |

@@ -50,7 +50,7 @@ export const MENU_GROUPS: MenuGroup[] = [
   },
   {
     key: 'energy-management', title: '能源管理', icon: DataAnalysis,
-    anyOf: ['energy.dashboard.view', 'energy.analysis.view', 'energy.dimension.view', 'energy.sync.view', 'energy.bill.view', 'energy.arrears.view', 'energy.anomaly.view', 'energy.balance-warning.view'],
+    anyOf: ['energy.dashboard.view', 'energy.analysis.view', 'energy.dimension.view', 'energy.sync.view', 'energy.bill.view', 'energy.arrears.view', 'energy.anomaly.view', 'energy.balance-warning.view', 'energy.offline.view', 'energy.exception.view'],
     items: [
       { path: '/energy/dashboard', title: '数据大屏', permission: 'energy.dashboard.view' },
       { path: '/energy/analysis', title: '用量分析', permission: 'energy.analysis.view' },
@@ -59,7 +59,9 @@ export const MENU_GROUPS: MenuGroup[] = [
       { path: '/energy/bills', title: '水电账单录入', permission: 'energy.bill.view' },
       { path: '/energy/arrears', title: '欠费通知', permission: 'energy.arrears.view' },
       { path: '/energy/account-anomalies', title: '账户异动监控', permission: 'energy.anomaly.view' },
-      { path: '/energy/balance-warnings', title: '余额预警通知', permission: 'energy.balance-warning.view' }
+      { path: '/energy/balance-warnings', title: '余额预警通知', permission: 'energy.balance-warning.view' },
+      { path: '/energy/device-alerts', title: '设备离线告警', permission: 'energy.offline.view' },
+      { path: '/energy/exception-accounts', title: '账户异常通知', permission: 'energy.exception.view' }
     ]
   },
   {

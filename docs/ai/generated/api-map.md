@@ -1,10 +1,10 @@
 # 接口地图（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-13 20:46:20 ｜ 代码锚点：feat/permission-code-model@9f40f22
+> 生成时间：2026-11-14 18:56:07 ｜ 代码锚点：feat/permission-code-model@2a47a6a
 
 
-共 482 个接口，58 个控制器。
+共 498 个接口，60 个控制器。
 
 > “代码内权限”为空表示该接口由 `RequestPermissionResolver` 的路径映射鉴权，未写 `@PreAuthorize`。
 
@@ -419,6 +419,16 @@
 | usage | BalanceWarningController | saveRule | PUT | `/api/v1/energy/balance-warnings/rules/{accountNumber}` | — |
 | usage | BalanceWarningController | runs | GET | `/api/v1/energy/balance-warnings/runs` | — |
 | usage | BalanceWarningController | sync | POST | `/api/v1/energy/balance-warnings/sync` | — |
+| usage | DeviceAlertController | events | GET | `/api/v1/energy/device-alerts/events` | `energy.offline.view` |
+| usage | DeviceAlertController | exclusions | GET | `/api/v1/energy/device-alerts/exclusions` | `energy.offline.view` |
+| usage | DeviceAlertController | addExclusion | POST | `/api/v1/energy/device-alerts/exclusions` | `energy.offline.manage` |
+| usage | DeviceAlertController | addExclusions | POST | `/api/v1/energy/device-alerts/exclusions/batch` | `energy.offline.manage` |
+| usage | DeviceAlertController | deleteExclusion | DELETE | `/api/v1/energy/device-alerts/exclusions/{id}` | `energy.offline.manage` |
+| usage | DeviceAlertController | offlineDevices | GET | `/api/v1/energy/device-alerts/offline-devices` | `energy.offline.view` |
+| usage | DeviceAlertController | run | POST | `/api/v1/energy/device-alerts/run` | `energy.offline.manage` |
+| usage | DeviceAlertController | runs | GET | `/api/v1/energy/device-alerts/runs` | `energy.offline.view` |
+| usage | DeviceAlertController | settings | GET | `/api/v1/energy/device-alerts/settings` | `energy.offline.view` |
+| usage | DeviceAlertController | updateSettings | PUT | `/api/v1/energy/device-alerts/settings` | `energy.offline.manage` |
 | usage | EnergyUsageController | analysis | GET | `/api/v1/energy/analysis` | — |
 | usage | EnergyUsageController | bills | GET | `/api/v1/energy/bills` | — |
 | usage | EnergyUsageController | createBill | POST | `/api/v1/energy/bills` | — |
@@ -448,6 +458,12 @@
 | usage | EnergyUsageController | addExclusions | POST | `/api/v1/energy/usage/sync-exclusions` | — |
 | usage | EnergyUsageController | deleteExclusion | DELETE | `/api/v1/energy/usage/sync-exclusions/{deviceId}` | — |
 | usage | EnergyUsageController | updateExclusion | PUT | `/api/v1/energy/usage/sync-exclusions/{deviceId}` | — |
+| usage | ExceptionAccountController | accounts | GET | `/api/v1/energy/exception-accounts/accounts` | `energy.exception.view` |
+| usage | ExceptionAccountController | exclusion | PUT | `/api/v1/energy/exception-accounts/accounts/{accountNumber}/exclusion` | `energy.exception.manage` |
+| usage | ExceptionAccountController | runs | GET | `/api/v1/energy/exception-accounts/runs` | `energy.exception.view` |
+| usage | ExceptionAccountController | settings | GET | `/api/v1/energy/exception-accounts/settings` | `energy.exception.view` |
+| usage | ExceptionAccountController | updateSettings | PUT | `/api/v1/energy/exception-accounts/settings` | `energy.exception.manage` |
+| usage | ExceptionAccountController | sync | POST | `/api/v1/energy/exception-accounts/sync` | `energy.exception.manage` |
 | verification | VerificationController | open | GET | `/api/v1/verification/tasks/{token}` | — |
 | verification | VerificationController | attachment | GET | `/api/v1/verification/tasks/{token}/attachments/{id}` | — |
 | verification | VerificationController | complete | POST | `/api/v1/verification/tasks/{token}/complete` | — |

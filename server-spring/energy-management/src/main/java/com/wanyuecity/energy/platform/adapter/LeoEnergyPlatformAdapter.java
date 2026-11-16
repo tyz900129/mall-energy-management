@@ -159,6 +159,13 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
     }
 
     @Override
+    public List<PlatformAccount> fetchExceptionAccounts(String baseUrl, String sessionToken, String spaceId) {
+        return paginate(baseUrl, sessionToken,
+                "/api/account/page?mobilePhone=&spaceId=" + enc(spaceId) + "&type=exception&name=",
+                "data", "list", this::mapAccount, 50);
+    }
+
+    @Override
     public List<PlatformAccountBill> fetchAccountHistoryBills(String baseUrl, String sessionToken, String platformAccountId) {
         JsonNode response = getJson(baseUrl, "/api/account/" + enc(platformAccountId)
                 + "/history-bills?id=" + enc(platformAccountId), sessionToken);
@@ -195,6 +202,15 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
             log.warn("account detail fetch failed, accountId={}: {}", summary.getPlatformAccountId(), ex.getMessage());
             return summary;
         }
+    }
+
+    @Override
+    public List<PlatformDevice> fetchDeviceMonitoring(String baseUrl, String sessionToken, String spaceId) {
+        // 只取列表接口：包含 deviceId/gatewayId/channelId/commStatus/acqTime，避免数百次详情请求
+        return paginate(baseUrl, sessionToken,
+                "/api/devices/show/device-monitoring?spaceId=" + enc(spaceId)
+                        + "&commStatus=&deviceName=&productId=&deviceSystem=",
+                "data", "list", this::mapDevice, 500);
     }
 
     @Override
@@ -637,6 +653,7 @@ public class LeoEnergyPlatformAdapter implements PlatformAdapter {
                 .balance(decimalOrNull(n.path("balance")))
                 .arrears(decimalOrNull(n.path("arrears")))
                 .arrearsStartedAt(firstText(n, "arrearsStartedAt", "arrearsStartTime", "arrearsTime", "arrearsDate", "debtStartTime", "oweTime"))
+                .exceptionType(firstText(n, "exceptionType", "exceptionName", "abnormalType", "abnormalName", "statusName"))
                 .platformStatus(n.path("billConfiguration").path("status").asText(""))
                 .sourceSpaceId(n.path("spaceId").asText(""))
                 .build();

@@ -1,10 +1,10 @@
 # 权限码清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-13 20:46:21 ｜ 代码锚点：feat/permission-code-model@9f40f22
+> 生成时间：2026-11-14 18:56:07 ｜ 代码锚点：feat/permission-code-model@2a47a6a
 
 
-共 167 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。
+共 171 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。
 
 > 角色授权关系以数据库 `sys_role_permission` 为准，本表不反映“谁拥有”。
 
@@ -70,6 +70,10 @@
 | `energy.dashboard.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `energy.dimension.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `energy.dimension.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
+| `energy.exception.manage` | `V110__energy_device_offline_and_exception_account.sql`<br>`security/RequestPermissionResolver.java`<br>`usage\controller\ExceptionAccountController.java` |
+| `energy.exception.view` | `V110__energy_device_offline_and_exception_account.sql`<br>`security/RequestPermissionResolver.java`<br>`usage\controller\ExceptionAccountController.java` |
+| `energy.offline.manage` | `V110__energy_device_offline_and_exception_account.sql`<br>`security/RequestPermissionResolver.java`<br>`usage\controller\DeviceAlertController.java` |
+| `energy.offline.view` | `V110__energy_device_offline_and_exception_account.sql`<br>`security/RequestPermissionResolver.java`<br>`usage\controller\DeviceAlertController.java` |
 | `energy.sync.execute` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `energy.sync.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `exception.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |

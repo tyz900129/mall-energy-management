@@ -36,6 +36,9 @@ public class PlatformAccount {
     private BigDecimal arrears;
     private String arrearsStartedAt;
 
+    /** 平台返回的异常类型（type=exception 接口），可能为空。 */
+    private String exceptionType;
+
     /** "0" = disabled, "1" = enabled, etc. Strings to keep the source semantics. */
     private String platformStatus;
 
