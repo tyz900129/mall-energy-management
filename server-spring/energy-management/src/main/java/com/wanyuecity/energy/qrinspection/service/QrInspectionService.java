@@ -67,7 +67,7 @@ public class QrInspectionService {
     public static final String SCENE_JOINT  = "JOINT";
 
     private static final Set<String> COMMERCIAL_ROLES = Set.of("APPLICANT", "OPS_PATROL_MANAGER");
-    private static final Set<String> PROPERTY_ROLES   = Set.of("PROPERTY_MANAGER", "DEVICE_VERIFIER");
+    private static final Set<String> PROPERTY_ROLES   = Set.of("DEVICE_VERIFIER");
     private static final Set<String> ADMIN_ROLES      = Set.of("SUPER_ADMIN", "SYSTEM_ADMIN");
 
     private UserInfo userInfo(Authentication auth) {

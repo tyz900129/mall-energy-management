@@ -19,7 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ComplaintOptionService {
 
-    private static final String DEFAULT_USER_ROLES = "CS_AGENT,CS_MANAGER,APPLICANT,PROPERTY_MANAGER,OPS_PATROL_MANAGER";
+    private static final String DEFAULT_USER_ROLES = "CS_AGENT,CS_MANAGER,APPLICANT,OPS_PATROL_MANAGER";
 
     private final JdbcTemplate jdbc;
     private final CsBrandMapper brandMapper;

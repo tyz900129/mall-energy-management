@@ -11,7 +11,13 @@
   - `inspection.equipment.view|manage` / `issue.manage|review`
   - `calendar.view` / `calendar.manage` / `calendar.report`
 - 表：`inspection_type`、`inspection_template`、`inspection_plan`、`inspection_plan_target`、`inspection_task`、`inspection_task_log`、`inspection_issue`、`inspection_reminder_log`、`inspection_equipment_category`、`inspection_equipment`、`inspection_category_template`、`calendar_generation_log`
-- 迁移：V46、V47、V103、V104、V105、V112
+- 迁移：V46、V47、V103、V104、V105、V112、V113
+- 数据范围（`sys_role.data_scope`，V113）：
+  - `ALL`：超级管理员、系统管理员，可见全部任务与全部计划；
+  - `DEPT_SUB`：处长/课长/班长等领导，可见本部门及子部门任务、本人任务，且只能给本部门及子部门创建任务；
+  - `SELF`：其余人员，仅可见本人/本岗位任务及本部门可认领任务。
+  - 范围在服务端强制生效：`InspectionService.tasks`、`calendarTasks`（含预计任务与营运巡场聚合）、`calendarPlans`、`calendarPlan`、`toggleCalendarPlan`、`ownerOptions`；前端筛选仅作展示过滤。
+- 「物业管理员」（`PROPERTY_MANAGER`）角色已随 V113 删除。
 - 日历计划接口（`/api/v1/calendar`，GET 需 `calendar.view`，写操作需 `calendar.manage`）：
   - `GET /plans`（keyword/status/category）、`GET /plans/{id}`（含最近 7 天生成日志）
   - `POST /plans`、`PUT /plans/{id}`、`POST /plans/{id}/toggle?enabled=`
@@ -48,4 +54,4 @@ mvn -Dtest=Calendar*Test test
 
 ## 最后核对
 
-2026-11-16 / main（日历计划管理页、周视图资源泳道、任务操作日志）
+2026-11-17 / main（角色数据范围 ALL/DEPT_SUB/SELF、删除物业管理员、任务创建限本部门及子部门）

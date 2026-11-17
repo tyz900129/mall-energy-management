@@ -31,6 +31,7 @@ public class InspectionService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final NotificationService notificationService;
+    private final com.wanyuecity.energy.security.DataScopeService dataScope;
     @Value("${energy.public-base-url:https://auto.apperload.com}") private String publicBaseUrl;
     // 补生成窗口：0 表示只生成当天、不补历史（当天仍在 from..to 区间内，照常生成）
     @Value("${energy.task.generate-backfill-days:0}") private int backfillDays;
@@ -142,17 +143,19 @@ public class InspectionService {
         return total;
     }
 
-    public Map<String,Object> calendarTasks(LocalDate from, LocalDate to, Long deptId, String category, String status, String keyword, boolean includeExternal){
+    public Map<String,Object> calendarTasks(LocalDate from, LocalDate to, Long deptId, String category, String status, String keyword, boolean includeExternal, String username){
         LocalDate begin=from==null?LocalDate.now().withDayOfMonth(1):from;
         LocalDate end=to==null?begin.plusDays(30):to;
         if(end.isAfter(begin.plusDays(30))) end=begin.plusDays(30);
         if(end.isBefore(begin)) end=begin;
+        com.wanyuecity.energy.security.DataScopeService.Scope scope=dataScope.resolve(username);
         StringBuilder where=new StringBuilder(" WHERE k.scheduled_at>=? AND k.scheduled_at<? AND k.status<>'CANCELLED'");
         List<Object> args=new ArrayList<>();args.add(Timestamp.valueOf(begin.atStartOfDay()));args.add(Timestamp.valueOf(end.plusDays(1).atStartOfDay()));
         if(deptId!=null){where.append(" AND (k.owner_dept_id=? OR k.owner_ancestors LIKE ?)");args.add(deptId);args.add("%/"+deptId+"/%");}
         if(category!=null&&!category.isBlank()){where.append(" AND p.category=?");args.add(category.trim());}
         if(status!=null&&!status.isBlank()){where.append(" AND k.status=?");args.add(status.trim());}
         if(keyword!=null&&!keyword.isBlank()){where.append(" AND (k.task_no LIKE ? OR k.target_name LIKE ? OR p.name LIKE ? OR k.owner_name LIKE ?)");String kw="%"+keyword.trim()+"%";args.add(kw);args.add(kw);args.add(kw);args.add(kw);}
+        where.append(taskScopeSql(scope,"k",args));
         List<Map<String,Object>> instances=jdbc.queryForList("SELECT k.id,k.task_no taskNo,k.target_name targetName,k.target_code targetCode,k.owner_type ownerType,k.owner_id ownerId,k.owner_name ownerName,k.owner_dept_id ownerDeptId,k.owner_dept_name ownerDeptName,k.assignee_name assigneeName,k.claimed_by claimedBy,k.status,k.scheduled_at scheduledAt,k.due_at dueAt,k.submitted_at submittedAt,k.source_type sourceType,p.name planName,p.category,p.form_mode formMode FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id"+where+" ORDER BY k.scheduled_at,k.id",args.toArray());
         List<Map<String,Object>> projections=new ArrayList<>();
         if(status==null||status.isBlank()||"PENDING".equals(status)){
@@ -161,6 +164,8 @@ public class InspectionService {
             for(Map<String,Object> x:jdbc.queryForList("SELECT plan_id,period_key FROM inspection_task WHERE scheduled_at>=? AND scheduled_at<?",Timestamp.valueOf(begin.atStartOfDay()),Timestamp.valueOf(end.plusDays(1).atStartOfDay()))) generated.add(String.valueOf(x.get("plan_id"))+":"+x.get("period_key"));
             for(Map<String,Object> p:plans){
                 if(deptId!=null){Long od=longValue(p.get("owner_dept_id"));if(od==null||!od.equals(deptId))continue;}
+                // 预计任务同样受数据范围约束
+                if(!scope.covers(text(p,"owner_type"),longValue(p.get("owner_id")),longValue(p.get("owner_dept_id"))))continue;
                 if(category!=null&&!category.isBlank()&&!category.trim().equals(String.valueOf(p.get("category"))))continue;
                 if(keyword!=null&&!keyword.isBlank()){String kw=keyword.trim();if(!text(p,"name").contains(kw)&&!text(p,"owner_display_name").contains(kw))continue;}
                 Long planId=longValue(p.get("id"));LocalDate start=toDate(p.get("start_date"));
@@ -172,14 +177,19 @@ public class InspectionService {
                 }
             }
         }
-        Map<String,Object> result=new LinkedHashMap<>();result.put("instances",instances);result.put("projections",projections);result.put("externals",includeExternal&&(category==null||category.isBlank())?externalCalendarTasks(begin,end,deptId,status,keyword):List.of());result.put("from",begin);result.put("to",end);return result;
+        Map<String,Object> result=new LinkedHashMap<>();result.put("instances",instances);result.put("projections",projections);result.put("externals",includeExternal&&(category==null||category.isBlank())?externalCalendarTasks(begin,end,deptId,status,keyword,scope):List.of());result.put("from",begin);result.put("to",end);return result;
     }
 
     /** 只读聚合：把营运巡场任务映射为日历条目，处理入口仍回到原模块。 */
-    public List<Map<String,Object>> externalCalendarTasks(LocalDate begin, LocalDate end, Long deptId, String status, String keyword){
+    public List<Map<String,Object>> externalCalendarTasks(LocalDate begin, LocalDate end, Long deptId, String status, String keyword, com.wanyuecity.energy.security.DataScopeService.Scope scope){
         StringBuilder sql=new StringBuilder("SELECT t.id,t.task_date taskDate,t.status,t.plan_start_at planStartAt,t.plan_end_at planEndAt,t.assignee_name assigneeName,t.submitter_name submitterName,t.late_minutes lateMinutes,t.pass_count passCount,t.fail_count failCount,t.is_handover handover,d.name deptName,s.name slotName FROM ops_patrol_task t JOIN ops_patrol_dept d ON d.id=t.dept_id JOIN ops_patrol_slot s ON s.id=t.slot_id WHERE t.task_date>=? AND t.task_date<=?");
         List<Object> args=new ArrayList<>();args.add(Date.valueOf(begin));args.add(Date.valueOf(end));
         if(deptId!=null){sql.append(" AND d.id IN (SELECT ops_dept_id FROM sys_department WHERE ops_dept_id IS NOT NULL AND (id=? OR ancestors LIKE ?))");args.add(deptId);args.add("%/"+deptId+"/%");}
+        if(scope!=null&&!scope.all()&&!scope.deptIds().isEmpty()){
+            sql.append(" AND d.id IN (SELECT ops_dept_id FROM sys_department WHERE ops_dept_id IS NOT NULL AND id IN (")
+                    .append(String.join(",", Collections.nCopies(scope.deptIds().size(),"?"))).append("))");
+            args.addAll(scope.deptIds());
+        }
         sql.append(" ORDER BY t.plan_start_at,t.id");
         List<Map<String,Object>> out=new ArrayList<>();
         String kw=keyword==null||keyword.isBlank()?null:keyword.trim();
@@ -228,16 +238,39 @@ public class InspectionService {
         return jdbc.queryForList("SELECT g.id,g.plan_id planId,p.name planName,g.occur_date occurDate,g.period_key periodKey,g.task_count taskCount,g.result,g.message,g.created_at createdAt FROM calendar_generation_log g LEFT JOIN inspection_plan p ON p.id=g.plan_id WHERE (? IS NULL OR g.plan_id=?) AND g.occur_date BETWEEN ? AND ? ORDER BY g.id DESC LIMIT 200",planId,planId,Date.valueOf(begin),Date.valueOf(end));
     }
 
+    /**
+     * 任务数据范围 SQL：管理员不限；领导看本部门及子部门、本人任务；
+     * 普通人员看本人、本岗位与被指派的部门任务。
+     */
+    private String taskScopeSql(com.wanyuecity.energy.security.DataScopeService.Scope s,String alias,List<Object> args){
+        if(s.all()) return "";
+        StringBuilder w=new StringBuilder(" AND (").append(alias).append(".assignee_user_id=?").append(" OR ").append(alias).append(".claimed_by=?");
+        args.add(s.userId());args.add(s.username());
+        if(!s.roleIds().isEmpty()){
+            w.append(" OR (").append(alias).append(".owner_type='ROLE' AND ").append(alias).append(".owner_id IN (")
+                    .append(String.join(",",Collections.nCopies(s.roleIds().size(),"?"))).append("))");
+            args.addAll(s.roleIds());
+        }
+        if(!s.deptIds().isEmpty()){
+            w.append(" OR ").append(alias).append(".owner_dept_id IN (")
+                    .append(String.join(",",Collections.nCopies(s.deptIds().size(),"?"))).append(")");
+            args.addAll(s.deptIds());
+        }
+        return w.append(")").toString();
+    }
+
     /** 日历计划列表：只返回 CALENDAR 类型，并计算下次生成时间。 */
-    public List<Map<String,Object>> calendarPlans(String keyword,String status,String category){
+    public List<Map<String,Object>> calendarPlans(String keyword,String status,String category,String username){
         StringBuilder sql=new StringBuilder("SELECT p.id,p.name,p.category,p.frequency_type frequencyType,p.frequency_value frequencyValue,p.start_date startDate,p.end_date endDate,p.execute_time executeTime,p.overdue_minutes overdueMinutes,p.owner_type ownerType,p.owner_id ownerId,p.owner_dept_id ownerDeptId,p.target_mode targetMode,p.claim_mode claimMode,p.form_mode formMode,p.require_photo requirePhoto,p.advance_minutes advanceMinutes,p.urge_minutes urgeMinutes,p.webhook_config_ids webhookConfigIds,p.enabled,p.last_generated_at lastGeneratedAt,p.updated_at updatedAt,COALESCE(CASE p.owner_type WHEN 'USER' THEN u.display_name WHEN 'ROLE' THEN r.name ELSE d.name END,p.assignee_name) ownerName,COALESCE(CASE p.owner_type WHEN 'DEPT' THEN d.name WHEN 'USER' THEN ud.name ELSE rd.name END,'-') ownerDeptName FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id LEFT JOIN sys_user u ON u.id=p.owner_id AND p.owner_type='USER' LEFT JOIN sys_role r ON r.id=p.owner_id AND p.owner_type='ROLE' LEFT JOIN sys_department d ON d.id=p.owner_id AND p.owner_type='DEPT' LEFT JOIN sys_department ud ON ud.id=u.department_id LEFT JOIN sys_department rd ON rd.id=r.dept_id WHERE y.code='CALENDAR'");
         List<Object> args=new ArrayList<>();
         if(keyword!=null&&!keyword.isBlank()){sql.append(" AND (p.name LIKE ? OR COALESCE(CASE p.owner_type WHEN 'USER' THEN u.display_name WHEN 'ROLE' THEN r.name ELSE d.name END,'') LIKE ?)");String kw="%"+keyword.trim()+"%";args.add(kw);args.add(kw);}
         if(status!=null&&!status.isBlank()){sql.append(" AND p.enabled=?");args.add(("1".equals(status.trim())||"ENABLED".equalsIgnoreCase(status.trim()))?1:0);}
         if(category!=null&&!category.isBlank()){sql.append(" AND p.category=?");args.add(category.trim());}
         sql.append(" ORDER BY p.enabled DESC,p.id DESC LIMIT 500");
+        com.wanyuecity.energy.security.DataScopeService.Scope scope=dataScope.resolve(username);
         List<Map<String,Object>> rows=new ArrayList<>();
         for(Map<String,Object> row:jdbc.queryForList(sql.toString(),args.toArray())){
+            if(!scope.covers(text(row,"ownerType"),longValue(row.get("ownerId")),longValue(row.get("ownerDeptId")))) continue;
             Map<String,Object> item=new LinkedHashMap<>(row);
             item.put("nextRunAt",nextRunAt(item));
             rows.add(item);
@@ -254,8 +287,24 @@ public class InspectionService {
         return item;
     }
 
+    /** 计划详情：按当前用户数据范围校验后可读。 */
+    public Map<String,Object> calendarPlan(Long id,String username){
+        assertPlanVisible(id,username);
+        return calendarPlan(id);
+    }
+
+    private void assertPlanVisible(Long id,String username){
+        com.wanyuecity.energy.security.DataScopeService.Scope scope=dataScope.resolve(username);
+        if(scope.all()) return;
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT owner_type ownerType,owner_id ownerId,owner_dept_id ownerDeptId FROM inspection_plan WHERE id=?",id);
+        if(rows.isEmpty()) bad("日历计划不存在");
+        Map<String,Object> row=rows.get(0);
+        if(!scope.covers(text(row,"ownerType"),longValue(row.get("ownerId")),longValue(row.get("ownerDeptId"))))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"无权访问该计划");
+    }
+
     @Transactional
-    public Map<String,Object> saveCalendarPlan(Long id,Map<String,Object> body){
+    public Map<String,Object> saveCalendarPlan(Long id,Map<String,Object> body,String username){
         String name=text(body,"name");
         if(name.isBlank()) bad("计划名称不能为空");
         if(name.length()>100) bad("计划名称不能超过100个字符");
@@ -285,6 +334,18 @@ public class InspectionService {
         }
         // 提前校验责任对象，避免生成阶段才发现归属无效
         resolveOwner(ownerType,ownerId,text(body,"assigneeName"),claimMode);
+        // 领导只能给本部门及子部门创建任务；管理员不限
+        com.wanyuecity.energy.security.DataScopeService.Scope scope=dataScope.resolve(username);
+        if(!scope.all()&&!scope.covers(ownerType,ownerId,ownerDeptId))
+            bad("只能为本部门及子部门的人员或岗位创建任务");
+        if(id!=null){
+            List<Map<String,Object>> old=jdbc.queryForList("SELECT owner_type ownerType,owner_id ownerId,owner_dept_id ownerDeptId FROM inspection_plan WHERE id=?",id);
+            if(!old.isEmpty()){
+                Map<String,Object> o=old.get(0);
+                if(!scope.covers(text(o,"ownerType"),longValue(o.get("ownerId")),longValue(o.get("ownerDeptId"))))
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,"无权修改该计划");
+            }
+        }
         Long typeId=calendarTypeId();
         Long templateId=calendarTemplateId(typeId);
         int enabled=boolInt(body,"enabled",1);
@@ -312,7 +373,8 @@ public class InspectionService {
     }
 
     @Transactional
-    public Map<String,Object> toggleCalendarPlan(Long id,boolean enabled){
+    public Map<String,Object> toggleCalendarPlan(Long id,boolean enabled,String username){
+        assertPlanVisible(id,username);
         Integer exists=jdbc.queryForObject("SELECT COUNT(*) FROM inspection_plan p JOIN inspection_type y ON y.id=p.inspection_type_id WHERE p.id=? AND y.code='CALENDAR'",Integer.class,id);
         if(exists==null||exists==0) bad("日历计划不存在");
         jdbc.update("UPDATE inspection_plan SET enabled=?,updated_at=NOW(3) WHERE id=?",enabled?1:0,id);
@@ -415,18 +477,10 @@ public class InspectionService {
         }catch(DuplicateKeyException ignored){return 0;}
     }
 
-    public List<Map<String,Object>> tasks(String status,String keyword,String username,boolean ownOnly){
+    public List<Map<String,Object>> tasks(String status,String keyword,String username){
         StringBuilder sql=new StringBuilder("SELECT k.id,k.task_no taskNo,k.plan_id planId,p.name planName,y.name inspectionTypeName,k.target_type targetType,k.target_code targetCode,k.target_name targetName,k.location_text locationText,k.scheduled_at scheduledAt,k.due_at dueAt,k.assignee_user_id assigneeUserId,k.assignee_name assigneeName,k.access_token accessToken,k.status,k.source_type sourceType,k.owner_type ownerType,k.owner_id ownerId,k.owner_name ownerName,k.owner_dept_id ownerDeptId,k.owner_dept_name ownerDeptName,k.claimed_by claimedBy,(SELECT COALESCE(NULLIF(u2.display_name,''),u2.username) FROM sys_user u2 WHERE u2.username=k.claimed_by LIMIT 1) claimedByName,k.claimed_at claimedAt,k.assignee_status assigneeStatus,k.started_at startedAt,k.submitted_at submittedAt,k.result_summary resultSummary,k.completed_by completedBy,p.claim_mode planClaimMode FROM inspection_task k JOIN inspection_plan p ON p.id=k.plan_id JOIN inspection_type y ON y.id=k.inspection_type_id WHERE 1=1");
         List<Object> args=new ArrayList<>(); if(status!=null&&!status.isBlank()){sql.append(" AND k.status=?");args.add(status);} if(keyword!=null&&!keyword.isBlank()){sql.append(" AND (k.task_no LIKE ? OR k.target_name LIKE ? OR k.target_code LIKE ?)");String x="%"+keyword+"%";args.add(x);args.add(x);args.add(x);}
-        if(ownOnly){
-            Map<String,Object> u=userRow(username);
-            if(u==null){sql.append(" AND (k.assignee_name=? OR k.assignee_user_id=(SELECT id FROM sys_user WHERE username=? LIMIT 1))");args.add(username);args.add(username);}
-            else{
-                Long uid=longValue(u.get("id")); String fullPath=deptFullPath(longValue(u.get("department_id")));
-                sql.append(" AND (k.assignee_user_id=? OR k.claimed_by=? OR (k.claimed_by IS NULL AND ((k.owner_type='ROLE' AND k.owner_id IN (SELECT role_id FROM sys_user_role WHERE user_id=?)) OR (k.owner_type='DEPT' AND k.owner_ancestors IS NOT NULL AND ? LIKE CONCAT(k.owner_ancestors,'%')))))");
-                args.add(uid);args.add(username);args.add(uid);args.add(fullPath);
-            }
-        }
+        sql.append(taskScopeSql(dataScope.resolve(username),"k",args));
         sql.append(" ORDER BY k.scheduled_at DESC,k.id DESC LIMIT 500");return jdbc.queryForList(sql.toString(),args.toArray());
     }
 
@@ -503,6 +557,23 @@ public class InspectionService {
         r.put("departments",jdbc.queryForList("SELECT id,code,name,parent_id parentId,ancestors,depth,dept_level deptLevel,status FROM sys_department WHERE deleted_at IS NULL ORDER BY sort_order,id"));
         r.put("roles",jdbc.queryForList("SELECT id,code,name,dept_id deptId FROM sys_role ORDER BY dept_id IS NULL DESC,dept_id,id"));
         r.put("users",jdbc.queryForList("SELECT id,username,COALESCE(NULLIF(display_name,''),username) name,department_id deptId FROM sys_user WHERE status=1 ORDER BY department_id,id"));
+        return r;
+    }
+
+    /** 日历计划责任对象选项：按当前用户数据范围收敛，领导只能选本部门及子部门。 */
+    public Map<String,Object> ownerOptions(String username){
+        com.wanyuecity.energy.security.DataScopeService.Scope s=dataScope.resolve(username);
+        if(s.all()) return ownerOptions();
+        Map<String,Object> r=new LinkedHashMap<>();
+        if(s.deptIds().isEmpty()){
+            r.put("departments",List.of());r.put("roles",List.of());r.put("users",List.of());
+            return r;
+        }
+        String in=String.join(",",Collections.nCopies(s.deptIds().size(),"?"));
+        Object[] ids=s.deptIds().toArray();
+        r.put("departments",jdbc.queryForList("SELECT id,code,name,parent_id parentId,ancestors,depth,dept_level deptLevel,status FROM sys_department WHERE deleted_at IS NULL AND id IN ("+in+") ORDER BY sort_order,id",ids));
+        r.put("roles",jdbc.queryForList("SELECT id,code,name,dept_id deptId FROM sys_role WHERE dept_id IN ("+in+") ORDER BY dept_id,id",ids));
+        r.put("users",jdbc.queryForList("SELECT id,username,COALESCE(NULLIF(display_name,''),username) name,department_id deptId FROM sys_user WHERE status=1 AND department_id IN ("+in+") ORDER BY department_id,id",ids));
         return r;
     }
 

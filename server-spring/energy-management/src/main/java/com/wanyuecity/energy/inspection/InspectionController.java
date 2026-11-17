@@ -30,7 +30,7 @@ public class InspectionController {
  @PutMapping("/plans/{id}") public ApiResponse<Map<String,Object>> updatePlan(@PathVariable Long id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.savePlan(id,b));}
  @PostMapping("/tasks/generate") public ApiResponse<Map<String,Object>> generate(@RequestBody(required=false) Map<String,Object> body){Object pid=body==null?null:body.get("planId");Object d=body==null?null:body.get("date");Long planId=pid==null?null:Long.valueOf(String.valueOf(pid));java.time.LocalDate day=(d==null||String.valueOf(d).isBlank())?null:java.time.LocalDate.parse(String.valueOf(d));return ApiResponse.ok(Map.of("generated",service.generate(planId,day)));}
  @GetMapping("/generation-logs") public ApiResponse<List<Map<String,Object>>> generationLogs(@RequestParam(required=false) Long planId,@RequestParam(required=false) String from,@RequestParam(required=false) String to){java.time.LocalDate f=(from==null||from.isBlank())?null:java.time.LocalDate.parse(from);java.time.LocalDate t=(to==null||to.isBlank())?null:java.time.LocalDate.parse(to);return ApiResponse.ok(service.generationLogs(planId,f,t));}
-    @GetMapping("/tasks") public ApiResponse<List<Map<String,Object>>> tasks(@RequestParam(required=false)String status,@RequestParam(required=false)String keyword,Authentication a){return ApiResponse.ok(service.tasks(status,keyword,a.getName(),ownOnly(a)));}
+    @GetMapping("/tasks") public ApiResponse<List<Map<String,Object>>> tasks(@RequestParam(required=false)String status,@RequestParam(required=false)String keyword,Authentication a){return ApiResponse.ok(service.tasks(status,keyword,a.getName()));}
     @GetMapping("/tasks/{id}") public ApiResponse<Map<String,Object>> task(@PathVariable Long id){return ApiResponse.ok(service.task(id));}
     @GetMapping("/tasks/token/{token}") public ApiResponse<Map<String,Object>> taskByToken(@PathVariable String token){return ApiResponse.ok(service.taskByToken(token));}
     @GetMapping(value="/tasks/{id}/qr",produces=MediaType.IMAGE_PNG_VALUE) public byte[] qr(@PathVariable Long id){return service.qr(id);}
@@ -45,12 +45,4 @@ public class InspectionController {
  @PostMapping("/issues/{id}/rectify") public ApiResponse<Map<String,Object>> rectify(@PathVariable Long id,@RequestBody Map<String,Object>b,Authentication a){return ApiResponse.ok(service.rectify(id,String.valueOf(b.getOrDefault("note","")),a.getName()));}
  @PostMapping("/issues/{id}/review") public ApiResponse<Map<String,Object>> review(@PathVariable Long id,@RequestBody Map<String,Object>b,Authentication a){return ApiResponse.ok(service.review(id,Boolean.TRUE.equals(b.get("passed")),a.getName()));}
     @GetMapping("/dashboard") public ApiResponse<Map<String,Object>> dashboard(){return ApiResponse.ok(service.dashboard());}
-
-    /** 数据范围：仅持 inspection.task.execute 的普通岗位按本人任务；管理员/核实岗保持全局。 */
-    private boolean ownOnly(Authentication a){
-        boolean global=java.util.Set.of("ROLE_SUPER_ADMIN","ROLE_SYSTEM_ADMIN","ROLE_DEVICE_VERIFIER","ROLE_VIEWER").stream()
-                .anyMatch(role->a.getAuthorities().stream().anyMatch(x->role.equals(x.getAuthority())));
-        if(global) return false;
-        return a.getAuthorities().stream().anyMatch(x->"inspection.task.execute".equals(x.getAuthority()));
-    }
 }
