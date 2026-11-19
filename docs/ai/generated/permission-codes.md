@@ -1,7 +1,7 @@
 # 权限码清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-16 23:02:58 ｜ 代码锚点：main@7c2a8ef
+> 生成时间：2026-11-18 06:56:06 ｜ 代码锚点：main@e6cb35b
 
 
 共 171 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。
@@ -29,8 +29,8 @@
 | `access.sync.write` | `V50__access_control_and_visitor_management.sql`<br>`security/RequestPermissionResolver.java` |
 | `access.test-data.delete` | `V59__access_event_sync_and_cleanup.sql`<br>`security/RequestPermissionResolver.java` |
 | `calendar.execute` | `V103__task_center_foundation_p1.sql`<br>`V105__calendar_role_grant_rd_zk_wy_sb_kz.sql` |
-| `calendar.manage` | `V103__task_center_foundation_p1.sql`<br>`V105__calendar_role_grant_rd_zk_wy_sb_kz.sql`<br>`security/RequestPermissionResolver.java` |
-| `calendar.report` | `V103__task_center_foundation_p1.sql`<br>`V105__calendar_role_grant_rd_zk_wy_sb_kz.sql`<br>`security/RequestPermissionResolver.java` |
+| `calendar.manage` | `V103__task_center_foundation_p1.sql`<br>`V105__calendar_role_grant_rd_zk_wy_sb_kz.sql`<br>`V113__role_cleanup_and_data_scope.sql`<br>`security/RequestPermissionResolver.java` |
+| `calendar.report` | `V103__task_center_foundation_p1.sql`<br>`V105__calendar_role_grant_rd_zk_wy_sb_kz.sql`<br>`V113__role_cleanup_and_data_scope.sql`<br>`security/RequestPermissionResolver.java` |
 | `calendar.view` | `V103__task_center_foundation_p1.sql`<br>`V105__calendar_role_grant_rd_zk_wy_sb_kz.sql`<br>`security/RequestPermissionResolver.java` |
 | `complaint.brand.manage` | `V94__complaint_module.sql`<br>`complaint\controller\ComplaintController.java`<br>`security/RequestPermissionResolver.java` |
 | `complaint.close` | `V94__complaint_module.sql`<br>`complaint\controller\ComplaintController.java`<br>`security/RequestPermissionResolver.java` |
@@ -160,7 +160,7 @@
 | `stall.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.audit.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.dept.manage` | `V100__dept_org_manage_s3.sql`<br>`security/RequestPermissionResolver.java`<br>`system\controller\SysDepartmentController.java` |
-| `system.dept.view` | `V100__dept_org_manage_s3.sql`<br>`security/RequestPermissionResolver.java`<br>`system\controller\SysDepartmentController.java` |
+| `system.dept.view` | `V100__dept_org_manage_s3.sql`<br>`V115__grant_leader_dept_and_webhook_view.sql`<br>`security/RequestPermissionResolver.java`<br>`system\controller\SysDepartmentController.java` |
 | `system.dictionary.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.dictionary.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.migration.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
@@ -168,7 +168,7 @@
 | `system.user.permission.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.user.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.webhook.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
-| `system.webhook.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
+| `system.webhook.view` | `V115__grant_leader_dept_and_webhook_view.sql`<br>`V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `verification.execute` | `V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
 | `verification.view` | `V43__fine_grained_permissions.sql`<br>`V87__role_default_permission_refinement.sql`<br>`security/RequestPermissionResolver.java` |
 | `visitor.approve` | `V50__access_control_and_visitor_management.sql`<br>`security/RequestPermissionResolver.java` |

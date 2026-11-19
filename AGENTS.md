@@ -2,7 +2,7 @@
 
 > 本文件是 AI 协作的唯一规则源。任何 AI 在修改本仓库前，先读完本文件，再按 §6 路由到对应模块卡。
 > 优先级：**用户本轮明确指令 > 代码与数据库的客观事实 > 本文件 > docs/ai/** > README.md / 旧文档**。
-> 核对锚点：2026-11-17 ｜ main ｜ Flyway 最高 V113 ｜ 当前另有分支 feat/permission-code-model
+> 核对锚点：2026-11-18 ｜ main ｜ Flyway 最高 V115 ｜ 当前另有分支 feat/permission-code-model
 
 ---
 
@@ -15,7 +15,7 @@
 |---|---|
 | 后端 | `server-spring/energy-management`，Java 17 / Spring Boot 3.3.5 / MyBatis-Plus / MySQL 8 / Flyway |
 | 前端 | `server-spring/energy-admin`，Vue 3 / TypeScript / Vite / Element Plus / Pinia |
-| 迁移 | `server-spring/energy-management/src/main/resources/db/migration`，当前最高 V113 |
+| 迁移 | `server-spring/energy-management/src/main/resources/db/migration`，当前最高 V115 |
 | 部署 | Docker Compose；220 生产、225 开发（细节不在本文件） |
 | 代码规模 | 约 385 个 Java 文件、57 个 Controller、90 个前端页面 |
 

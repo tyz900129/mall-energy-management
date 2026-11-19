@@ -13,7 +13,8 @@
   - `system.webhook.view|manage`
   - `system.audit.view` / `system.migration.manage`
 - 表：`sys_user`、`sys_role`、`sys_user_role`、`sys_permission`、`sys_role_permission`、`sys_user_permission`、`sys_menu`、`sys_role_menu`、`sys_department`、`sys_dept_permission_policy`、`dept_move_log`、`business_dictionary`、`webhook_config`、`sys_department_webhook`、`audit_log`、`system_config`
-- 迁移：V1、V9、V12、V43、V86–V88、V91、V98–V102、V107–V109
+- 迁移：V1、V9、V12、V43、V86–V88、V91、V98–V102、V107–V109、V115
+- V115 补授：`system.dept.view` 授予 9 个领导角色（`OPS_PATROL_MANAGER`、`APPLICANT`、`CS_MANAGER`、`WY_SB_KZ/WY_AB_KZ/WY_BJ_KZ`、`WY_SB_BZ/WY_AB_BZ/WY_BJ_BZ`），解决任务日历部门树 403；`system.webhook.view` 授予 `WY_SB_KZ`、`WY_SB_BZ`，解决巡检计划读取 Webhook 配置 403。普通员工仍未授 `system.dept.view`。
 - 用户批量导入导出（`SysUserExcelService`）：
   - `GET /api/v1/users/import/template`（`system.user.manage`）
   - `POST /api/v1/users/import`（默认 `dryRun=true`，`system.user.manage`）
@@ -53,4 +54,4 @@ mvn -Dtest=Sys*Test test
 
 ## 最后核对
 
-2026-11-16 / main（用户批量导入导出）
+2026-11-18 / main（V115 领导角色补授 system.dept.view 与 system.webhook.view）
