@@ -56,13 +56,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
         // Never echo the credential-related message; keep it generic.
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(ApiResponse.CODE_UNAUTHORIZED, "Invalid username or password"));
+                .body(ApiResponse.fail(ApiResponse.CODE_UNAUTHORIZED, "账号或密码错误"));
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthn(AuthenticationException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(ApiResponse.CODE_UNAUTHORIZED, "Authentication failed"));
+                .body(ApiResponse.fail(ApiResponse.CODE_UNAUTHORIZED, "登录状态无效，请重新登录"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

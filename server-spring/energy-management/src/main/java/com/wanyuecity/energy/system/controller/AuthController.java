@@ -73,17 +73,17 @@ public class AuthController {
         if (user == null) {
             log.info("login failed: user not found, ip={}", http.getRemoteAddr());
             auditLogin(username,null,false,"USER_NOT_FOUND",http);
-            throw BizException.unauthorized("Invalid username or password");
+            throw BizException.unauthorized("账号或密码错误");
         }
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             log.info("login failed: bad password, user={}, ip={}", user.getUsername(), http.getRemoteAddr());
             auditLogin(user.getUsername(),user.getId(),false,"BAD_CREDENTIALS",http);
-            throw BizException.unauthorized("Invalid username or password");
+            throw BizException.unauthorized("账号或密码错误");
         }
         if (Integer.valueOf(0).equals(user.getStatus())) {
             log.info("login failed: disabled, user={}, ip={}", user.getUsername(), http.getRemoteAddr());
             auditLogin(user.getUsername(),user.getId(),false,"USER_DISABLED",http);
-            throw BizException.forbidden("User disabled");
+            throw BizException.forbidden("账号已停用");
         }
         return completeLogin(user,http);
     }

@@ -15,21 +15,28 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class OperationClearanceService {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private final JdbcTemplate jdbc;
     private final OperationClearanceTemplateService templates;
+    private final ObjectMapper json;
 
-    public OperationClearanceService(JdbcTemplate jdbc, OperationClearanceTemplateService templates) {
+    public OperationClearanceService(JdbcTemplate jdbc, OperationClearanceTemplateService templates, ObjectMapper json) {
         this.jdbc = jdbc;
         this.templates = templates;
+        this.json = json;
     }
 
     public Map<String, Object> currentPeriod() {
@@ -128,11 +135,48 @@ public class OperationClearanceService {
                         "c.status,c.submitted_at submittedAt FROM operation_clearance_record c " +
                         "LEFT JOIN operation_clearance_template t ON t.id=c.template_id " +
                         "WHERE c.stall_id=? AND c.period_date=? LIMIT 1", stall.get("stallId"), Date.valueOf(periodDate));
+        Map<String, Object> record = records.isEmpty() ? null : records.get(0);
+        if (record != null) {
+            record.put("photos", extractPhotos(Objects.toString(record.get("answersJson"), null), Objects.toString(record.get("templateFieldsJson"), null)));
+        }
         Map<String, Object> result = new LinkedHashMap<>(stall);
         result.put("periodDate", periodDate.toString());
         result.put("scheduleText", scheduleText(schedule));
-        result.put("record", records.isEmpty() ? null : records.get(0));
+        result.put("record", record);
         return result;
+    }
+
+    /** 从 answers_json 中提取模板里 IMAGE 类型字段对应的照片，供前端画册展示。 */
+    private List<Map<String, Object>> extractPhotos(String answersJson, String templateFieldsJson) {
+        List<Map<String, Object>> photos = new ArrayList<>();
+        if (answersJson == null || answersJson.isBlank() || templateFieldsJson == null || templateFieldsJson.isBlank()) return photos;
+        try {
+            Set<String> imageKeys = new HashSet<>();
+            List<Map<String, Object>> fields = json.readValue(templateFieldsJson, new TypeReference<List<Map<String, Object>>>() {});
+            for (Map<String, Object> f : fields) {
+                if ("IMAGE".equals(Objects.toString(f.get("type"), ""))) imageKeys.add(Objects.toString(f.get("key"), ""));
+            }
+            if (imageKeys.isEmpty()) return photos;
+            Map<String, Object> answers = json.readValue(answersJson, new TypeReference<Map<String, Object>>() {});
+            for (String key : imageKeys) collectPhoto(answers.get(key), photos);
+        } catch (Exception ignored) {
+        }
+        return photos;
+    }
+
+    private void collectPhoto(Object value, List<Map<String, Object>> photos) {
+        if (value instanceof Map<?, ?> m) {
+            Object id = m.get("id");
+            if (id != null) {
+                Map<String, Object> p = new LinkedHashMap<>();
+                p.put("id", id);
+                p.put("fileName", m.get("fileName"));
+                p.put("url", m.get("url"));
+                photos.add(p);
+            }
+        } else if (value instanceof List<?> list) {
+            for (Object o : list) collectPhoto(o, photos);
+        }
     }
 
     public Map<String, Object> page(String username, boolean all, String keyword, String date, int pageNum, int pageSize) {
@@ -155,7 +199,7 @@ public class OperationClearanceService {
             args.add(value);
             args.add(value);
         }
-        String from = " FROM operation_clearance_record c JOIN stall s ON s.id=c.stall_id";
+        String from = " FROM operation_clearance_record c JOIN stall s ON s.id=c.stall_id LEFT JOIN operation_clearance_template t ON t.id=c.template_id";
         Long total = jdbc.queryForObject("SELECT COUNT(*)" + from + where, Long.class, args.toArray());
         args.add(size);
         args.add((page - 1) * size);
@@ -163,8 +207,12 @@ public class OperationClearanceService {
                         "s.stall_code stallCode,c.merchant_name_snapshot merchantName,c.submitter_name submitterName," +
                         "c.manager_name_snapshot managerName,c.template_name_snapshot templateName,c.answers_json answersJson," +
                         "c.electricity_off electricityOff,c.water_off waterOff,c.gas_off gasOff,c.door_closed doorClosed," +
-                        "c.exception_description exceptionDescription,c.status,c.submitted_at submittedAt" + from + where +
+                        "c.exception_description exceptionDescription,c.status,c.submitted_at submittedAt,t.fields_json templateFieldsJson" + from + where +
                         " ORDER BY c.period_date DESC,c.submitted_at DESC LIMIT ? OFFSET ?", args.toArray());
+        for (Map<String, Object> row : rows) {
+            row.put("photos", extractPhotos(Objects.toString(row.get("answersJson"), null), Objects.toString(row.get("templateFieldsJson"), null)));
+            row.remove("templateFieldsJson");
+        }
         return Map.of("records", rows, "total", total == null ? 0 : total, "current", page, "size", size);
     }
 

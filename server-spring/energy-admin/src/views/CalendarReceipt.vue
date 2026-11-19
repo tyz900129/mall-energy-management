@@ -55,12 +55,12 @@
               <el-image class="photo-img" :src="calendarPublicApi.photoUrl(token, photo.id)" :preview-src-list="photoPreviewUrls" :initial-index="photos.indexOf(photo)" fit="cover" preview-teleported />
             </div>
             <label v-if="detail.submittable && photos.length < (detail.maxPhotos || 9)" class="photo-add">
-              <input type="file" accept="image/jpeg,image/png" multiple hidden @change="onPick" />
+              <input type="file" accept="image/jpeg,image/png" capture="environment" multiple hidden @change="onPick" />
               <el-icon><Plus /></el-icon>
-              <span>上传</span>
+              <span>现场拍照</span>
             </label>
           </div>
-          <div class="hint">支持 JPEG/PNG，单张不超过 10MB，最多 {{ detail.maxPhotos || 9 }} 张</div>
+          <div class="hint">必须现场拍摄，单张不超过 10MB，最多 {{ detail.maxPhotos || 9 }} 张</div>
         </div>
 
         <div class="card">

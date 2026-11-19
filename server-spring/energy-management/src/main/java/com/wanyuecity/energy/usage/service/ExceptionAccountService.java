@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class ExceptionAccountService {
     public static final String EVENT = "ENERGY_ACCOUNT_EXCEPTION";
+    private static final java.time.format.DateTimeFormatter MESSAGE_TIME = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final JdbcTemplate jdbc;
     private final PlatformConfigService configService;
@@ -192,7 +193,7 @@ public class ExceptionAccountService {
 
     private String message(List<Map<String, Object>> rows, LocalDateTime now) {
         StringBuilder b = new StringBuilder("### ⚠️ 水电费账户异常通知\n\n");
-        b.append("**通知时间**：").append(now).append("\n");
+        b.append("**通知时间**：").append(now == null ? "-" : now.format(MESSAGE_TIME)).append("\n");
         b.append("**异常账户**：").append(rows.size()).append(" 个\n\n---\n");
         int max = Math.min(rows.size(), 30);
         for (int i = 0; i < max; i++) {

@@ -5,15 +5,22 @@
         <div class="page-title">商户日清记录</div>
         <div class="page-note">日清提交时段：{{ scheduleText }}；仓库和非在用铺位不参与统计。</div>
       </div>
-      <el-button v-if="canConfigure" type="primary" plain @click="openSettings">配置提交时间</el-button>
+      <div class="header-actions">
+        <el-radio-group v-model="viewMode">
+          <el-radio-button label="list">列表</el-radio-button>
+          <el-radio-button label="album">画册</el-radio-button>
+        </el-radio-group>
+        <el-button v-if="canConfigure" type="primary" plain @click="openSettings">配置提交时间</el-button>
+      </div>
     </div>
     <div class="toolbar">
       <el-input v-model="query.keyword" placeholder="铺位或商户名称" clearable/>
       <el-date-picker v-model="query.periodDate" type="date" value-format="YYYY-MM-DD" placeholder="日清日期" clearable/>
       <el-button type="primary" @click="search">查询</el-button>
-      <el-button v-if="canExport" plain @click="exportCsv">导出</el-button>
+      <el-button v-if="canExport && viewMode==='list'" plain @click="exportCsv">导出</el-button>
     </div>
-    <div class="table-card">
+
+    <div v-if="viewMode==='list'" class="table-card">
       <el-table :data="rows" v-loading="loading" border>
         <el-table-column prop="periodDate" label="日清日期" width="115"/>
         <el-table-column prop="stallCode" label="铺位" width="110"/>
@@ -22,10 +29,35 @@
         <el-table-column prop="managerName" label="责任商管" width="110"/>
         <el-table-column label="检查结果" min-width="220"><template #default="{row}"><el-tag v-for="item in checks(row)" :key="item.name" :type="item.ok?'success':'danger'" size="small" class="tag">{{item.name}}{{item.ok?'已关':'未关'}}</el-tag></template></el-table-column>
         <el-table-column label="状态" width="90"><template #default="{row}"><el-tag :type="row.status==='NORMAL'?'success':'danger'">{{row.status==='NORMAL'?'正常':'异常'}}</el-tag></template></el-table-column>
+        <el-table-column label="清场照片" width="150">
+          <template #default="{row}">
+            <div class="row-photos">
+              <template v-if="(row.photos||[]).length">
+                <el-image v-for="(p,i) in row.photos.slice(0,3)" :key="p.id" class="row-thumb" :src="photoUrl(p.id)" :preview-src-list="previewList(row.photos)" :initial-index="i" fit="cover" preview-teleported/>
+                <span v-if="row.photos.length>3" class="more">+{{row.photos.length-3}}</span>
+              </template>
+              <span v-else class="muted">无</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="异常说明" min-width="170"><template #default="{row}">{{row.exceptionDescription||'-'}}</template></el-table-column>
         <el-table-column label="提交时间" width="175"><template #default="{row}">{{formatDateTime(row.submittedAt)}}</template></el-table-column>
       </el-table>
       <el-pagination class="pager" v-model:current-page="query.pageNum" v-model:page-size="query.pageSize" :total="total" layout="total, prev, pager, next" @change="load"/>
+    </div>
+
+    <div v-else class="album-card" v-loading="loading">
+      <div v-if="!albumPhotos.length" class="empty">暂无清场照片</div>
+      <div class="photo-wall">
+        <div v-for="(item,idx) in albumPhotos" :key="item.id" class="wall-item">
+          <el-image class="wall-img" :src="photoUrl(item.id)" :preview-src-list="albumPreviewList" :initial-index="idx" fit="cover" preview-teleported/>
+          <div class="wall-meta">
+            <div class="wall-merchant">{{item.merchantName||'-'}} <span class="stall">{{item.stallCode}}</span></div>
+            <div class="wall-sub">{{item.submitterName}} · {{formatDateTime(item.submittedAt)}}</div>
+            <el-tag :type="item.status==='NORMAL'?'success':'danger'" size="small">{{item.status==='NORMAL'?'正常':'异常'}}</el-tag>
+          </div>
+        </div>
+      </div>
     </div>
 
     <el-dialog v-model="settingsVisible" title="配置商户日清提交时间" width="460px">
@@ -40,19 +72,28 @@
 </template>
 
 <script setup lang="ts">
-import {computed,onMounted,reactive,ref} from 'vue'
+import {computed,onBeforeUnmount,onMounted,reactive,ref} from 'vue'
 import {ElMessage} from 'element-plus'
-import {operationClearanceApi} from '@/api/operation'
+import {operationClearanceApi,operationFormImageApi} from '@/api/operation'
 import {formatDateTime} from '@/utils/format'
 import {useUserStore} from '@/stores/user'
 
 const user=useUserStore(),rows=ref<any[]>([]),total=ref(0),loading=ref(false),scheduleText=ref('加载中')
 const settingsVisible=ref(false),settingsSaving=ref(false),settingsForm=reactive({startTime:'21:00',endTime:'09:00'})
 const query=reactive({keyword:'',periodDate:'',pageNum:1,pageSize:20})
+const viewMode=ref<'list'|'album'>('list')
 const canConfigure=computed(()=>user.hasPermission('operation.clearance.setting.manage'))
 const canExport=computed(()=>user.hasPermission('operation.clearance.export'))
 
-async function load(){loading.value=true;try{const result:any=await operationClearanceApi.page(query);rows.value=result.records||[];total.value=Number(result.total)||0}finally{loading.value=false}}
+const photoUrls=reactive<Record<string,string>>({})
+async function fetchPhoto(id:any){if(!id||photoUrls[id])return;try{const blob:any=await operationFormImageApi.image(String(id));photoUrls[id]=URL.createObjectURL(blob)}catch(e){}}
+function photoUrl(id:any){if(!id)return '';if(!photoUrls[id])fetchPhoto(id);return photoUrls[id]||''}
+function prefetchPhotos(){for(const r of rows.value)for(const p of (r.photos||[]))fetchPhoto(p.id)}
+function previewList(photos:any[]){return (photos||[]).map((p:any)=>photoUrl(p.id)).filter(Boolean)}
+const albumPhotos=computed(()=>rows.value.flatMap((r:any)=>(r.photos||[]).map((p:any)=>({...p,merchantName:r.merchantName,stallCode:r.stallCode,submitterName:r.submitterName,status:r.status,submittedAt:r.submittedAt,periodDate:r.periodDate}))))
+const albumPreviewList=computed(()=>albumPhotos.value.map((p:any)=>photoUrl(p.id)).filter(Boolean))
+
+async function load(){loading.value=true;try{const result:any=await operationClearanceApi.page(query);rows.value=result.records||[];total.value=Number(result.total)||0;prefetchPhotos()}finally{loading.value=false}}
 async function loadSchedule(){const result:any=await operationClearanceApi.schedule();scheduleText.value=result.scheduleText||`${result.startTime||'21:00'}至${result.endTime||'09:00'}`}
 function search(){query.pageNum=1;load()}
 async function exportCsv(){const blob:any=await operationClearanceApi.export({keyword:query.keyword,periodDate:query.periodDate});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`商户日清记录_${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url)}
@@ -60,8 +101,23 @@ const checks=(row:any)=>[{name:'电',ok:!!row.electricityOff},{name:'水',ok:!!r
 async function openSettings(){const result:any=await operationClearanceApi.settings();settingsForm.startTime=result.startTime;settingsForm.endTime=result.endTime;settingsVisible.value=true}
 async function saveSettings(){if(!settingsForm.startTime||!settingsForm.endTime)return ElMessage.warning('请选择开始和结束时间');if(settingsForm.startTime===settingsForm.endTime)return ElMessage.warning('开始时间和结束时间不能相同');settingsSaving.value=true;try{const result:any=await operationClearanceApi.updateSettings(settingsForm);scheduleText.value=result.scheduleText;settingsVisible.value=false;ElMessage.success('日清提交时间已更新')}finally{settingsSaving.value=false}}
 onMounted(async()=>{await Promise.all([load(),loadSchedule()])})
+onBeforeUnmount(()=>{for(const url of Object.values(photoUrls))URL.revokeObjectURL(url)})
 </script>
 
 <style scoped>
-.page-note{color:#909399;margin-top:6px;font-size:13px}.toolbar{display:flex;gap:10px;margin-bottom:12px}.toolbar .el-input{width:250px}.tag{margin:2px}.pager{margin-top:12px;justify-content:flex-end}.settings-form{margin-top:18px}@media(max-width:768px){.page-header{align-items:flex-start;gap:12px}.toolbar{flex-wrap:wrap}.toolbar>*{width:100%!important}.table-card{overflow-x:auto}:deep(.el-dialog){width:calc(100% - 20px)!important}}
+.page-note{color:#909399;margin-top:6px;font-size:13px}
+.header-actions{display:flex;align-items:center;gap:12px}
+.toolbar{display:flex;gap:10px;margin-bottom:12px}.toolbar .el-input{width:250px}.tag{margin:2px}.pager{margin-top:12px;justify-content:flex-end}.settings-form{margin-top:18px}
+.row-photos{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.row-thumb{width:38px;height:38px;border-radius:4px;cursor:pointer}
+.more{color:#909399;font-size:12px}.muted{color:#c0c4cc;font-size:12px}
+.album-card{min-height:300px}.empty{text-align:center;color:#909399;padding:60px 0}
+.photo-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.wall-item{border:1px solid #ebeef5;border-radius:8px;overflow:hidden;background:#fff}
+.wall-img{width:100%;height:180px;display:block;cursor:pointer}
+.wall-meta{padding:8px 10px}
+.wall-merchant{font-size:13px;font-weight:600;color:#303133}
+.wall-merchant .stall{color:#909399;font-weight:400;margin-left:4px}
+.wall-sub{font-size:12px;color:#909399;margin:3px 0 6px}
+@media(max-width:768px){.page-header{align-items:flex-start;gap:12px;flex-direction:column}.header-actions{width:100%;justify-content:space-between}.toolbar{flex-wrap:wrap}.toolbar>*{width:100%!important}.table-card{overflow-x:auto}.photo-wall{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}:deep(.el-dialog){width:calc(100% - 20px)!important}}
 </style>

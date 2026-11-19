@@ -25,6 +25,7 @@ public class DeviceAlertService {
     public static final String EVENT = "ENERGY_DEVICE_OFFLINE";
     /** 恢复事件刻意不用 OFFLINE 前缀，避免 Webhook 按子串匹配时被离线订阅误收。 */
     public static final String EVENT_RECOVERED = "ENERGY_DEVICE_ONLINE";
+    private static final DateTimeFormatter MESSAGE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final JdbcTemplate jdbc;
     private final PlatformConfigService configService;
@@ -333,7 +334,7 @@ public class DeviceAlertService {
 
     private String buildMessage(List<AlertScope> alerts, LocalDateTime now) {
         StringBuilder b = new StringBuilder("### 📡 设备离线告警\n\n");
-        b.append("**巡检时间**：").append(now).append("\n");
+        b.append("**巡检时间**：").append(now == null ? "-" : now.format(MESSAGE_TIME)).append("\n");
         b.append("**告警数量**：").append(alerts.size()).append(" 条\n\n---\n");
         Map<String, Long> byLevel = alerts.stream().collect(Collectors.groupingBy(a -> a.level, Collectors.counting()));
         byLevel.forEach((lvl, cnt) -> b.append("- ").append(levelLabel(lvl)).append("：").append(cnt).append(" 条\n"));

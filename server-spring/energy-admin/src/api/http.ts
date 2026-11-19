@@ -31,8 +31,12 @@ http.interceptors.response.use(
     if (status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      const isLoginRequest = String(err.config?.url || '').includes('/auth/login')
       const publicPage = PUBLIC_PAGE_PREFIXES.some(prefix => location.pathname.startsWith(prefix))
-      if (!publicPage && location.pathname !== '/login') {
+      if (isLoginRequest) {
+        // 登录页的账密校验失败必须明确提示，否则用户点击后无任何反馈
+        ElMessage.error(msg || '账号或密码错误')
+      } else if (!publicPage && location.pathname !== '/login') {
         location.href = '/login'
         ElMessage.error('登录已过期')
       }
