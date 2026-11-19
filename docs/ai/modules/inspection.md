@@ -11,7 +11,9 @@
   - `inspection.equipment.view|manage` / `issue.manage|review`
   - `calendar.view` / `calendar.manage` / `calendar.report`
 - 表：`inspection_type`、`inspection_template`、`inspection_plan`、`inspection_plan_target`、`inspection_task`、`inspection_task_log`、`inspection_issue`、`inspection_reminder_log`、`inspection_equipment_category`、`inspection_equipment`、`inspection_category_template`、`calendar_generation_log`
-- 迁移：V46、V47、V103、V104、V105、V112、V113
+- 迁移：V46、V47、V103、V104、V105、V112、V113、V114
+- 设备分类（V114 起）：电梯拆为 `ELEVATOR`（客梯）、`ELEVATOR_FREIGHT`（货梯）、`ELEVATOR_ESCALATOR`（扶梯），各带专属台账字段；78 台电梯台账以 `equipment_code`（设备代码）为幂等键导入，频率与检查项不固化在数据里，由模板与计划配置。
+- 计划保存时会校验所选设备分类已关联计划模板（`inspection_category_template`），因此跨分类选设备必须各自建计划。
 - 数据范围（`sys_role.data_scope`，V113）：
   - `ALL`：超级管理员、系统管理员，可见全部任务与全部计划；
   - `DEPT_SUB`：处长/课长/班长等领导，可见本部门及子部门任务、本人任务，且只能给本部门及子部门创建任务；
@@ -54,4 +56,4 @@ mvn -Dtest=Calendar*Test test
 
 ## 最后核对
 
-2026-11-17 / main（角色数据范围 ALL/DEPT_SUB/SELF、删除物业管理员、任务创建限本部门及子部门）
+2026-11-17 / main（角色数据范围 ALL/DEPT_SUB/SELF、删除物业管理员、任务创建限本部门及子部门；电梯分类拆分并导入 78 台台账，V114）
