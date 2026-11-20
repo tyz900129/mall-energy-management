@@ -1,10 +1,10 @@
 # 接口地图（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-20 17:00:46 ｜ 代码锚点：main@b7cb7f3
+> 生成时间：2026-11-20 20:25:49 ｜ 代码锚点：main@ada7ce1
 
 
-共 517 个接口，60 个控制器。
+共 518 个接口，60 个控制器。
 
 > “代码内权限”为空表示该接口由 `RequestPermissionResolver` 的路径映射鉴权，未写 `@PreAuthorize`。
 
@@ -188,6 +188,7 @@
 | operation | OperationDashboardController | dashboard | GET | `/api/v1/operations/dashboard` | — |
 | operation | OperationFormImageController | upload | POST | `/api/v1/operations/form-images` | — |
 | operation | OperationFormImageController | image | GET | `/api/v1/operations/form-images/{id}` | — |
+| operation | OperationFormImageController | thumb | GET | `/api/v1/operations/form-images/{id}/thumb` | — |
 | operation | OperationMerchantResponsibilityController | page | GET | `/api/v1/operations/merchant-responsibilities` | — |
 | operation | OperationMerchantResponsibilityController | assign | POST | `/api/v1/operations/merchant-responsibilities` | — |
 | operation | OperationMerchantResponsibilityController | myStallsQrZip | GET | `/api/v1/operations/merchant-responsibilities/application/zip` | — |
