@@ -7,6 +7,7 @@ import { ref, reactive, computed } from 'vue'
 import {
   createPrinter,
   supportsUsb,
+  supportsSerial,
   supportsBluetooth,
   friendlyError,
   fitToPrinthead,
@@ -16,7 +17,7 @@ import {
   type PrinterStatus,
 } from 'libniimai'
 
-export type PrinterConnection = 'usb' | 'bluetooth' | null
+export type PrinterConnection = 'usb' | 'serial' | 'bluetooth' | null
 
 export interface PrintableSpec {
   widthMm: number
@@ -51,9 +52,14 @@ function refreshStatus() {
   status.deviceName = s.deviceName || ''
 }
 
-/** 返回当前浏览器可用的传输方式 */
+/** 返回当前浏览器可用的传输方式，优先 serial（NIIMBOT B1 USB 线缆走 Web Serial，避开 claimInterface 错误） */
 export function availableKinds(): PrinterConnection[] {
   const arr: PrinterConnection[] = []
+  // NIIMBOT B1 USB 线缆在 Windows 上显示为 CH340 虚拟串口，必须走 Web Serial
+  if (typeof navigator !== 'undefined' && 'serial' in navigator) {
+    try { if (supportsSerial()) arr.push('serial') } catch {}
+  }
+  // WebUSB：需要 Zadig 把 B1 驱动换成 WinUSB，很少人这么做，放最后
   if (typeof navigator !== 'undefined' && 'usb' in navigator) {
     try { if (supportsUsb()) arr.push('usb') } catch {}
   }
@@ -84,7 +90,14 @@ export async function connectPrinter(kind: ConnectionKind): Promise<boolean> {
     status.connected = false
     status.deviceName = ''
     connection.value = null
-    status.message = friendlyError(err) || ('连接失败：' + (err?.message || String(err)))
+    let msg = friendlyError(err) || (err?.message || String(err))
+    // 精准识别 claimInterface 错误 → 指导用户改用 Web Serial
+    if (msg.includes('claimInterface') || msg.includes('Unable to claim')) {
+      msg = 'WebUSB claimInterface 失败。请改用「USB 线缆 · Web Serial」连接（Windows 下精臣 B1 显示为 CH340 串口，Web Serial 原生支持）。'
+    } else if (msg.includes('Access denied') || msg.includes('Failed to open serial')) {
+      msg = '串口访问被拒。请关闭其他占用 CH340 端口的程序（如精臣官方打印软件）后重试，或换蓝牙连接。'
+    }
+    status.message = msg
     return false
   } finally {
     connecting.value = false

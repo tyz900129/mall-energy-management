@@ -105,13 +105,16 @@
       </div>
       <div v-else>
         <div class="hint">
-          精臣 B1 支持 USB 和蓝牙两种连接方式，按需选择：
+          精臣 B1 的 USB 线缆在 Windows 上会被识别成 CH340 虚拟串口，因此<strong>USB 线缆请选「Web Serial」</strong>，不要选 WebUSB（会报 claimInterface 错误）。蓝牙版选蓝牙。
         </div>
-        <el-button type="primary" size="large" style="width:100%;margin:8px 0" :disabled="niimbotConnecting" @click="doConnect('usb')">
-          {{ niimbotConnecting ? '连接中...' : '🔌 通过 USB 连接（推荐）' }}
+        <el-button type="primary" size="large" style="width:100%;margin:8px 0" :disabled="niimbotConnecting" @click="doConnect('serial')">
+          {{ niimbotConnecting ? '连接中...' : '🔌 USB 线缆 · Web Serial（推荐）' }}
         </el-button>
         <el-button type="primary" size="large" plain style="width:100%;margin:8px 0" :disabled="niimbotConnecting" @click="doConnect('bluetooth')">
-          {{ niimbotConnecting ? '连接中...' : '📶 通过 蓝牙 连接' }}
+          {{ niimbotConnecting ? '连接中...' : '📶 蓝牙 连接' }}
+        </el-button>
+        <el-button size="small" plain style="width:100%;margin:8px 0;color:#909399" :disabled="niimbotConnecting" @click="doConnect('usb')">
+          WebUSB（需 Zadig 换驱动，一般不用）
         </el-button>
         <el-button v-if="niimbotConnected" type="danger" plain size="small" @click="doDisconnect">断开连接</el-button>
         <div class="status-box">状态：{{ niimbotStatusMessage }}</div>
@@ -290,7 +293,7 @@ async function printAllEquipments() {
 
 // ---------- 精臣 B1 打印（单张）----------
 function openNiimbotDialog() { niimbotDialog.value = true }
-async function doConnect(kind: 'usb' | 'bluetooth') {
+async function doConnect(kind: 'serial' | 'usb' | 'bluetooth') {
   await connectPrinter(kind)
   if (status.connected) {
     ElMessage.success('打印机已连接')

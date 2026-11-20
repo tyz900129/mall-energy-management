@@ -73,6 +73,7 @@ declare module 'vue' {
     OperationDynamicForm: typeof import('./src/components/OperationDynamicForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    StallQrCard: typeof import('./src/components/StallQrCard.vue')['default']
     UsageTrendChart: typeof import('./src/components/UsageTrendChart.vue')['default']
   }
   export interface ComponentCustomProperties {

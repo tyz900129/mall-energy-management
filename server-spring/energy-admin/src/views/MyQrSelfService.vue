@@ -37,16 +37,18 @@
     <!-- B1 连接弹窗 -->
     <el-dialog v-model="niimbotDialog" title="连接精臣 B1 打印机" width="420px">
       <div v-if="!canNiimbot" class="warn">
-        ⚠️ 当前浏览器不支持 WebUSB/WebBluetooth。请在 <b>Chrome 或 Edge 桌面版</b>上打开本页面。
+        ⚠️ 当前浏览器不支持 Web Serial / WebUSB / WebBluetooth。请在 <b>Chrome 或 Edge 桌面版</b>上打开本页面，并确保网站走 HTTPS 或 localhost。
       </div>
       <div v-else>
-        <el-button type="primary" size="large" style="width:100%" :disabled="niimbotConnecting" @click="doConnect('usb')">
-          {{ niimbotConnecting ? '连接中...' : '🔌 USB 连接（推荐）' }}
+        <div class="hint" style="font-size:12px;color:#606266;margin-bottom:8px">
+          精臣 B1 的 USB 线缆在 Windows 上被识别成 CH340 串口，<strong>请选 Web Serial</strong>（不要选 WebUSB，会报 claimInterface 错误）。
+        </div>
+        <el-button type="primary" size="large" style="width:100%" :disabled="niimbotConnecting" @click="doConnect('serial')">
+          {{ niimbotConnecting ? '连接中...' : '🔌 USB 线缆 · Web Serial（推荐）' }}
         </el-button>
         <el-button type="primary" size="large" plain style="width:100%;margin-top:8px" :disabled="niimbotConnecting" @click="doConnect('bluetooth')">
           {{ niimbotConnecting ? '连接中...' : '📶 蓝牙 连接' }}
         </el-button>
-        <el-button v-if="niimbotConnected" type="danger" plain size="small" style="margin-top:8px" @click="doDisconnect">断开</el-button>
         <div class="status-box">状态：{{ niimbotStatusMessage }}</div>
       </div>
     </el-dialog>
@@ -110,7 +112,7 @@ async function downloadSingle(row: any) {
   URL.revokeObjectURL(url)
 }
 
-async function doConnect(kind: 'usb' | 'bluetooth') {
+async function doConnect(kind: 'serial' | 'usb' | 'bluetooth') {
   await connectPrinter(kind)
   if (status.connected) { ElMessage.success('已连接'); niimbotDialog.value = false }
   else ElMessage.error(status.message || '连接失败')
