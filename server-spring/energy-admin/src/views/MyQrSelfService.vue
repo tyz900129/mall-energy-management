@@ -19,13 +19,13 @@
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="!stalls.length" class="empty">您当前没有负责的铺位</div>
     <div v-else class="grid">
-      <div v-for="row in stalls" :key="row.id" class="stall-card">
+      <div v-for="row in stalls" :key="row.stallId" class="stall-card">
         <div class="head">
           <div class="code">{{ row.stallCode }}</div>
           <div class="sub">{{ row.floorName }} · {{ row.stallName || '未命名' }}</div>
         </div>
         <div class="qr">
-          <img :src="stallPngs[row.id] || ''" alt="QR" />
+          <img :src="stallPngs[row.stallId] || ''" alt="QR" />
         </div>
         <div class="actions">
           <el-button size="small" @click="downloadSingle(row)">下载 PNG</el-button>
@@ -84,8 +84,8 @@ async function load() {
     // 预取单张 QR png URL 用于展示
     for (const s of stalls.value) {
       try {
-        const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${s.id}/qr`, { responseType: 'blob' })
-        stallPngs[s.id] = URL.createObjectURL(blob)
+        const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${s.stallId}/qr`, { responseType: 'blob' })
+        stallPngs[s.stallId] = URL.createObjectURL(blob)
       } catch {}
     }
   } finally { loading.value = false }
@@ -103,7 +103,7 @@ async function downloadMyZip() {
 }
 
 async function downloadSingle(row: any) {
-  const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${row.id}/qr`, { responseType: 'blob' })
+  const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${row.stallId}/qr`, { responseType: 'blob' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -153,7 +153,7 @@ function makeLabelCanvas(pngBlob: Blob, lines: string[], preset: keyof typeof NI
 
 async function printB1(row: any) {
   try {
-    const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${row.id}/qr`, { responseType: 'blob' })
+    const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${row.stallId}/qr`, { responseType: 'blob' })
     const lines = [row.stallCode || '', row.floorName || '']
     const canvas = await makeLabelCanvas(blob as Blob, lines, printPreset.value)
     const ok = await printCanvas(canvas, NIIMBOT_B1_PRESETS[printPreset.value])

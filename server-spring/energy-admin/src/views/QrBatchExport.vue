@@ -123,10 +123,10 @@
 
     <!-- ===== 隐藏的 HTML print 区域 ===== -->
     <div v-if="printStalls.length" ref="printArea" class="print-area">
-      <template v-for="row in printStalls" :key="row.id">
+      <template v-for="row in printStalls" :key="row.stallId">
         <div class="print-tag" :class="`preset-${printPreset}`">
           <div class="qr-box">
-            <img :src="stallPrintPngs[row.id] || ''" alt="QR" />
+            <img :src="stallPrintPngs[row.stallId] || ''" alt="QR" />
           </div>
           <div class="text-box">
             <div class="line1">{{ row.stallCode }}</div>
@@ -225,7 +225,7 @@ async function downloadBlob(apiFn: () => Promise<any>, suggestedName: string) {
 async function downloadStallZip() {
   if (!stallSelected.value.length) return
   await downloadBlob(
-    () => operationMerchantApi.batchQrZip(stallSelected.value.map((r: any) => r.id)),
+    () => operationMerchantApi.batchQrZip(stallSelected.value.map((r: any) => r.stallId)),
     `铺位二维码_${Date.now()}.zip`
   )
   ElMessage.success('ZIP 已开始下载')
@@ -241,7 +241,7 @@ async function downloadEqZip() {
 }
 
 async function downloadSingleStall(row: any) {
-  const blob = await http.get(`/api/v1/operations/merchant-responsibilities/${row.id}/qr`, { responseType: 'blob' })
+  const blob = await http.get(`/api/v1/operations/merchant-responsibilities/${row.stallId}/qr`, { responseType: 'blob' })
   const url = URL.createObjectURL(blob as any)
   const a = document.createElement('a')
   a.href = url
@@ -271,8 +271,8 @@ async function printAllStalls() {
   printEquipments.value = []
   for (const r of rows) {
     try {
-      const blob = await http.get(`/api/v1/operations/merchant-responsibilities/${r.id}/qr`, { responseType: 'blob' }) as any
-      stallPrintPngs[r.id] = URL.createObjectURL(blob)
+      const blob = await http.get(`/api/v1/operations/merchant-responsibilities/${r.stallId}/qr`, { responseType: 'blob' }) as any
+      stallPrintPngs[r.stallId] = URL.createObjectURL(blob)
     } catch {}
   }
   setTimeout(() => window.print(), 150)
@@ -347,7 +347,7 @@ function makeLabelCanvas(pngBlob: Blob, lines: string[], preset: keyof typeof NI
 
 async function niimbotPrintStall(row: any) {
   try {
-    const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${row.id}/qr`, { responseType: 'blob' })
+    const blob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${row.stallId}/qr`, { responseType: 'blob' })
     const lines = [row.stallCode || '', row.floorName || '']
     const canvas = await makeLabelCanvas(blob as Blob, lines, printPreset.value)
     const ok = await printCanvas(canvas, NIIMBOT_B1_PRESETS[printPreset.value])
