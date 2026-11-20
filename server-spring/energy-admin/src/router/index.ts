@@ -110,7 +110,10 @@ const routes = [
       // 服务管理（客诉管理）
       { path: 'complaints', name: 'ComplaintList', component: () => import('@/views/ComplaintList.vue'), meta: { title: '客诉管理', permission:'complaint.view' } },
       { path: 'complaints/dashboard', name: 'ComplaintDashboard', component: () => import('@/views/ComplaintDashboard.vue'), meta: { title: '客诉数据报表', permission:'complaint.stats.view' } },
-      { path: 'complaints/staff', name: 'ComplaintStaff', component: () => import('@/views/ComplaintStaff.vue'), meta: { title: '客诉人员名单', permission:'complaint.staff.manage' } }
+      { path: 'complaints/staff', name: 'ComplaintStaff', component: () => import('@/views/ComplaintStaff.vue'), meta: { title: '客诉人员名单', permission:'complaint.staff.manage' } },
+      // 二维码批量导出 / 商管自助下载
+      { path: 'qr-batch-export', name: 'QrBatchExport', component: () => import('@/views/QrBatchExport.vue'), meta: { title: '二维码批量导出', permission:'stall.qr.batch.view' } },
+      { path: 'qr-self-service', name: 'QrSelfService', component: () => import('@/views/MyQrSelfService.vue'), meta: { title: '我的二维码', permission:'stall.qr.self.view' } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }

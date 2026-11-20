@@ -81,6 +81,18 @@ export const merchantApi = {
   previewCode: (name: string) => http.get('/api/v1/merchants/code-preview', { params: { name } })
 }
 
+export const operationMerchantApi = {
+  page: (params: any) => http.get('/api/v1/operations/merchant-responsibilities', { params }),
+  get: (id: number) => http.get(`/api/v1/operations/merchant-responsibilities/${id}`),
+  qr: (stallId: number) => http.get(`/api/v1/operations/merchant-responsibilities/${stallId}/qr`, { responseType: 'blob' }),
+  /** 管理端批量导出铺位二维码 zip */
+  batchQrZip: (stallIds: number[]) =>
+    http.post('/api/v1/operations/merchant-responsibilities/qr-batch', { stallIds }, { responseType: 'blob' }),
+  /** 商管自助下载自己负责铺位的二维码 zip（后端强制过滤） */
+  myStallsQrZip: () =>
+    http.get('/api/v1/operations/merchant-responsibilities/my-stalls-qr', { responseType: 'blob' }),
+}
+
 export const accountApi = {
   page: (params: { keyword?: string; showDisabled?: boolean; pageNum?: number; pageSize?: number }) =>
     http.get('/api/v1/accounts', { params }),

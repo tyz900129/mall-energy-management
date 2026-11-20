@@ -1,10 +1,10 @@
 # 接口地图（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-20 16:29:43 ｜ 代码锚点：main@5e99d4e
+> 生成时间：2026-11-20 17:00:46 ｜ 代码锚点：main@b7cb7f3
 
 
-共 511 个接口，60 个控制器。
+共 517 个接口，60 个控制器。
 
 > “代码内权限”为空表示该接口由 `RequestPermissionResolver` 的路径映射鉴权，未写 `@PreAuthorize`。
 
@@ -149,10 +149,12 @@
 | inspection | InspectionController | updateType | PUT | `/api/v1/inspections/types/{id}` | — |
 | inspection | InspectionEquipmentController | list | GET | `/api/v1/inspection-equipment` | — |
 | inspection | InspectionEquipmentController | create | POST | `/api/v1/inspection-equipment` | — |
+| inspection | InspectionEquipmentController | batchQrZip | POST | `/api/v1/inspection-equipment/application/zip` | — |
 | inspection | InspectionEquipmentController | categories | GET | `/api/v1/inspection-equipment/categories` | — |
 | inspection | InspectionEquipmentController | createCategory | POST | `/api/v1/inspection-equipment/categories` | — |
 | inspection | InspectionEquipmentController | updateCategory | PUT | `/api/v1/inspection-equipment/categories/{id}` | — |
 | inspection | InspectionEquipmentController | qr | GET | `/api/v1/inspection-equipment/public-qr/{token}` | — |
+| inspection | InspectionEquipmentController | batchQrZip | POST | `/api/v1/inspection-equipment/qr-batch` | — |
 | inspection | InspectionEquipmentController | scan | GET | `/api/v1/inspection-equipment/scan/{token}` | — |
 | inspection | InspectionEquipmentController | get | GET | `/api/v1/inspection-equipment/{id}` | — |
 | inspection | InspectionEquipmentController | update | PUT | `/api/v1/inspection-equipment/{id}` | — |
@@ -188,8 +190,12 @@
 | operation | OperationFormImageController | image | GET | `/api/v1/operations/form-images/{id}` | — |
 | operation | OperationMerchantResponsibilityController | page | GET | `/api/v1/operations/merchant-responsibilities` | — |
 | operation | OperationMerchantResponsibilityController | assign | POST | `/api/v1/operations/merchant-responsibilities` | — |
+| operation | OperationMerchantResponsibilityController | myStallsQrZip | GET | `/api/v1/operations/merchant-responsibilities/application/zip` | — |
+| operation | OperationMerchantResponsibilityController | batchQrZip | POST | `/api/v1/operations/merchant-responsibilities/application/zip` | — |
 | operation | OperationMerchantResponsibilityController | byToken | GET | `/api/v1/operations/merchant-responsibilities/by-token/{token}` | — |
 | operation | OperationMerchantResponsibilityController | managers | GET | `/api/v1/operations/merchant-responsibilities/managers` | — |
+| operation | OperationMerchantResponsibilityController | myStallsQrZip | GET | `/api/v1/operations/merchant-responsibilities/my-stalls-qr` | — |
+| operation | OperationMerchantResponsibilityController | batchQrZip | POST | `/api/v1/operations/merchant-responsibilities/qr-batch` | — |
 | operation | OperationMerchantResponsibilityController | history | GET | `/api/v1/operations/merchant-responsibilities/{stallId}/history` | — |
 | operation | OperationMerchantResponsibilityController | qr | GET | `/api/v1/operations/merchant-responsibilities/{stallId}/qr` | — |
 | operation | OperationPropertyInspectionController | records | GET | `/api/v1/operations/property-inspections` | — |

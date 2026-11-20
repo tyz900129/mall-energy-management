@@ -5,5 +5,7 @@ export const inspectionEquipmentApi={
  list:(params:any={})=>http.get('/api/v1/inspection-equipment',{params}),
  get:(id:any)=>http.get(`/api/v1/inspection-equipment/${id}`),
  save:(d:any)=>d.id?http.put(`/api/v1/inspection-equipment/${d.id}`,d):http.post('/api/v1/inspection-equipment',d),
- scan:(token:string)=>http.get(`/api/v1/inspection-equipment/scan/${token}`)
+ scan:(token:string)=>http.get(`/api/v1/inspection-equipment/scan/${token}`),
+ /** 管理端批量导出巡检设备二维码 zip */
+ batchQrZip:(ids:number[])=>http.post('/api/v1/inspection-equipment/qr-batch',{ids},{responseType:'blob'})
 }

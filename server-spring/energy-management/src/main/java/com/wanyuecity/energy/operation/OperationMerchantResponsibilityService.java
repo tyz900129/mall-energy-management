@@ -1,19 +1,20 @@
 package com.wanyuecity.energy.operation;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.io.ByteArrayOutputStream;
-import java.util.UUID;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -62,6 +63,69 @@ public class OperationMerchantResponsibilityService {
         String token=Objects.toString(rows.get(0).get("token"),"");if(token.isBlank()){token=UUID.randomUUID().toString().replace("-","");jdbc.update("UPDATE stall SET operation_qr_token=? WHERE id=?",token,stallId);}
         try{String url=publicBaseUrl.replaceAll("/+$","")+"/operation/stall/"+token;BitMatrix matrix=new QRCodeWriter().encode(url,BarcodeFormat.QR_CODE,520,520);ByteArrayOutputStream out=new ByteArrayOutputStream();MatrixToImageWriter.writeToStream(matrix,"PNG",out);return out.toByteArray();}catch(Exception e){throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,"铺位二维码生成失败");}
     }
+
+    /** 管理端批量导出铺位二维码 zip */
+    public void batchZip(List<Long> stallIds, OutputStream os) throws Exception {
+        if (stallIds == null || stallIds.isEmpty()) throw bad("请选择至少一个铺位");
+        List<Map<String,Object>> rows = jdbc.queryForList(
+            "SELECT id stallId, stall_code stallCode, COALESCE(NULLIF(stall_name,''), stall_code) stallName, floor_name floorName FROM stall WHERE id IN (" + placeholders(stallIds.size()) + ") AND status<>'DECOMMISSIONED' ORDER BY floor_code, stall_code",
+            stallIds.toArray());
+        if (rows.isEmpty()) throw bad("所选铺位均不存在或已停用");
+        try (ZipOutputStream zos = new ZipOutputStream(os)) {
+            for (Map<String,Object> r : rows) {
+                Long sid = number(r.get("stallId"));
+                String code = text(r.get("stallCode"));
+                String floor = text(r.get("floorName"));
+                byte[] png = qr(sid);
+                String fileName = sanitize(code) + "_" + sanitize(floor) + "_qr.png";
+                ZipEntry entry = new ZipEntry(fileName);
+                zos.putNextEntry(entry);
+                zos.write(png);
+                zos.closeEntry();
+            }
+        }
+    }
+
+    /** 商管自助下载自己负责的铺位二维码 zip（后端强制过滤，防越权） */
+    public void myStallsZip(OutputStream os) throws Exception {
+        Long userId = getCurrentUserId();
+        List<Map<String,Object>> rows = jdbc.queryForList(
+            "SELECT s.id stallId, s.stall_code stallCode, COALESCE(NULLIF(s.stall_name,''), s.stall_code) stallName, s.floor_name floorName "
+            + "FROM stall s JOIN operation_merchant_responsibility r ON r.stall_id=s.id AND r.status='ACTIVE' "
+            + "WHERE r.responsible_user_id=? AND s.status<>'DECOMMISSIONED' ORDER BY s.floor_code, s.stall_code", userId);
+        if (rows.isEmpty()) throw bad("您当前没有负责的铺位");
+        try (ZipOutputStream zos = new ZipOutputStream(os)) {
+            for (Map<String,Object> r : rows) {
+                Long sid = number(r.get("stallId"));
+                String code = text(r.get("stallCode"));
+                String floor = text(r.get("floorName"));
+                byte[] png = qr(sid);
+                String fileName = sanitize(code) + "_" + sanitize(floor) + "_qr.png";
+                ZipEntry entry = new ZipEntry(fileName);
+                zos.putNextEntry(entry);
+                zos.write(png);
+                zos.closeEntry();
+            }
+        }
+    }
+
+    private Long getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || "anonymousUser".equals(auth.getPrincipal())) throw bad("未登录");
+        Object principal = auth.getPrincipal();
+        if (principal instanceof Map) {
+            Object uid = ((Map<?,?>) principal).get("userId");
+            if (uid != null) return number(uid);
+        }
+        // fallback：按 username 查 sys_user.id
+        String username = auth.getName();
+        List<Map<String,Object>> rows = jdbc.queryForList("SELECT id FROM sys_user WHERE username=?", username);
+        if (rows.isEmpty()) throw bad("用户不存在");
+        return number(rows.get(0).get("id"));
+    }
+
+    private String placeholders(int n) { StringJoiner j = new StringJoiner(","); for (int i = 0; i < n; i++) j.add("?"); return j.toString(); }
+    private String sanitize(String s) { if (s == null || s.isBlank()) return "unknown"; return s.replaceAll("[\\\\/:*?\"<>|\\s]+", "_").substring(0, Math.min(32, s.length())); }
 
     @Transactional
     public Map<String,Object> assign(Map<String,Object> body,String operator) {

@@ -15,9 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service @RequiredArgsConstructor
 public class InspectionEquipmentService {
@@ -38,6 +41,32 @@ public class InspectionEquipmentService {
     public Map<String,Object> equipmentById(Long id){Map<String,Object>r=one("SELECT e.*,e.equipment_code equipmentCode,e.equipment_name equipmentName,e.category_id categoryId,c.name categoryName,c.base_fields_json baseFieldsJson,e.system_name systemName,e.installation_location installationLocation,e.floor_code floorCode,e.area_name areaName,e.serial_number serialNumber,e.commissioned_date commissionedDate,e.responsible_department responsibleDepartment,e.responsible_person responsiblePerson,e.responsible_phone responsiblePhone,e.equipment_status equipmentStatus,e.importance_level importanceLevel,e.maintenance_company maintenanceCompany,e.maintenance_phone maintenancePhone,e.next_maintenance_date nextMaintenanceDate,e.attributes_json attributesJson,e.qr_token qrToken FROM inspection_equipment e JOIN inspection_equipment_category c ON c.id=e.category_id WHERE e.id=?",id);r.put("templates",jdbc.queryForList("SELECT t.id,t.name,x.inspection_kind inspectionKind,t.fields_json fieldsJson FROM inspection_category_template x JOIN inspection_template t ON t.id=x.template_id WHERE x.category_id=? AND x.enabled=1 AND t.enabled=1",r.get("categoryId")));return r;}
     public Map<String,Object> byToken(String token){Map<String,Object>r=one("SELECT id FROM inspection_equipment WHERE qr_token=? AND enabled=1",token);Map<String,Object>e=equipmentById(longValue(r.get("id")));e.put("pendingTasks",jdbc.queryForList("SELECT id,task_no taskNo,status,scheduled_at scheduledAt,due_at dueAt,access_token accessToken FROM inspection_task WHERE target_type='INSPECTION_EQUIPMENT' AND target_id=? AND status IN ('PENDING','IN_PROGRESS','OVERDUE') ORDER BY scheduled_at",String.valueOf(e.get("id"))));return e;}
     public byte[] qr(String token){byToken(token);try{String url=publicBaseUrl.replaceAll("/$","")+"/inspection/equipment/"+token;BitMatrix m=new QRCodeWriter().encode(url,BarcodeFormat.QR_CODE,420,420);ByteArrayOutputStream out=new ByteArrayOutputStream();MatrixToImageWriter.writeToStream(m,"PNG",out);return out.toByteArray();}catch(Exception ex){bad("设备二维码生成失败");return new byte[0];}}
+
+    /** 管理端批量导出巡检设备二维码 zip */
+    public void batchZip(List<Long> ids, OutputStream os) throws Exception {
+        if (ids == null || ids.isEmpty()) bad("请选择至少一台设备");
+        List<Map<String,Object>> rows = jdbc.queryForList(
+            "SELECT id, equipment_code equipmentCode, equipment_name equipmentName, installation_location installationLocation, qr_token qrToken FROM inspection_equipment WHERE id IN (" + ph(ids.size()) + ") AND enabled=1 ORDER BY equipment_code",
+            ids.toArray());
+        if (rows.isEmpty()) bad("所选设备均不存在或已停用");
+        try (ZipOutputStream zos = new ZipOutputStream(os)) {
+            for (Map<String,Object> r : rows) {
+                String token = (String) r.get("qrToken");
+                if (token == null || token.isBlank()) continue;
+                byte[] png = qr(token);
+                String code = Objects.toString(r.get("equipmentCode"), "");
+                String name = Objects.toString(r.get("equipmentName"), "");
+                String fileName = sanitize(code) + "_" + sanitize(name) + "_qr.png";
+                ZipEntry entry = new ZipEntry(fileName);
+                zos.putNextEntry(entry);
+                zos.write(png);
+                zos.closeEntry();
+            }
+        }
+    }
+
+    private String ph(int n) { StringJoiner j = new StringJoiner(","); for (int i = 0; i < n; i++) j.add("?"); return j.toString(); }
+    private String sanitize(String s) { if (s == null || s.isBlank()) return "unknown"; return s.replaceAll("[\\\\/:*?\"<>|\\s]+", "_").substring(0, Math.min(32, s.length())); }
 
     private Map<String,Object> one(String s,Object...a){List<Map<String,Object>>l=jdbc.queryForList(s,a);if(l.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"数据不存在");return new LinkedHashMap<>(l.get(0));}private Long lastId(){return jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);}private void required(Map<?,?>m,String k,String msg){if(text(m,k).isBlank())bad(msg);}private void bad(String s){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}private String jsonText(Object o){if(o==null)return "[]";if(o instanceof String s)return s.isBlank()?"[]":s;try{return json.writeValueAsString(o);}catch(JsonProcessingException e){bad("JSON格式错误");return "[]";}}
     private static String text(Map<?,?>m,String k){Object o=m.get(k);return o==null?"":String.valueOf(o).trim();}private static String defaultText(Map<?,?>m,String k,String d){String s=text(m,k);return s.isBlank()?d:s;}private static Long longValue(Object o){if(o==null||String.valueOf(o).isBlank())return null;return o instanceof Number n?n.longValue():Long.valueOf(String.valueOf(o));}private static int intValue(Object o,int d){if(o==null||String.valueOf(o).isBlank())return d;return o instanceof Number n?n.intValue():Integer.parseInt(String.valueOf(o));}private static int boolInt(Map<?,?>m,String k,int d){Object o=m.get(k);if(o==null)return d;if(o instanceof Boolean b)return b?1:0;return intValue(o,d);}private static Date date(Object o){if(o==null||String.valueOf(o).isBlank())return null;return Date.valueOf(LocalDate.parse(String.valueOf(o).substring(0,10)));}

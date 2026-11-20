@@ -41,11 +41,12 @@ export const MENU_GROUPS: MenuGroup[] = [
   },
   {
     key: 'business-master-data', title: '经营基础资料', icon: OfficeBuilding,
-    anyOf: ['merchant.menu', 'stall.menu', 'metering.menu'],
+    anyOf: ['merchant.menu', 'stall.menu', 'metering.menu', 'stall.qr.batch.view'],
     items: [
       { path: '/merchant', title: '商户账户管理', permission: 'merchant.menu' },
       { path: '/stall', title: '铺位管理', permission: 'stall.menu' },
-      { path: '/stall-device', title: '计量设备绑定', permission: 'metering.menu' }
+      { path: '/stall-device', title: '计量设备绑定', permission: 'metering.menu' },
+      { path: '/qr-batch-export', title: '二维码批量导出', permission: 'stall.qr.batch.view' }
     ]
   },
   {
@@ -111,7 +112,7 @@ export const MENU_GROUPS: MenuGroup[] = [
   },
   {
     key: 'operation-business-management', title: '运营管理', icon: Management,
-    anyOf: ['operation.merchant.view', 'operation.dashboard.view', 'operation.clearance.submit', 'operation.clearance.review', 'operation.property.view', 'operation.violation.view', 'operation.accountability.view'],
+    anyOf: ['operation.merchant.view', 'operation.dashboard.view', 'operation.clearance.submit', 'operation.clearance.review', 'operation.property.view', 'operation.violation.view', 'operation.accountability.view', 'stall.qr.self.view'],
     items: [
       { path: '/operation/dashboard', title: '运营日清总览', permission: 'operation.dashboard.view' },
       { path: '/operation/merchant-responsibilities', title: '责任商管管理', permission: 'operation.merchant.view' },
@@ -119,7 +120,8 @@ export const MENU_GROUPS: MenuGroup[] = [
       { path: '/operation/clearance-templates', title: '日清表单模板', permission: 'operation.clearance.template.view' },
       { path: '/operation/property-inspections', title: '物业清场检查', permission: 'operation.property.view' },
       { path: '/operation/violation-items', title: '违规项目管理', permission: 'operation.violation.view' },
-      { path: '/operation/accountability', title: '追责管理', permission: 'operation.accountability.view' }
+      { path: '/operation/accountability', title: '追责管理', permission: 'operation.accountability.view' },
+      { path: '/qr-self-service', title: '我的二维码', permission: 'stall.qr.self.view' }
     ]
   },
   {

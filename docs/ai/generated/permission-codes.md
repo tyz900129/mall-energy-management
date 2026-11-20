@@ -1,10 +1,10 @@
 # 权限码清单（自动生成）
 
 > 自动生成，请勿手改。生成命令：`python scripts/ai/generate-context.py`
-> 生成时间：2026-11-20 16:29:43 ｜ 代码锚点：main@5e99d4e
+> 生成时间：2026-11-20 17:00:46 ｜ 代码锚点：main@b7cb7f3
 
 
-共 171 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。
+共 173 个权限码，来源为 `@PreAuthorize`、`RequestPermissionResolver` 与迁移脚本。
 
 > 角色授权关系以数据库 `sys_role_permission` 为准，本表不反映“谁拥有”。
 
@@ -157,6 +157,8 @@
 | `stall.engineering.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `stall.manage` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `stall.menu` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V88__role_page_data_permission_alignment.sql` |
+| `stall.qr.batch.view` | `V116__qr_export_permissions.sql` |
+| `stall.qr.self.view` | `V116__qr_export_permissions.sql` |
 | `stall.view` | `V111__reapply_role_data_permission_alignment.sql`<br>`V43__fine_grained_permissions.sql`<br>`V86__sys_department_and_permission_scope.sql`<br>`V87__role_default_permission_refinement.sql`<br>`V88__role_page_data_permission_alignment.sql`<br>`V99__dept_permission_policy_s2.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.audit.view` | `V43__fine_grained_permissions.sql`<br>`security/RequestPermissionResolver.java` |
 | `system.dept.manage` | `V100__dept_org_manage_s3.sql`<br>`security/RequestPermissionResolver.java`<br>`system\controller\SysDepartmentController.java` |

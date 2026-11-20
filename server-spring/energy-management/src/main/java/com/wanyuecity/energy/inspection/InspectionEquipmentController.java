@@ -1,9 +1,13 @@
 package com.wanyuecity.energy.inspection;
 
 import com.wanyuecity.energy.core.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @RestController @RequestMapping("/api/v1/inspection-equipment") @RequiredArgsConstructor
@@ -18,4 +22,15 @@ public class InspectionEquipmentController {
  @PutMapping("/{id}")public ApiResponse<Map<String,Object>>update(@PathVariable Long id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.saveEquipment(id,b));}
  @GetMapping("/scan/{token}")public ApiResponse<Map<String,Object>>scan(@PathVariable String token){return ApiResponse.ok(service.byToken(token));}
  @GetMapping(value="/public-qr/{token}",produces=MediaType.IMAGE_PNG_VALUE)public byte[]qr(@PathVariable String token){return service.qr(token);}
+
+    /** 管理端批量导出巡检设备二维码 zip */
+    @PostMapping(value = "/qr-batch", produces = "application/zip")
+    public void batchQrZip(@RequestBody Map<String, Object> body, HttpServletResponse response) throws Exception {
+        response.setContentType("application/zip");
+        String filename = URLEncoder.encode("巡检设备二维码批量导出.zip", StandardCharsets.UTF_8).replace("+", "%20");
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + filename);
+        @SuppressWarnings("unchecked")
+        List<Long> ids = (List<Long>) body.get("ids");
+        service.batchZip(ids, response.getOutputStream());
+    }
 }
