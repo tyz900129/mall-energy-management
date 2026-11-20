@@ -154,7 +154,11 @@ public class OperationClearanceService {
             Set<String> imageKeys = new HashSet<>();
             List<Map<String, Object>> fields = json.readValue(templateFieldsJson, new TypeReference<List<Map<String, Object>>>() {});
             for (Map<String, Object> f : fields) {
-                if ("IMAGE".equals(Objects.toString(f.get("type"), ""))) imageKeys.add(Objects.toString(f.get("key"), ""));
+                if (!"IMAGE".equals(Objects.toString(f.get("type"), ""))) continue;
+                // 模板字段的题目标识字段名是 code（兼容历史 key 写法）
+                String code = Objects.toString(f.get("code"), "");
+                if (code.isBlank()) code = Objects.toString(f.get("key"), "");
+                if (!code.isBlank()) imageKeys.add(code);
             }
             if (imageKeys.isEmpty()) return photos;
             Map<String, Object> answers = json.readValue(answersJson, new TypeReference<Map<String, Object>>() {});

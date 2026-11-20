@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed,onBeforeUnmount,onMounted,reactive,ref} from 'vue'
+import {computed,onBeforeUnmount,onMounted,reactive,ref,watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import {operationClearanceApi,operationFormImageApi} from '@/api/operation'
 import {formatDateTime} from '@/utils/format'
@@ -101,6 +101,8 @@ const checks=(row:any)=>[{name:'电',ok:!!row.electricityOff},{name:'水',ok:!!r
 async function openSettings(){const result:any=await operationClearanceApi.settings();settingsForm.startTime=result.startTime;settingsForm.endTime=result.endTime;settingsVisible.value=true}
 async function saveSettings(){if(!settingsForm.startTime||!settingsForm.endTime)return ElMessage.warning('请选择开始和结束时间');if(settingsForm.startTime===settingsForm.endTime)return ElMessage.warning('开始时间和结束时间不能相同');settingsSaving.value=true;try{const result:any=await operationClearanceApi.updateSettings(settingsForm);scheduleText.value=result.scheduleText;settingsVisible.value=false;ElMessage.success('日清提交时间已更新')}finally{settingsSaving.value=false}}
 onMounted(async()=>{await Promise.all([load(),loadSchedule()])})
+// 画册需要铺满当天记录，切到画册时放大取数（后端上限100），切回列表恢复分页
+watch(viewMode,mode=>{query.pageNum=1;query.pageSize=mode==='album'?100:20;load()})
 onBeforeUnmount(()=>{for(const url of Object.values(photoUrls))URL.revokeObjectURL(url)})
 </script>
 
