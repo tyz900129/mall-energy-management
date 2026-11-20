@@ -19,15 +19,24 @@
         <div class="card">
           <div class="card-title">问题描述</div>
           <p class="desc">{{issue.description}}</p>
-          <div class="photos" v-if="attachments.length">
-            <el-image v-for="a in attachments" :key="a.id" :src="a.url" :preview-src-list="attachments.map((x:any)=>x.url)" fit="cover" class="photo" />
-          </div>
+          <template v-if="submissionPhotos.length">
+            <div class="photo-section-title">问题照片 · {{submissionPhotos.length}} 张</div>
+            <div class="photos">
+              <el-image v-for="a in submissionPhotos" :key="a.id" :src="a.url" :preview-src-list="submissionPhotos.map((x:any)=>x.url)" fit="cover" class="photo" />
+            </div>
+          </template>
         </div>
 
         <div class="card" v-if="issue.rectificationNote">
           <div class="card-title">已提交的整改说明</div>
           <p class="desc">{{issue.rectificationNote}}</p>
           <div class="row"><label>提交时间</label><span>{{short(issue.rectifiedAt)}}</span></div>
+          <template v-if="rectifyPhotos.length">
+            <div class="photo-section-title">整改照片 · {{rectifyPhotos.length}} 张</div>
+            <div class="photos">
+              <el-image v-for="a in rectifyPhotos" :key="a.id" :src="a.url" :preview-src-list="rectifyPhotos.map((x:any)=>x.url)" fit="cover" class="photo" />
+            </div>
+          </template>
         </div>
 
         <div class="card" v-if="canFeedback">
@@ -79,7 +88,8 @@ const token = String(route.params.token||'')
 const loading = ref(false)
 const saving = ref(false)
 const issue = ref<any>(null)
-const attachments = ref<any[]>([])
+const submissionPhotos = ref<any[]>([])
+const rectifyPhotos = ref<any[]>([])
 const canFeedback = ref(false)
 const name = ref('')
 const note = ref('')
@@ -95,7 +105,8 @@ async function load(){
   try{
     const data:any = await patrolApi.publicIssue(token)
     issue.value = data.issue
-    attachments.value = data.attachments || []
+    submissionPhotos.value = data.submissionPhotos || []
+    rectifyPhotos.value = data.rectifyPhotos || []
     canFeedback.value = !!data.canFeedback
   }catch{ issue.value = null }
   finally{ loading.value=false }
@@ -155,7 +166,8 @@ onMounted(load)
 .row label{color:#909399;flex-shrink:0}
 .danger{color:#f56c6c}
 .desc{margin:0;font-size:14px;line-height:1.7;color:#303133;white-space:pre-wrap}
-.photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.photo-section-title{font-size:12px;color:#909399;margin-top:10px;margin-bottom:4px;font-weight:500}
+.photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .photo{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;background:#f5f7fa}
 .photo img{width:100%;height:100%;object-fit:cover}
 .photo .remove{position:absolute;right:0;top:0;width:20px;height:20px;line-height:20px;text-align:center;background:rgba(0,0,0,.5);color:#fff;cursor:pointer}

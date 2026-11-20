@@ -568,9 +568,10 @@ public class PatrolService {
     public Map<String, Object> issueDetail(Long id) {
         Map<String, Object> issue = issueRow(id);
         if (issue == null) throw BizException.notFound("问题不存在");
-        List<Map<String, Object>> attachments = attachmentService.list("SUBMISSION", ((Number) issue.get("submissionId")).longValue());
-        attachments.addAll(attachmentService.list("RECTIFY", id));
-        issue.put("attachments", attachments);
+        List<Map<String, Object>> submissionPhotos = attachmentService.list("SUBMISSION", ((Number) issue.get("submissionId")).longValue());
+        List<Map<String, Object>> rectifyPhotos = attachmentService.list("RECTIFY", id);
+        issue.put("submissionPhotos", submissionPhotos);
+        issue.put("rectifyPhotos", rectifyPhotos);
         issue.put("logs", jdbc.queryForList("SELECT action,from_department_id AS fromDepartmentId,to_department_id AS toDepartmentId,from_status AS fromStatus,"
                 + "to_status AS toStatus,note,operator,created_at AS createdAt FROM patrol_issue_log WHERE issue_id=? ORDER BY id", id));
         return issue;
@@ -690,11 +691,12 @@ public class PatrolService {
     public Map<String, Object> publicIssue(String token) {
         Map<String, Object> issue = issueByToken(token);
         if (issue == null) throw BizException.notFound("整改链接无效或已失效");
-        List<Map<String, Object>> attachments = publicAttachments(token, attachmentService.list("SUBMISSION", ((Number) issue.get("submissionId")).longValue()));
-        attachments.addAll(publicAttachments(token, attachmentService.list("RECTIFY", ((Number) issue.get("id")).longValue())));
+        List<Map<String, Object>> submissionPhotos = publicAttachments(token, attachmentService.list("SUBMISSION", ((Number) issue.get("submissionId")).longValue()));
+        List<Map<String, Object>> rectifyPhotos = publicAttachments(token, attachmentService.list("RECTIFY", ((Number) issue.get("id")).longValue()));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("issue", issue);
-        result.put("attachments", attachments);
+        result.put("submissionPhotos", submissionPhotos);
+        result.put("rectifyPhotos", rectifyPhotos);
         String status = text(issue.get("status"));
         result.put("canFeedback", !"CLOSED".equals(status));
         result.put("categories", categories());

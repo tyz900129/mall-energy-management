@@ -78,10 +78,19 @@
         <div class="kv"><label>上报人</label><span>{{current.submitterName}} · {{formatTime(current.submittedAt)}}</span></div>
         <div class="kv"><label>整改时限</label><span :class="{danger: isOverdue(current)}">{{formatTime(current.dueAt)}}</span></div>
         <div class="kv block"><label>问题描述</label><p>{{current.description}}</p></div>
-        <div class="photos" v-if="current.attachments?.length">
-          <el-image v-for="a in current.attachments" :key="a.id" :src="photoUrl(a)" :preview-src-list="current.attachments.map(photoUrl)" fit="cover" class="photo" />
+        <div class="photo-group" v-if="current.submissionPhotos?.length">
+          <div class="photo-group-title">问题照片 · {{current.submissionPhotos.length}} 张</div>
+          <div class="photos">
+            <el-image v-for="a in current.submissionPhotos" :key="a.id" :src="photoUrl(a)" :preview-src-list="current.submissionPhotos.map(photoUrl)" fit="cover" class="photo" />
+          </div>
         </div>
         <div class="kv block" v-if="current.rectificationNote"><label>整改反馈</label><p>{{current.rectificationNote}}</p></div>
+        <div class="photo-group" v-if="current.rectifyPhotos?.length">
+          <div class="photo-group-title">整改照片 · {{current.rectifyPhotos.length}} 张</div>
+          <div class="photos">
+            <el-image v-for="a in current.rectifyPhotos" :key="a.id" :src="photoUrl(a)" :preview-src-list="current.rectifyPhotos.map(photoUrl)" fit="cover" class="photo" />
+          </div>
+        </div>
         <div class="kv block" v-if="current.reviewNote"><label>复核意见</label><p>{{current.reviewNote}}</p></div>
         <div class="logs">
           <div class="log" v-for="(log,idx) in current.logs" :key="idx">
@@ -262,6 +271,8 @@ onBeforeUnmount(()=> window.removeEventListener('resize', syncMobile))
 .detail .kv p{margin:0;color:#303133;line-height:1.7;white-space:pre-wrap}
 .photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .photo{width:96px;height:96px;border-radius:6px}
+.photo-group{margin-top:12px}
+.photo-group-title{font-size:12px;color:#909399;margin-bottom:6px;font-weight:500}
 .logs{margin-top:14px;border-top:1px solid #ebeef5;padding-top:10px}
 .log{font-size:12px;color:#606266;display:flex;gap:8px;padding:4px 0;align-items:center;flex-wrap:wrap}
 .log .op{color:#303133;font-style:normal;font-weight:500}
