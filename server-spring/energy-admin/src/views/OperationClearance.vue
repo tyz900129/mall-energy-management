@@ -33,7 +33,10 @@
           <template #default="{row}">
             <div class="row-photos">
               <template v-if="(row.photos||[]).length">
-                <el-image v-for="(p,i) in row.photos.slice(0,3)" :key="p.id" class="row-thumb" :src="photoUrl(p.id)" :preview-src-list="previewList(row.photos)" :initial-index="i" fit="cover" preview-teleported/>
+                <template v-for="(p,i) in row.photos.slice(0,3)" :key="p.id">
+                  <el-image v-if="photoUrls[p.id]" class="row-thumb" :src="photoUrls[p.id]" :preview-src-list="previewList(row.photos)" :initial-index="i" fit="cover" preview-teleported/>
+                  <div v-else class="row-thumb thumb-state" @click="retryPhoto(p.id)">{{photoFailed[p.id]?'重试':''}}</div>
+                </template>
                 <span v-if="row.photos.length>3" class="more">+{{row.photos.length-3}}</span>
               </template>
               <span v-else class="muted">无</span>
@@ -50,7 +53,8 @@
       <div v-if="!albumPhotos.length" class="empty">暂无清场照片</div>
       <div class="photo-wall">
         <div v-for="(item,idx) in albumPhotos" :key="item.id" class="wall-item">
-          <el-image class="wall-img" :src="photoUrl(item.id)" :preview-src-list="albumPreviewList" :initial-index="idx" fit="cover" preview-teleported/>
+          <el-image v-if="photoUrls[item.id]" class="wall-img" :src="photoUrls[item.id]" :preview-src-list="albumPreviewList" :initial-index="idx" fit="cover" preview-teleported/>
+          <div v-else class="wall-img wall-state" @click="retryPhoto(item.id)">{{photoFailed[item.id]?'点击重试':'加载中…'}}</div>
           <div class="wall-meta">
             <div class="wall-merchant">{{item.merchantName||'-'}} <span class="stall">{{item.stallCode}}</span></div>
             <div class="wall-sub">{{item.submitterName}} · {{formatDateTime(item.submittedAt)}}</div>
@@ -86,8 +90,25 @@ const canConfigure=computed(()=>user.hasPermission('operation.clearance.setting.
 const canExport=computed(()=>user.hasPermission('operation.clearance.export'))
 
 const photoUrls=reactive<Record<string,string>>({})
-async function fetchPhoto(id:any){if(!id||photoUrls[id])return;try{const blob:any=await operationFormImageApi.image(String(id));photoUrls[id]=URL.createObjectURL(blob)}catch(e){}}
-function photoUrl(id:any){if(!id)return '';if(!photoUrls[id])fetchPhoto(id);return photoUrls[id]||''}
+const photoFailed=reactive<Record<string,boolean>>({})
+const photoPending=reactive<Record<string,boolean>>({})
+async function fetchPhoto(id:any){
+  const key=id?String(id):''
+  if(!key||photoUrls[key]||photoPending[key])return
+  photoPending[key]=true
+  try{
+    const blob:any=await operationFormImageApi.image(key)
+    if(!(blob instanceof Blob))throw new Error('响应不是图片')
+    photoUrls[key]=URL.createObjectURL(blob)
+    photoFailed[key]=false
+  }catch(e){
+    photoFailed[key]=true
+  }finally{
+    photoPending[key]=false
+  }
+}
+function retryPhoto(id:any){const key=id?String(id):'';if(!key)return;photoFailed[key]=false;fetchPhoto(key)}
+function photoUrl(id:any){const key=id?String(id):'';if(!key)return '';if(!photoUrls[key])fetchPhoto(key);return photoUrls[key]||''}
 function prefetchPhotos(){for(const r of rows.value)for(const p of (r.photos||[]))fetchPhoto(p.id)}
 function previewList(photos:any[]){return (photos||[]).map((p:any)=>photoUrl(p.id)).filter(Boolean)}
 const albumPhotos=computed(()=>rows.value.flatMap((r:any)=>(r.photos||[]).map((p:any)=>({...p,merchantName:r.merchantName,stallCode:r.stallCode,submitterName:r.submitterName,status:r.status,submittedAt:r.submittedAt,periodDate:r.periodDate}))))
@@ -117,6 +138,8 @@ onBeforeUnmount(()=>{for(const url of Object.values(photoUrls))URL.revokeObjectU
 .photo-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
 .wall-item{border:1px solid #ebeef5;border-radius:8px;overflow:hidden;background:#fff}
 .wall-img{width:100%;height:180px;display:block;cursor:pointer}
+.thumb-state{background:#f5f7fa;display:flex;align-items:center;justify-content:center;color:#909399;font-size:11px}
+.wall-state{background:#f5f7fa;display:flex;align-items:center;justify-content:center;color:#909399;font-size:13px}
 .wall-meta{padding:8px 10px}
 .wall-merchant{font-size:13px;font-weight:600;color:#303133}
 .wall-merchant .stall{color:#909399;font-weight:400;margin-left:4px}
