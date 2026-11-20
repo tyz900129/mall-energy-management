@@ -34,8 +34,8 @@
             <div class="row-photos">
               <template v-if="(row.photos||[]).length">
                 <template v-for="(p,i) in row.photos.slice(0,3)" :key="p.id">
-                  <el-image v-if="photoUrls[p.id]" class="row-thumb" :src="photoUrls[p.id]" :preview-src-list="previewList(row.photos)" :initial-index="i" fit="cover" preview-teleported/>
-                  <div v-else class="row-thumb thumb-state" @click="retryPhoto(p.id)">{{photoFailed[p.id]?'重试':''}}</div>
+                  <img v-if="thumbUrls[p.id]" class="row-thumb" :src="thumbUrls[p.id]" loading="lazy" @click="openViewer(row.photos,i)"/>
+                  <div v-else class="row-thumb thumb-state" @click="retryThumb(p.id)">{{thumbFailed[p.id]?'重试':''}}</div>
                 </template>
                 <span v-if="row.photos.length>3" class="more">+{{row.photos.length-3}}</span>
               </template>
@@ -49,12 +49,12 @@
       <el-pagination class="pager" v-model:current-page="query.pageNum" v-model:page-size="query.pageSize" :total="total" layout="total, prev, pager, next" @change="load"/>
     </div>
 
-    <div v-else class="album-card" v-loading="loading">
+    <div v-else class="album-card" v-loading="albumLoading">
       <div v-if="!albumPhotos.length" class="empty">暂无清场照片</div>
       <div class="photo-wall">
         <div v-for="(item,idx) in albumPhotos" :key="item.id" class="wall-item">
-          <el-image v-if="photoUrls[item.id]" class="wall-img" :src="photoUrls[item.id]" :preview-src-list="albumPreviewList" :initial-index="idx" fit="cover" preview-teleported/>
-          <div v-else class="wall-img wall-state" @click="retryPhoto(item.id)">{{photoFailed[item.id]?'点击重试':'加载中…'}}</div>
+          <img v-if="thumbUrls[item.id]" class="wall-img" :src="thumbUrls[item.id]" loading="lazy" @click="openAlbumViewer(idx)"/>
+          <div v-else class="wall-img wall-state" @click="retryThumb(item.id)">{{thumbFailed[item.id]?'点击重试':'加载中…'}}</div>
           <div class="wall-meta">
             <div class="wall-merchant">{{item.merchantName||'-'}} <span class="stall">{{item.stallCode}}</span></div>
             <div class="wall-sub">{{item.submitterName}} · {{formatDateTime(item.submittedAt)}}</div>
@@ -62,7 +62,12 @@
           </div>
         </div>
       </div>
+      <div v-if="albumRows.length<albumTotal" class="album-more">
+        <el-button :loading="albumLoading" @click="loadAlbum(false)">加载更多（{{albumRows.length}}/{{albumTotal}}）</el-button>
+      </div>
     </div>
+
+    <el-image-viewer v-if="viewerVisible" :url-list="viewerList" :initial-index="viewerIndex" hide-on-click-modal teleported @close="viewerVisible=false"/>
 
     <el-dialog v-model="settingsVisible" title="配置商户日清提交时间" width="460px">
       <el-alert title="支持跨日时段。例如开始21:00、结束09:00，表示每日21:00至次日09:00。" type="info" :closable="false"/>
@@ -89,42 +94,77 @@ const viewMode=ref<'list'|'album'>('list')
 const canConfigure=computed(()=>user.hasPermission('operation.clearance.setting.manage'))
 const canExport=computed(()=>user.hasPermission('operation.clearance.export'))
 
-const photoUrls=reactive<Record<string,string>>({})
-const photoFailed=reactive<Record<string,boolean>>({})
-const photoPending=reactive<Record<string,boolean>>({})
-async function fetchPhoto(id:any){
-  const key=id?String(id):''
-  if(!key||photoUrls[key]||photoPending[key])return
-  photoPending[key]=true
-  try{
-    const blob:any=await operationFormImageApi.image(key)
-    if(!(blob instanceof Blob))throw new Error('响应不是图片')
-    photoUrls[key]=URL.createObjectURL(blob)
-    photoFailed[key]=false
-  }catch(e){
-    photoFailed[key]=true
-  }finally{
-    photoPending[key]=false
-  }
+// -------- 图片：缩略图常驻，原图仅在预览时按需加载，全局并发上限 4 --------
+const thumbUrls=reactive<Record<string,string>>({})
+const thumbFailed=reactive<Record<string,boolean>>({})
+const thumbPending=reactive<Record<string,boolean>>({})
+const fullUrls=reactive<Record<string,string>>({})
+const fullPending=reactive<Record<string,boolean>>({})
+const fullFailed=reactive<Record<string,boolean>>({})
+const MAX_CONCURRENT=4
+let activeLoads=0
+const loadQueue:(()=>void)[]=[]
+function withLimit<T>(task:()=>Promise<T>):Promise<T>{
+  return new Promise<T>((resolve,reject)=>{
+    const run=()=>{activeLoads++;task().then(resolve,reject).finally(()=>{activeLoads--;const next=loadQueue.shift();if(next)next()})}
+    if(activeLoads<MAX_CONCURRENT)run();else loadQueue.push(run)
+  })
 }
-function retryPhoto(id:any){const key=id?String(id):'';if(!key)return;photoFailed[key]=false;fetchPhoto(key)}
-function photoUrl(id:any){const key=id?String(id):'';if(!key)return '';if(!photoUrls[key])fetchPhoto(key);return photoUrls[key]||''}
-function prefetchPhotos(){for(const r of rows.value)for(const p of (r.photos||[]))fetchPhoto(p.id)}
-function previewList(photos:any[]){return (photos||[]).map((p:any)=>photoUrl(p.id)).filter(Boolean)}
-const albumPhotos=computed(()=>rows.value.flatMap((r:any)=>(r.photos||[]).map((p:any)=>({...p,merchantName:r.merchantName,stallCode:r.stallCode,submitterName:r.submitterName,status:r.status,submittedAt:r.submittedAt,periodDate:r.periodDate}))))
-const albumPreviewList=computed(()=>albumPhotos.value.map((p:any)=>photoUrl(p.id)).filter(Boolean))
+async function loadBlob(cache:Record<string,string>,pending:Record<string,boolean>,failed:Record<string,boolean>,id:any,fetcher:(key:string)=>Promise<any>){
+  const key=id?String(id):''
+  if(!key||cache[key]||pending[key])return
+  pending[key]=true
+  try{
+    const blob:any=await withLimit(()=>fetcher(key))
+    if(!(blob instanceof Blob))throw new Error('响应不是图片')
+    cache[key]=URL.createObjectURL(blob);failed[key]=false
+  }catch(e){failed[key]=true}finally{pending[key]=false}
+}
+const fetchThumb=(id:any)=>loadBlob(thumbUrls,thumbPending,thumbFailed,id,operationFormImageApi.thumb)
+const fetchFull=(id:any)=>loadBlob(fullUrls,fullPending,fullFailed,id,operationFormImageApi.image)
+function retryThumb(id:any){const key=id?String(id):'';if(!key)return;thumbFailed[key]=false;thumbPending[key]=false;fetchThumb(key)}
+function prefetchThumbs(list:any[]){for(const r of list)for(const p of (r.photos||[]))fetchThumb(p.id)}
 
-async function load(){loading.value=true;try{const result:any=await operationClearanceApi.page(query);rows.value=result.records||[];total.value=Number(result.total)||0;prefetchPhotos()}finally{loading.value=false}}
+// -------- 原图预览：点击时才加载原图 --------
+const viewerVisible=ref(false),viewerIndex=ref(0),viewerList=ref<string[]>([])
+async function openViewer(photos:any[],start:number){
+  const list=(photos||[]).filter((p:any)=>p&&p.id)
+  if(!list.length)return
+  const idx=Math.max(0,Math.min(start,list.length-1))
+  await fetchFull(list[idx].id)
+  viewerIndex.value=idx
+  viewerList.value=list.map((p:any)=>fullUrls[p.id]||thumbUrls[p.id]||'')
+  viewerVisible.value=true
+  list.forEach((p:any)=>fetchFull(p.id))
+}
+
+// -------- 画册独立分页，每页 24 张 --------
+const albumRows=ref<any[]>([]),albumTotal=ref(0),albumLoading=ref(false),albumPage=ref(1)
+const albumPhotos=computed(()=>albumRows.value.flatMap((r:any)=>(r.photos||[]).map((p:any)=>({...p,merchantName:r.merchantName,stallCode:r.stallCode,submitterName:r.submitterName,status:r.status,submittedAt:r.submittedAt,periodDate:r.periodDate}))))
+const openAlbumViewer=(idx:number)=>openViewer(albumPhotos.value,idx)
+async function loadAlbum(reset:boolean){
+  albumLoading.value=true
+  try{
+    if(reset)albumPage.value=1
+    const result:any=await operationClearanceApi.page({keyword:query.keyword,periodDate:query.periodDate,pageNum:albumPage.value,pageSize:24})
+    const records=result.records||[]
+    albumRows.value=reset?records:[...albumRows.value,...records]
+    albumTotal.value=Number(result.total)||0
+    prefetchThumbs(records)
+    if(records.length)albumPage.value++
+  }finally{albumLoading.value=false}
+}
+
+async function load(){loading.value=true;try{const result:any=await operationClearanceApi.page(query);rows.value=result.records||[];total.value=Number(result.total)||0;prefetchThumbs(rows.value)}finally{loading.value=false}}
 async function loadSchedule(){const result:any=await operationClearanceApi.schedule();scheduleText.value=result.scheduleText||`${result.startTime||'21:00'}至${result.endTime||'09:00'}`}
-function search(){query.pageNum=1;load()}
+function search(){query.pageNum=1;if(viewMode.value==='album')loadAlbum(true);else load()}
 async function exportCsv(){const blob:any=await operationClearanceApi.export({keyword:query.keyword,periodDate:query.periodDate});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`商户日清记录_${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url)}
 const checks=(row:any)=>[{name:'电',ok:!!row.electricityOff},{name:'水',ok:!!row.waterOff},{name:'气',ok:!!row.gasOff},{name:'门窗',ok:!!row.doorClosed}]
 async function openSettings(){const result:any=await operationClearanceApi.settings();settingsForm.startTime=result.startTime;settingsForm.endTime=result.endTime;settingsVisible.value=true}
 async function saveSettings(){if(!settingsForm.startTime||!settingsForm.endTime)return ElMessage.warning('请选择开始和结束时间');if(settingsForm.startTime===settingsForm.endTime)return ElMessage.warning('开始时间和结束时间不能相同');settingsSaving.value=true;try{const result:any=await operationClearanceApi.updateSettings(settingsForm);scheduleText.value=result.scheduleText;settingsVisible.value=false;ElMessage.success('日清提交时间已更新')}finally{settingsSaving.value=false}}
 onMounted(async()=>{await Promise.all([load(),loadSchedule()])})
-// 画册需要铺满当天记录，切到画册时放大取数（后端上限100），切回列表恢复分页
-watch(viewMode,mode=>{query.pageNum=1;query.pageSize=mode==='album'?100:20;load()})
-onBeforeUnmount(()=>{for(const url of Object.values(photoUrls))URL.revokeObjectURL(url)})
+watch(viewMode,mode=>{if(mode==='album')loadAlbum(true);else load()})
+onBeforeUnmount(()=>{for(const url of Object.values(thumbUrls))URL.revokeObjectURL(url);for(const url of Object.values(fullUrls))URL.revokeObjectURL(url)})
 </script>
 
 <style scoped>
@@ -132,12 +172,13 @@ onBeforeUnmount(()=>{for(const url of Object.values(photoUrls))URL.revokeObjectU
 .header-actions{display:flex;align-items:center;gap:12px}
 .toolbar{display:flex;gap:10px;margin-bottom:12px}.toolbar .el-input{width:250px}.tag{margin:2px}.pager{margin-top:12px;justify-content:flex-end}.settings-form{margin-top:18px}
 .row-photos{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.row-thumb{width:38px;height:38px;border-radius:4px;cursor:pointer}
+.row-thumb{width:38px;height:38px;border-radius:4px;cursor:pointer;object-fit:cover;display:block}
 .more{color:#909399;font-size:12px}.muted{color:#c0c4cc;font-size:12px}
 .album-card{min-height:300px}.empty{text-align:center;color:#909399;padding:60px 0}
 .photo-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
 .wall-item{border:1px solid #ebeef5;border-radius:8px;overflow:hidden;background:#fff}
-.wall-img{width:100%;height:180px;display:block;cursor:pointer}
+.wall-img{width:100%;height:180px;display:block;cursor:pointer;object-fit:cover}
+.album-more{margin-top:16px;text-align:center}
 .thumb-state{background:#f5f7fa;display:flex;align-items:center;justify-content:center;color:#909399;font-size:11px}
 .wall-state{background:#f5f7fa;display:flex;align-items:center;justify-content:center;color:#909399;font-size:13px}
 .wall-meta{padding:8px 10px}

@@ -24,6 +24,13 @@ public class OperationFormImageController {
     @GetMapping("/{id}") @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Resource> image(@PathVariable String id) {
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG)
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate()).body(service.load(id));
+                .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable()).body(service.load(id));
+    }
+
+    /** 画册/列表缩略图：长边 480px，体积约为原图 1/10，可长期缓存 */
+    @GetMapping("/{id}/thumb") @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Resource> thumb(@PathVariable String id) {
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG)
+                .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable()).body(service.loadThumb(id));
     }
 }
