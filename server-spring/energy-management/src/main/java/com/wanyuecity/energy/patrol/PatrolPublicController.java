@@ -38,8 +38,9 @@ public class PatrolPublicController {
     public ApiResponse<Map<String, Object>> feedback(@PathVariable String token,
                                                      @RequestParam(required = false) String note,
                                                      @RequestParam(value = "photos", required = false) MultipartFile[] photos,
+                                                     @RequestParam(required = false) String operatorName,
                                                      HttpServletRequest request) {
-        return ApiResponse.ok(service.publicFeedback(token, note, photos, clientIp(request)));
+        return ApiResponse.ok(service.publicFeedback(token, note, photos, operatorName, clientIp(request)));
     }
 
     @GetMapping("/departments/{token}")

@@ -55,10 +55,11 @@ export const patrolApi = {
     })
   },
   publicIssue: (token: string) => http.get(`/api/v1/patrol-public/issues/${encodeURIComponent(token)}`),
-  publicFeedback: (token: string, note: string, photos: File[]) => {
+  publicFeedback: (token: string, note: string, photos: File[], operatorName?: string) => {
     const form = new FormData()
     form.append('note', note)
     photos.forEach(file => form.append('photos', file))
+    if (operatorName) form.append('operatorName', operatorName)
     return http.post(`/api/v1/patrol-public/issues/${encodeURIComponent(token)}/feedback`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 120000

@@ -134,13 +134,13 @@ export const MENU_GROUPS: MenuGroup[] = [
     ]
   },
   {
-    key: 'patrol-management', title: '巡场管理', icon: Tickets,
+    key: 'patrol-management', title: '物业巡场管理', icon: Tickets,
     anyOf: ['patrol.point.view', 'patrol.issue.view'],
     items: [
       { path: '/patrol/entry', title: '今日巡场', permission: 'patrol.submit' },
-      { path: '/patrol/issues', title: '巡场问题', permission: 'patrol.issue.view' },
-      { path: '/patrol/submissions', title: '巡场记录', permission: 'patrol.issue.view' },
-      { path: '/patrol/points', title: '巡场点位', permission: 'patrol.config' },
+      { path: '/patrol/issues', title: '物业巡场问题', permission: 'patrol.issue.view' },
+      { path: '/patrol/submissions', title: '物业巡场记录', permission: 'patrol.issue.view' },
+      { path: '/patrol/points', title: '物业巡场点位', permission: 'patrol.config' },
       { path: '/patrol/departments', title: '整改部门', permission: 'patrol.config' },
       { path: '/patrol/duties', title: '值班排班', permission: 'patrol.config' },
       { path: '/patrol/categories', title: '分类字典', permission: 'patrol.config' }

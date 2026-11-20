@@ -714,7 +714,7 @@ public class PatrolService {
         return attachmentService.saveAll("SUBMISSION", submissionId, photos);
     }
 
-    public Map<String, Object> publicFeedback(String token, String note, MultipartFile[] photos, String clientIp) {
+    public Map<String, Object> publicFeedback(String token, String note, MultipartFile[] photos, String operatorName, String clientIp) {
         Map<String, Object> issue = issueByToken(token);
         if (issue == null) throw BizException.notFound("整改链接无效或已失效");
         String status = text(issue.get("status"));
@@ -726,13 +726,14 @@ public class PatrolService {
         String cleanNote = text(note);
         if (cleanNote.length() < 2) throw BizException.badRequest("请填写整改措施");
         if (cleanNote.length() > 500) throw BizException.badRequest("整改措施不能超过 500 字");
+        String feedbacker = (operatorName != null && !operatorName.isBlank()) ? operatorName.trim() : "部门反馈";
         Long issueId = ((Number) issue.get("id")).longValue();
         attachmentService.saveAll("RECTIFY", issueId, photos);
         LocalDateTime now = LocalDateTime.now();
         // 整改提交即闭环，取消管理员复核步骤
         jdbc.update("UPDATE patrol_issue SET status='CLOSED',rectification_note=?,rectified_at=?,rectified_by=?,closed_at=?,overdue_flag=0 WHERE id=?",
-                cleanNote, now, "部门反馈(" + clientIp + ")", now, issueId);
-        logIssue(issueId, "FEEDBACK_CLOSE", null, null, status, "CLOSED", cleanNote, "部门反馈");
+                cleanNote, now, feedbacker, now, issueId);
+        logIssue(issueId, "FEEDBACK_CLOSE", null, null, status, "CLOSED", cleanNote, feedbacker);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ok", true);
         result.put("status", "CLOSED");

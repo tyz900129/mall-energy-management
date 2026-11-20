@@ -86,7 +86,8 @@
         <div class="logs">
           <div class="log" v-for="(log,idx) in current.logs" :key="idx">
             <span>{{formatTime(log.createdAt)}}</span>
-            <b>{{actionLabel(log.action)}}</b>
+            <el-tag :type="actionTagType(log.action)" size="small" effect="light">{{actionLabel(log.action)}}</el-tag>
+            <i v-if="log.operator && log.operator!=='system'" class="op">· {{log.operator}}</i>
             <em>{{log.note||''}}</em>
           </div>
         </div>
@@ -163,9 +164,18 @@ const ACTION_LABELS: Record<string,string> = {
   FEEDBACK_CLOSE:'提交整改反馈',
   REVIEW_PASS:'复核通过',
   REVIEW_REJECT:'复核驳回',
-  OVERDUE_NOTICE:'逾期提醒'
+  OVERDUE_NOTICE:'逾期提醒',
+  UNASSIGNED_REMIND:'待分派提醒'
+}
+const ACTION_TAGS: Record<string,'danger'|'success'|'primary'|'warning'|'info'> = {
+  CREATE:'danger',
+  ASSIGN:'primary',TRANSFER:'primary',
+  FEEDBACK_CLOSE:'success',
+  REVIEW_PASS:'success',REVIEW_REJECT:'warning',
+  OVERDUE_NOTICE:'info',UNASSIGNED_REMIND:'info'
 }
 function actionLabel(action:string){ return ACTION_LABELS[action] || '状态变更' }
+function actionTagType(action:string){ return ACTION_TAGS[action] || 'info' }
 
 function statusLabel(status:string){
   return ({UNASSIGNED:'待分派',ASSIGNED:'待整改',RECTIFYING:'整改中',REVIEWING:'待复核',CLOSED:'已闭环',REJECTED:'已驳回'} as Record<string,string>)[status] || status
@@ -253,7 +263,9 @@ onBeforeUnmount(()=> window.removeEventListener('resize', syncMobile))
 .photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .photo{width:96px;height:96px;border-radius:6px}
 .logs{margin-top:14px;border-top:1px solid #ebeef5;padding-top:10px}
-.log{font-size:12px;color:#606266;display:flex;gap:8px;padding:4px 0}
+.log{font-size:12px;color:#606266;display:flex;gap:8px;padding:4px 0;align-items:center;flex-wrap:wrap}
+.log .op{color:#303133;font-style:normal;font-weight:500}
+.log em{font-style:normal;color:#909399}
 .log b{color:#409eff}
 .log em{color:#909399;font-style:normal}
 @media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}

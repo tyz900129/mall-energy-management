@@ -33,6 +33,10 @@
         <div class="card" v-if="canFeedback">
           <div class="card-title">提交整改情况</div>
           <div class="field">
+            <label>整改人 <i>*</i></label>
+            <el-input v-model="name" maxlength="32" placeholder="请填写提交整改人员姓名" />
+          </div>
+          <div class="field">
             <label>整改措施 <i>*</i></label>
             <el-input v-model="note" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="请填写处理过程与结果" />
           </div>
@@ -77,6 +81,7 @@ const saving = ref(false)
 const issue = ref<any>(null)
 const attachments = ref<any[]>([])
 const canFeedback = ref(false)
+const name = ref('')
 const note = ref('')
 const photos = ref<{file:File,preview:string}[]>([])
 const overdue = computed(()=> !!issue.value?.dueAt && issue.value.status!=='CLOSED' && new Date(issue.value.dueAt).getTime()<Date.now())
@@ -122,13 +127,15 @@ function removePhoto(index:number){
   photos.value.splice(index,1)
 }
 async function submit(){
+  if(name.value.trim().length<1) return ElMessage.warning('请填写整改人姓名')
   if(note.value.trim().length<2) return ElMessage.warning('请填写整改措施')
   saving.value=true
   try{
-    await patrolApi.publicFeedback(token, note.value.trim(), photos.value.map(p=>p.file))
+    await patrolApi.publicFeedback(token, note.value.trim(), photos.value.map(p=>p.file), name.value.trim())
     photos.value.forEach(p=>URL.revokeObjectURL(p.preview))
     photos.value=[]
     note.value=''
+    name.value=''
     ElMessage.success('整改已提交并闭环')
     await load()
   }finally{ saving.value=false }

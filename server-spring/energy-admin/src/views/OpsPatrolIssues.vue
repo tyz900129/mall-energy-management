@@ -115,7 +115,9 @@
           <div class="sec-title">处理记录</div>
           <el-timeline>
             <el-timeline-item v-for="(l, i) in detail.logs" :key="i" :timestamp="fmt(l.createdAt)" placement="top">
-              <b>{{ l.operatorName || '-' }}</b> {{ actionLabel(l.action) }}<span v-if="l.note">：{{ l.note }}</span>
+              <b>{{ l.operatorName || '-' }}</b>
+              <el-tag :type="actionTagType(l.action)" size="small" effect="light">{{ actionLabel(l.action) }}</el-tag>
+              <span v-if="l.note">：{{ l.note }}</span>
             </el-timeline-item>
           </el-timeline>
 
@@ -237,6 +239,9 @@ function statusTagType(st: string) {
 }
 function actionLabel(a: string) {
   return ({ CREATE: '创建问题', ASSIGN: '指派跟进', TRANSFER: '变更跟进人', RECTIFY: '提交整改', FEEDBACK_CLOSE: '整改闭环', REVIEW_PASS: '复核通过', REVIEW_REJECT: '复核驳回', OVERDUE_NOTICE: '逾期提醒' } as Record<string, string>)[a] || '状态变更'
+}
+function actionTagType(a: string) {
+  return ({ CREATE: 'danger', ASSIGN: 'primary', TRANSFER: 'primary', RECTIFY: 'success', FEEDBACK_CLOSE: 'success', REVIEW_PASS: 'success', REVIEW_REJECT: 'warning', OVERDUE_NOTICE: 'info' } as Record<string, any>)[a] || 'info'
 }
 function fmt(v: string) { return formatDateTime(v) }
 
