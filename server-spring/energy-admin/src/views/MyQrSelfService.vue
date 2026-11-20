@@ -13,6 +13,9 @@
         <el-button type="success" :disabled="!stalls.length" @click="downloadMyZip">
           📦 一键下载全部 ZIP
         </el-button>
+        <el-button plain type="warning" :disabled="!stalls.length" @click="downloadAllLabelImages">
+          📱 下载全部标签图（供精臣 App 使用）
+        </el-button>
       </div>
     </div>
 
@@ -35,9 +38,17 @@
     </div>
 
     <!-- B1 连接弹窗 -->
-    <el-dialog v-model="niimbotDialog" title="连接精臣 B1 打印机" width="420px">
+    <el-dialog v-model="niimbotDialog" title="连接精臣 B1 打印机" width="480px">
       <div v-if="!canNiimbot" class="warn">
-        ⚠️ 当前浏览器不支持 Web Serial / WebUSB / WebBluetooth。请在 <b>Chrome 或 Edge 桌面版</b>上打开本页面，并确保网站走 HTTPS 或 localhost。
+        <div style="font-weight:600;margin-bottom:6px">🚫 浏览器无法直连 B1 打印机</div>
+        <div style="line-height:1.6">{{ whyNoNiimbot || '当前浏览器不支持 Web Serial / WebUSB / Web Bluetooth' }}</div>
+        <div style="margin-top:10px;padding:10px;background:#fff8e1;border-radius:6px;font-size:12px;color:#7a5a00">
+          <b>解决方案：</b><br/>
+          ① 电脑 Chrome/Edge + USB 线（最稳）<br/>
+          ② 电脑 Chrome + 蓝牙<br/>
+          ③ 安卓手机 Chrome + 蓝牙<br/>
+          ④ <b>iOS Safari 用户</b>：点页面上的「📱 下载全部标签图」保存到相册 → 打开<b>精臣官方 App</b> → 选相册打印
+        </div>
       </div>
       <div v-else>
         <div class="hint" style="font-size:12px;color:#606266;margin-bottom:8px">
@@ -59,7 +70,7 @@
 import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { operationMerchantApi } from '@/api/merchant'
-import { useNiimbotPrinter, NIIMBOT_B1_PRESETS } from '@/composables/useNiimbotPrinter'
+import { useNiimbotPrinter, NIIMBOT_B1_PRESETS, whyNotSupported, isIOSSafari } from '@/composables/useNiimbotPrinter'
 import http from '@/api/http'
 
 const {
@@ -76,6 +87,7 @@ const niimbotDialog = ref(false)
 const canNiimbot = ref(false)
 const niimbotConnected = computed(() => status.connected)
 const niimbotStatusMessage = computed(() => status.message || '未连接')
+const whyNoNiimbot = computed(() => whyNotSupported())
 
 async function load() {
   try {
@@ -100,6 +112,36 @@ async function downloadMyZip() {
   a.click()
   URL.revokeObjectURL(url)
   ElMessage.success('ZIP 已开始下载')
+}
+
+/** 降级：把我负责的所有铺位生成精臣标签 PNG 逐张下载，供 iOS Safari 保存相册后在精臣 App 打印 */
+async function downloadAllLabelImages() {
+  if (!stalls.value.length) return
+  ElMessage.info(`开始生成 ${stalls.value.length} 张标签图，请稍候...（iOS Safari 请确保允许下载）`)
+  let ok = 0, fail = 0
+  for (const s of stalls.value) {
+    try {
+      const pngBlob: any = await http.get(`/api/v1/operations/merchant-responsibilities/${s.stallId}/qr`, { responseType: 'blob' })
+      const canvas = await makeLabelCanvas(pngBlob as Blob, [s.stallCode || '', s.floorName || ''], printPreset.value)
+      await new Promise<void>((resolve) => {
+        canvas.toBlob((b) => {
+          if (!b) { fail++; return resolve() }
+          const url = URL.createObjectURL(b)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `铺位_${s.stallCode || s.stallId}_${printPreset.value}mm.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setTimeout(() => URL.revokeObjectURL(url), 500)
+          ok++
+          resolve()
+        }, 'image/png')
+      })
+    } catch { fail++ }
+  }
+  if (fail === 0) ElMessage.success(`全部 ${ok} 张标签图已下载`)
+  else ElMessage.warning(`完成 ${ok} 张，失败 ${fail} 张`)
 }
 
 async function downloadSingle(row: any) {
